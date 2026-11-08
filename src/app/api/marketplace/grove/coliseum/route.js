@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session";
 import { groveOpen } from "@/lib/marketplace/grove.js";
-import { startRun, settleRun, pendingChests, runPlan } from "@/lib/marketplace/grove-coliseum.js";
-import { coliseumState } from "@/lib/marketplace/grove-quests.js";
+import { startRun, settleRun, pendingChests, runPlan, coliseumState, claimDailyKey } from "@/lib/marketplace/grove-coliseum.js";
+
 import { openColiseumChest } from "@/lib/marketplace/grove-coliseum-loot.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -47,6 +47,17 @@ export async function POST(request) {
 
             const body = await request.json().catch(() => ({}));
             const map = Math.max(1, Math.min(7, Number(body?.map) || 1));
+
+            // ── ⚠️ THE DAILY KEY, MOVED HERE FROM THE DELETED QUESTS ROUTE ──────────────────────────
+            // 2026-11-08. `claimDailyKey` was served by /api/marketplace/grove/quests because the quest
+            // chains were the other faucet; that route went with the chains. It had to land somewhere in the
+            // same commit, because with the chain token gone the daily is now the ONLY way to get a key and
+            // deleting its endpoint would have made the Coliseum unenterable while every screen still
+            // offered it. See the note on COLISEUM_KEY_CAP in grove-coliseum.js.
+            if (body?.action === "daily") {
+                const r = await claimDailyKey(buyer.id, map);
+                return noStore(r, { status: r.ok ? 200 : 409 });
+            }
 
             if (body?.action === "start") {
                 const r = await startRun(buyer.id, map);

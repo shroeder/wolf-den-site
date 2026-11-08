@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { COLISEUM_ZONE, COLISEUM_NPCS } from "@/lib/marketplace/grove-npcs.js";
+import { COLISEUM_ZONE, COLISEUM_NPCS } from "@/lib/marketplace/grove-coliseum-plan.js";
 import GroveMarshal from "@/components/grove/GroveMarshal";
 
 import GroveScene from "@/components/grove/GroveScene.js";

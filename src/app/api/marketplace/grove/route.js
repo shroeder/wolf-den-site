@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveMove, groveCraft, groveCraftMany, groveRework, groveBelt,
+    groveState, groveEnter, groveSettle, groveBelt,
     groveBoss } from "@/lib/marketplace/grove.js";
 import { turnInStatue } from "@/lib/marketplace/grove-statue-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -54,17 +54,12 @@ export async function POST(request) {
                 }));
                 case "settle": return noStore(await groveSettle(buyer.id, { zoneId: String(b.zone || ""), kills: b.kills, eaten: b.eaten }));
                 case "boss": return noStore(await groveBoss(buyer.id, String(b.zone || "")));
-                case "move": return noStore(await groveMove(buyer.id, b));
-                // ⚠️ NO act, NO aim — AND THAT CLOSES A HOLE RATHER THAN OPENING ONE. The act was the one
-                // number in the Grove the server could not verify: it can replay a kill from a seed, but it
-                // could never replay whether somebody actually hit the timing window, so a scripted client
-                // could always post a flawless performance. clampAct bounded the damage; removing the input
-                // removes the claim. The quality is now rolled entirely server-side from the player's xp.
-                case "craft": return noStore(await groveCraft(buyer.id, String(b.recipe || "")));
-                case "craftAll": return noStore(await groveCraftMany(buyer.id, String(b.recipe || ""), {
-                    times: b.times,
-                }));
-                case "rework": return noStore(await groveRework(buyer.id, String(b.slot || "")));
+                // ✂️ `move` went with the bank it moved parts into.
+                // ✂️ craft, craftAll AND rework ARE GONE, 2026-11-08. Luke: "remove crafting all
+                // together." The three cases are deleted rather than left returning an error, because a
+                // route that still ACCEPTS an action it no longer honours is the shape the tempering
+                // removal warned about: "a flag the UI no longer sends but the server still honours is
+                // an exploit waiting to be found." An unknown action falls through to bad_action.
                 // The Grove's own chest line, never chests.js. See the note on the boss grant.
                 // ⚠️ ONE STATUE PER CALL, matching the gesture. Luke: "you can turn them in by clicking the
                 // associated statue. It fills a bar." A bulk endpoint would spend the first-crystal and

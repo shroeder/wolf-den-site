@@ -3,9 +3,7 @@
 import { useEffect } from "react";
 
 import { toolArt } from "@/lib/marketplace/grove-catalog.js";
-import {
-    GROVE_RECIPES, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
-} from "@/lib/marketplace/grove-recipes.js";
+import { toolBonusPct, TOOL_TIER_CAP, toolNumeral } from "@/lib/marketplace/grove-recipes.js";
 import { QUALITY_BANDS, qualityBand, toolBonusFor, bandTint } from "@/lib/marketplace/grove-forge.js";
 
 // ── INSPECTING A TOOL ───────────────────────────────────────────────────────────────────────────────────────
@@ -23,16 +21,24 @@ import { QUALITY_BANDS, qualityBand, toolBonusFor, bandTint } from "@/lib/market
 // Masterwork tier 4 and a Rough tier 6 can pay nearly the same and want completely different things from
 // you. This sheet separates them and offers the door for each.
 //
-// ⚠️ IT OFFERS DOORS, IT DOES NOT CRAFT. Everything here is a route to a row on the bench, which is the one
-// place a craft can start — see goToArea's third argument. A second Craft button, priced and gated
-// separately from the real one, is two implementations of "can I make this".
+// ── ⚠️ IT NO LONGER OFFERS ANY DOORS, BECAUSE EVERY ONE OF THEM LED TO THE BENCH ──────────────────────────
+// 2026-11-08. This sheet used to answer "is this one finished, and if not, what would it take" — the next
+// rung priced against your bag, and a re-roll offer below the top band — and every route it offered ended
+// on a row at the workbench, which was the one place a craft could start.
+//
+// What is left is the half that was always the biggest miss: `toolMeta` had carried `quality` since it was
+// written and NO screen showed it, so the one thing the crafting act existed to decide was invisible on
+// the thing it decided. A member who holds a tool can still read what it is and what it pays.
+//
+// ⚠️ THE TIER/BAND DISTINCTION STAYS AND IS STILL THE POINT. The tier is what the tool IS; the band is how
+// well that one came out. Both multiply into the single percentage the shelf prints, which is why that
+// percentage alone was unreadable — a Masterwork tier 4 and a Rough tier 6 pay nearly the same. Neither
+// can be acted on at the moment, so the sheet states them instead of offering a button for each.
 
 const bandName = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || id;
 const topBandId = QUALITY_BANDS[0].id;
 
-export default function GroveToolSheet({
-    tool, pack = {}, PartIcon, partName, onGoRecipe = () => {}, onClose = () => {},
-}) {
+export default function GroveToolSheet({ tool, onClose = () => {} }) {
     useEffect(() => {
         const k = (e) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", k);
@@ -41,22 +47,14 @@ export default function GroveToolSheet({
 
     const tier = Number(tool?.tier) || 0;
     const band = tier ? qualityBand(tool.quality ?? 0) : null;
-    const atCap = tier >= TOOL_TIER_CAP;
 
-    // The rung above the one you hold — or rung one, when the slot is empty. Same source the bench charges
-    // from, so a cost shown here cannot disagree with the cost taken there.
-    const next = GROVE_RECIPES.find(
-        (r) => r.kind === "tool" && r.slot === tool?.slot && Number(r.tier) === tier + 1,
-    );
-    const nextCosts = next ? Object.entries(next.parts || {}).map(([part, need]) => {
-        const have = Number(pack[part] || 0);
-        return { part, need, have, short: Math.max(0, need - have) };
-    }) : [];
-    const shortTotal = nextCosts.reduce((a, c) => a + c.short, 0);
-
-    // The one still on the table: a rework re-rolls the band and keeps the better of the two, so it is only
-    // worth offering below the top band. Same rule the bench uses to decide whether to show the button.
-    const canRework = tier > 0 && band?.id !== topBandId;
+    // ✂️ `next`, `nextCosts` and `shortTotal` were here — the rung above the one you hold, priced part by
+    // part against your bag off the same recipe the bench charged from, so the cost shown could not
+    // disagree with the cost taken.
+    // ⚠️ STILL COMPUTED, BUT ONLY TO CHOOSE A SENTENCE. A rework re-rolled the band and kept the better of
+    // the two, so it was only ever offered below the top band; now the same test decides whether the tool
+    // reads as "the best it rolls" or as one that simply came out this way.
+    const belowTopBand = tier > 0 && band?.id !== topBandId;
 
     return (
         <div className="gv-pv" role="dialog" aria-label={tool?.name || "Tool"} onClick={onClose}>
@@ -85,59 +83,23 @@ export default function GroveToolSheet({
                         <p className="gv-pv-where">
                             The tier is worth {toolBonusPct(tier)}%; it came out{" "}
                             <b style={band ? { color: bandTint(band.id) } : undefined}>{band?.name}</b>
-                            {canRework ? ", which a rework can still re-roll." : " — the best it rolls."}
+                            {belowTopBand ? " — there is no way to re-roll it at the moment." : " — the best it rolls."}
                         </p>
                     </section>
                 ) : null}
 
-                {/* ── THE NEXT RUNG ────────────────────────────────────────────────────────────────
-                    ⚠️ THE ARROW IS TIER TO TIER, NOT WHAT-YOU-HAVE TO TIER. The left number is this
-                    tier's own share with no band in it, because the next one rolls a fresh band of
-                    its own — promising a Masterwork holder that tier 8 pays more than their tier 7
-                    would be a promise the roll does not make. */}
-                {next ? (
-                    <section className="gv-pv-sec">
-                        <h5>{tier ? "The next rung" : "The first rung"}</h5>
-                        <button type="button" className="gv-ts-next" onClick={() => onGoRecipe(next.id)}>
-                            <b>{next.name}</b>
-                            <em>{toolBonusPct(tier)}% <i aria-hidden="true">→</i> {toolBonusPct(next.tier)}%</em>
-                        </button>
-                        <ul className="gv-ts-cost">
-                            {nextCosts.map((c) => (
-                                <li key={c.part} className={c.short ? "is-short" : "is-have"}
-                                    title={`${partName(c.part)} — ${c.have} of ${c.need}`}>
-                                    <PartIcon id={c.part} size={17} />
-                                    <span>{Math.min(c.have, c.need)}/{c.need}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <p className="gv-pv-where">
-                            {shortTotal === 0
-                                ? "You have everything it needs."
-                                : `${shortTotal} part${shortTotal === 1 ? "" : "s"} short.`}
-                        </p>
-                    </section>
-                ) : atCap ? (
-                    <section className="gv-pv-sec">
-                        <h5>The next rung</h5>
-                        <p className="gv-pv-where">
-                            Tier {toolNumeral(TOOL_TIER_CAP)} is the last one. There is nothing above this.
-                        </p>
-                    </section>
-                ) : (
-                    // A rung that is designed but whose map is not built yet. Saying so is better than an
-                    // empty section, and far better than pretending the ladder ends here.
-                    <section className="gv-pv-sec">
-                        <h5>The next rung</h5>
-                        <p className="gv-pv-where">Forged from a map that is not open yet.</p>
-                    </section>
-                )}
+                {/* ── ✂️ THE NEXT RUNG AND THE RE-ROLL OFFER WERE BOTH HERE ────────────────────────
+                    The rung above showed this tier's own share arrowing to the next one — tier to tier,
+                    deliberately NOT what-you-have to tier, because the next rung rolls a fresh band of
+                    its own and promising a Masterwork holder that tier 8 beats their tier 7 is a promise
+                    the roll does not make. Under it sat the cost, part by part, and a count of how many
+                    you were short.
 
-                {canRework ? (
-                    <button type="button" className="gv-pv-wish" onClick={() => onGoRecipe(`${tool.slot}_t${tier}`)}>
-                        Re-roll its quality — it keeps the better of the two
-                    </button>
-                ) : null}
+                    Both were buttons into a bench row. Nothing replaces them here on purpose: a section
+                    saying "there is a tier above this and no way to reach it" is a wall with a label on
+                    it, and [[migrating-a-category-strands-its-drop-paths]] is the warning about exactly
+                    that — a path that reads to the player as bad luck rather than as absent. The tier
+                    cap is still stated above, which is the honest half. See item R. */}
             </div>
         </div>
     );

@@ -47,9 +47,13 @@ const kills = Array.from({ length: 60 }, (_, i) => ({ id: i % 3 === 0 ? "thornli
 // COUNTS in a different key order. That is a difference in how the object was typed up, not in what the
 // player gets, and asserting on it would have sent me hunting a bug that was not there.
 const stable = (o2) => JSON.stringify(Object.fromEntries(Object.entries(o2).sort(([a], [b]) => a.localeCompare(b))));
-const same = (x, y) => stable(x.parts) === stable(y.parts)
-    && stable(x.emblems) === stable(y.emblems)
-    && x.gold === y.gold && x.xp === y.xp && x.chests.length === y.chests.length;
+// ⚠️ `parts` WAS THE FIRST THING COMPARED HERE and it is gone (2026-11-08). The insertion-order lesson
+// in the note above is kept because it still applies to `emblems`, which is built the same way.
+const same = (x, y) => stable(x.emblems) === stable(y.emblems)
+    && x.gold === y.gold && x.xp === y.xp && x.chests.length === y.chests.length
+    // Gear is collected into an array per kill, so the order DOES differ when the kill list is reversed —
+    // the count is the invariant, not the sequence.
+    && x.gears.length === y.gears.length && x.setPieces === y.setPieces;
 const forward = settleKills(kills, lookup, SEED);
 const backward = settleKills([...kills].reverse(), lookup, SEED);
 ok(same(forward, backward), "settling out of order changed the totals");

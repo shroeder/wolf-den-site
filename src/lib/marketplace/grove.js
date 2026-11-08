@@ -9,14 +9,13 @@ import { db } from "@/lib/db";
 import { vendorTier } from "@/lib/marketplace/grove-statues.js";
 import { grantStatues, statueState } from "@/lib/marketplace/grove-statue-store.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
-import { craftLevel, craftXpFor, rollQuality, qualityBand, qualityOdds, QUALITY_BANDS, toolBonusFor,
-    craftBonusFor, charmValue, charmValueOf } from "@/lib/marketplace/grove-forge.js";
+import { qualityBand, QUALITY_BANDS, toolBonusFor, charmValue } from "@/lib/marketplace/grove-forge.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { questBoard, coliseumState, bumpQuests } from "@/lib/marketplace/grove-quests.js";
+import { coliseumState } from "@/lib/marketplace/grove-coliseum.js";
 import {
-    GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_PARTS, GROVE_EMBLEMS, GROVE_POP,
+    GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_EMBLEMS, GROVE_POP,
     GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById, safeCredit,
 } from "@/lib/marketplace/grove-catalog.js";
@@ -24,18 +23,13 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
-import { reworkCost, toolRecipeFor, repeatable, CRAFT_ALL_CAP
-} from "@/lib/marketplace/grove-recipes.js";
 import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
 import { grantStone } from "@/lib/marketplace/pet-ascension.js";
-import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
-import { GROVE_PLOT_CAP } from "@/lib/marketplace/farm-crops.js";
-import {
-    GROVE_RECIPES, recipeById, recipeMap, tabletBonuses, TOOL_SLOTS, toolBonusPct,
-} from "@/lib/marketplace/grove-recipes.js";
-import { mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
+// ⚠️ TOOL_SLOTS IS ALL THAT IS STILL WANTED FROM grove-recipes.js. It is the list of the twelve slots
+// and what each one serves, which toolMeta still needs to describe a tool somebody owns.
+import { TOOL_SLOTS } from "@/lib/marketplace/grove-recipes.js";
 
 // ── THE GROVE, SERVER SIDE ───────────────────────────────────────────────────────────────────────────────────
 // The client plays the whole scene (see grove-roll.js for why). This file does the four things the client is
@@ -136,10 +130,12 @@ function bonusesFrom(emblemRows, player = null) {
     // silently does nothing, which is the one failure a collectible cannot survive.
     const out = {
         rarityFind: 0, emblemFind: 0, rareSpawn: 0,
-        hyperFind: 0, partYield: 0, goldFind: 0, xpFind: 0, overkill: 0,
-        // Map 8's Geared Mark. Read by the rare row in grove-roll.js and nowhere else -- the row that
-        // already pays a part from one map deeper, so this buys more of it rather than adding a mechanism.
-        salvage: 0,
+        hyperFind: 0, goldFind: 0, xpFind: 0, overkill: 0,
+        // ── ✂️ partYield AND salvage ARE GONE, 2026-11-08 ───────────────────────────────────────
+        // Both were read by the parts roll and by nothing else, so deleting parts left them as exactly
+        // what the rule above forbids: keys in this bag with no reader. The two cards that granted them
+        // were re-pointed in grove-maps.js rather than left dead — see the notes on the Wrack Mark
+        // (live, members hold it) and the Geared Mark (map 8, unbuilt).
         // ⚠️ NOT A BONUS, A GATE. It rides in this bag because the bag is already the one thing the roll
         // receives about the player, and threading a second argument through every caller of rollKill to
         // carry one integer would be a worse trade. rarityWeights reads it; nothing adds to it.
@@ -173,11 +169,9 @@ function bonusesFrom(emblemRows, player = null) {
         else if (meta.stat === "emblem_find") out.emblemFind += v;
         else if (meta.stat === "rare_spawn") out.rareSpawn += v;
         else if (meta.stat === "hyper_find") out.hyperFind += v;
-        else if (meta.stat === "part_yield") out.partYield += v;
         else if (meta.stat === "gold_find") out.goldFind += v;
         else if (meta.stat === "xp_find") out.xpFind += v;
         else if (meta.stat === "overkill") out.overkill += v;
-        else if (meta.stat === "salvage") out.salvage += v;
     }
     return out;
 }
@@ -279,7 +273,7 @@ async function heroLook(buyerId) {
 export async function groveState(buyerId) {
     if (!buyerId || !groveOpen(buyerId)) return { ok: false, error: "closed" };
 
-    const [p, zones, items, seen, emblems, tools, craftLog, everMade, charms, look, hero] = await Promise.all([
+    const [p, zones, items, emblems, tools, charms, look, hero] = await Promise.all([
         playerRow(buyerId),
         // ⚠️ THE COOLDOWN IS COMPUTED IN SQL, ON THE QUERY THIS ALREADY RAN. Two reasons. It costs nothing
         // — no extra round trip, and round trips are the meter that bills. And the comparison happens where
@@ -292,33 +286,10 @@ export async function groveState(buyerId) {
             [buyerId, String(BOSS_COOLDOWN_MS)],
         ).catch(() => []),
         db.query(`SELECT place, part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
-        db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT slot, tier, quality, reworks FROM mkt_grove_tool WHERE buyer_id = $1`, [buyerId]).catch(() => []),
-        // ⚠️ RECALL. Luke: the crafting level needs "visibility transparency recall and awareness". A level
-        // with no history behind it is a number the player is asked to take on faith -- and this one is a
-        // ladder they are being asked to climb, so "what have I actually made, and how did it come out"
-        // has to be answerable on the same screen. Twelve is enough to show a run without becoming a log.
-        db.query(
-            `SELECT recipe_id, kind, xp, quality, created_at
-               FROM mkt_grove_craft_log WHERE buyer_id = $1
-              ORDER BY created_at DESC LIMIT 12`, [buyerId],
-        ).catch(() => []),
-        // ── ⚠️ EVERYTHING EVER MADE, NOT THE LAST TWELVE ────────────────────────────────────────
-        // Luke: "if you already have a harvesting hoe, then you ... can make another one because it's
-        // random rolls, but we should definitely know that we already have one. And it shouldn't be
-        // like giving us the uncrafted bubble for things like that ... you can like never get rid of
-        // the bubbles."
-        //
-        // The dock's badge counted every recipe you COULD make, and most recipes are repeatable — so for
-        // anyone with a stocked bag it was permanently lit and no action could clear it. That is the
-        // Gear pill's bug exactly (see badgeInfo in GameNav): a badge is a TO-DO, not an inventory
-        // count, and one that never clears teaches you to stop reading every other badge in the game.
-        //
-        // `recent` above is LIMIT 12 for the history panel and cannot answer "have I ever", so this
-        // asks the question it is actually being asked. Distinct ids only — in the same Promise.all,
-        // which is where this file already puts an extra read rather than paying a round trip for it.
-        db.query(`SELECT DISTINCT recipe_id FROM mkt_grove_craft_log WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        // ✂️ TWO QUERIES WERE HERE: the last twelve crafts for the history panel, and every recipe ever
+        // made for the dock badge. Both read mkt_grove_craft_log, which nothing writes any more.
         // ⚠️ IN THE SAME Promise.all, NOT A FOURTEENTH ROUND TRIP. Round trips are the meter that
         // bills — see CLAUDE.md — and this is one more row set on a query set that is already in flight.
         db.query(`SELECT charm_id, band, qty FROM mkt_grove_charm WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
@@ -330,35 +301,20 @@ export async function groveState(buyerId) {
     ]);
 
     const killsBy = Object.fromEntries((zones || []).map((z) => [z.zone_id, z]));
-    const seenSet = new Set((seen || []).map((r) => r.part_id));
-    // ⚠️ FOOD SHARES mkt_grove_item WITH PARTS AND IS SPLIT OUT HERE. It occupies a bag slot exactly like a
-    // part does — which is the whole tension of the belt: carrying healing costs you carrying loot — but the
-    // workbench must not offer to craft a poultice OUT OF poultices, so the two are separated by identity
-    // rather than by table.
-    const pack = {};
-    const bank = {};
+    // ⚠️ FOOD IS ALL THAT IS LEFT IN mkt_grove_item, BUT IT IS STILL FILTERED BY IDENTITY. The old part
+    // rows are deliberately not deleted (see the note where storeParts used to be), so this table still
+    // returns them and a reader that trusted the table to hold only food would put a Gnawed Root on the
+    // belt. GROVE_FOODS stays the gate.
     const food = {};
     for (const r of items || []) {
-        if (GROVE_FOODS[r.part_id]) { food[r.part_id] = Number(r.qty); continue; }
-        (r.place === "bank" ? bank : pack)[r.part_id] = Number(r.qty);
+        if (GROVE_FOODS[r.part_id]) food[r.part_id] = Number(r.qty);
     }
 
     return {
         ok: true,
         ...look,
         hero,
-        // ── ⚠️ THE TRACKER NEEDS THIS AT THE HUB, AND HAD NOTHING ───────────────────────────────────
-        // GroveQuests was fed `session?.quests` — and `session` only exists once you have ENTERED a
-        // zone. So at the hub, which is the only place the Quests row appears in the menu, the panel
-        // was handed [] every single time and said "Nobody has asked you for anything yet" no matter
-        // how many chains were underway. The one panel whose whole job is telling you WHERE the next
-        // giver stands could not do it.
-        //
-        // ⚠️ ONE QUERY. questBoard is rowsFor() plus arithmetic over static catalogues, so this adds a
-        // single indexed read to a page that already does many — the same trade the session makes, and
-        // the alternative is a fetch every time somebody glances at the panel, which the note on the
-        // session's own copy argues against.
-        quests: await questBoard(buyerId).catch(() => []),
+        // ✂️ `quests` WAS HERE — the hub's copy of the quest board. Removed 2026-11-08 with the givers.
         unlockedN: Number(p?.unlocked_n) || 1,
         // ⚠️ THE COLUMNS STAY, THE CONCEPT GOES. pack_slots / bank_slots / packs_built / banks_built are
         // still on the row because dropping columns is how you lose the record of what somebody crafted
@@ -394,8 +350,6 @@ export async function groveState(buyerId) {
                 bossKills: Number(row?.boss_kills) || 0,
             };
         }),
-        pack,
-        bank,
         food,
         // What auto-eats, and the threshold it fires at. Luke: "if you get below 60 percent hp."
         belt: p?.belt || null,
@@ -410,21 +364,9 @@ export async function groveState(buyerId) {
         // from the other side: what it came out at, and how many tries that took.
         toolReworks: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.reworks) || 0])),
 
-        craft: {
-            ...craftLevel(Number(p?.craft_xp) || 0),
-            // ⚠️ THE ODDS ARE SENT, NOT DESCRIBED. "Higher levels improve your rolls" is a claim; the
-            // actual band shares at THIS level are a fact the player can check against what they get.
-            // Computed from the same curve the server rolls against, so the screen cannot drift from it.
-            odds: qualityOdds(craftLevel(Number(p?.craft_xp) || 0).level),
-            recent: (craftLog || []).map((r) => ({
-                recipe: r.recipe_id,
-                kind: r.kind,
-                xp: Number(r.xp) || 0,
-                quality: r.quality == null ? null : Number(r.quality),
-                band: r.quality == null ? null : qualityBand(Number(r.quality)).id,
-                at: r.created_at,
-            })),
-        },
+        // ✂️ THE `craft` BLOCK WAS HERE: the crafting level, the band odds at that level, and the last
+        // twelve things made. craft_xp stays on the row — nothing earns it now, and it is the record of
+        // how far somebody got — but a level with no ladder under it is not worth sending to a screen.
         toolMeta: TOOL_SLOTS.map((t) => ({
             ...t,
             tier: Number((tools || []).find((x) => x.slot === t.slot)?.tier) || 0,
@@ -437,46 +379,14 @@ export async function groveState(buyerId) {
                 (tools || []).find((x) => x.slot === t.slot)?.quality ?? null,
             ),
         })),
-        seen: [...seenSet],
-        // The tablet: what you have seen out of everything there is, and what that is worth.
-        // ⚠️ THE DENOMINATOR IS WHAT YOU CAN ACTUALLY FIND. GROVE_PARTS holds every material in the world,
-        // including the 132 designed for maps nobody can walk into yet; counting those turns "16 of 16,
-        // every part discovered" into "16 of 148" and reads as eleven twelfths of the game missing rather
-        // than not built. The tablet is a record of what the Grove has shown you, so it counts what the
-        // Grove can show you.
-        tablet: {
-            seen: seenSet.size,
-            total: Object.values(GROVE_PARTS).filter((p) => mapIsBuilt(p.map ?? 1)).length,
-            bonuses: tabletBonuses(seenSet.size),
-        },
-        // ── EVERY RECIPE, ALWAYS ────────────────────────────────────────────────────────────────────
-        // ⚠️ THIS REVERSES A RULE THAT WAS DELIBERATE, so it is worth saying why rather than letting the
-        // old comment in grove-recipes.js read as still true. The bench used to show only recipes whose
-        // every part you had already seen — Luke: "You only see recipes once youve found the items that
-        // require it". Played, it hid the thing a crafting screen is FOR: with 26 recipes and 16 parts a
-        // new player saw an empty bench and no reason to pick up a root, and the shape of the map-1 goal
-        // was invisible until it was nearly finished. Luke, after living with it: "I think we should see
-        // all recipes instead of the silly find all to unlock."
+        // ✂️ seen, tablet, recipes, taught AND made WERE ALL HERE, and all five were about the bench.
         //
-        // The seen-set is still sent and still matters — it drives the tablet and lets the bench grey the
-        // parts you have never laid eyes on — it just no longer decides what you are allowed to read.
-        //
-        // ⚠️ "EVERY RECIPE" MEANS EVERY RECIPE OF A MAP YOU CAN WALK TO. The ladder is declared to tier XII
-        // so it can be priced and read as a whole (grove-maps.js), which is 132 recipes asking for materials
-        // that have no creature to drop them yet. Sending those would bury the twelve real ones in a list of
-        // things nobody can make and nobody can work toward — the exact failure the "show them all" change
-        // above was fixing, arriving from the other direction. mapIsBuilt is the line; raise MAPS_BUILT the
-        // day a map's zones land and its recipes appear here on their own.
-        // ⚠️ MINUS THE ONES A BOSS HAS NOT TAUGHT YET. The one narrow exception to "every recipe, always"
-        // — see reachableRecipes. A charm recipe you have not earned is not greyed out on the bench, it is
-        // absent, because a visible row you cannot act on is the wall this list exists to avoid and a
-        // visible row labelled "beat a boss you have not reached" is a spoiler as well as a wall.
-        recipes: GROVE_RECIPES.filter((r) => mapIsBuilt(recipeMap(r))
-            && (!r.taughtBy || (p?.taught || []).includes(r.id))).map((r) => r.id),
-        // What the bosses have taught, so the bench can run the same filter the server just ran.
-        taught: p?.taught || [],
-        // Every recipe this member has ever finished, for the badge rule in recipeRows. Ids only.
-        made: (everMade || []).map((r) => r.recipe_id).filter(Boolean),
+        // ⚠️ THE TABLET WENT WITH THEM, AND IT WAS NEVER WIRED ANYWAY. It reported "you have seen 14 of
+        // 16 materials" and a list of bonuses from tabletBonuses — and tabletBonuses was read HERE AND
+        // NOWHERE ELSE. The breakpoints in TABLET_BREAKS ("Well travelled", +3% rarity_find) were shown
+        // to players as earned bonuses and never reached the roll: a [[declared-but-never-read]] of the
+        // purest kind, live for the whole life of the feature. It is being deleted rather than fixed
+        // because its subject is being deleted — but it is worth knowing it was never real.
         // ── THE CHARMS IN HAND ──────────────────────────────────────────────────────────────────────
         // ⚠️ ONE ENTRY PER (charm, quality), BECAUSE THAT IS WHAT A STACK IS HERE. Two Rootwood Seekings
         // rolled Rough and Masterwork are different objects and the player picks between them at the
@@ -613,30 +523,20 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
         ).catch(() => [])).map((r) => [r.k, { url: r.url, name: itemById(r.k)?.name || r.k }]))
         : {};
 
-    // ── ⚠️ THE QUEST BOARD RIDES THE SESSION, NOT ITS OWN FETCH ──────────────────────────────────────
-    // The tracker is a dock panel, and a dock panel that fetches on open is a round trip a member pays for
-    // every time they glance at it. This is one read of a small table the session is already awake for —
-    // the same argument that got the nav from 111 round trips to 3.
-    const quests = await questBoard(buyerId).catch(() => []);
-    // ── WHO IS STANDING IN THIS PARTICULAR ZONE ──────────────────────────────────────────────────────
-    // Three givers are hidden across twelve zones per map, so most zones have nobody and the scene must
-    // not draw a figure in them. Matching on the global zone number rather than a per-map index keeps
-    // this honest across map boundaries, where an off-by-twelve would put map 2's cartographer in map 1.
-    // ⚠️ NOT THE MARSHAL. He has a chain now and so he is on the board, but the scene already paints
-    // him outside his own building as .gv-colnpc -- matching him here would stand a SECOND figure on the
-    // same spot and give one person two cards. He is reached by tapping the Coliseum, which is where he
-    // is standing. Flagged on the board by npcsOnMap rather than inferred from the zone, because the
-    // Coliseum zone is a perfectly ordinary zone that a quest giver could also stand in.
-    const npcHere = quests.find((q) => q.zone === zone.n && !q.coliseum) || null;
+    // ── ✂️ THE QUEST BOARD AND THE GIVER IN THIS ZONE WERE BOTH HERE ────────────────────────────────
+    // Luke, 2026-11-08: "Remove all quest givers and quests."
+    //
+    // `quests` was one read of mkt_grove_quest riding the session, and `npcHere` was which of the three
+    // givers hidden across this map's twelve zones was standing in THIS one — the thing the scene drew a
+    // figure for. The marshal was deliberately excluded from that match so he was not painted twice; he
+    // is the one person left in the forest, and he is still reached by tapping the Coliseum.
     const coliseum = await coliseumState(buyerId, zone.map || 1).catch(() => null);
 
     return {
         ok: true,
         seed,
         gearArt,
-        quests,
         coliseum,
-        npcHere,
         zone: {
             ...zone,
             kills,
@@ -657,57 +557,17 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     };
 }
 
-/**
- * Settle a burst of kills.
- *
- * ⚠️ TAKES IDS AND INDEXES, NEVER ITEMS. The client says what it killed; the server decides what fell out.
- */
-/**
- * Parts into the backpack, and into the permanent seen-set.
- *
- * ── ⚠️ THE BAG HAS NO CEILING ANY MORE ──────────────────────────────────────────────────────────────────────
- * It used to hold sixteen DISTINCT parts, expandable in fours by crafting a backpack, and anything that did
- * not fit was simply not granted. Luke: "get rid of bag slot limits. And get rid of bank and backpack
- * expansions. Its just a lame mechanic that is a meaningless tax on the player."
- *
- * He is right, and the sharpest evidence is what this function used to have to be careful about: loot the
- * player WATCHED LAND and then did not receive. Every guard around that — the overflow map, the "FULL" badge
- * on the menu, the room counter, the chest path having to pay through the same rule so it would not quietly
- * differ — existed to make a tax legible rather than to make the game better. The whole apparatus is gone and
- * the failure mode went with it.
- *
- * ⚠️ DISCOVERY IS STILL SEEING, NOT KEEPING, and that rule now costs nothing to honour: everything found is
- * both seen and stored, so a recipe unlocks because you picked the part up.
- *
- * Still shared by the settle and the Coliseum's chests rather than copied — same reason as before.
- */
-// Exported so the Coliseum's chests pay through the same path as the settle.
-export async function storeParts(buyerId, parts) {
-    const stored = {};
-    // ⚠️ KEPT AS AN ALWAYS-EMPTY OBJECT rather than deleted from the return. Four call sites read
-    // `overflow` and the client renders a line when it has keys; returning the shape and never filling it
-    // means the removal is one edit here instead of five, and a caller that still checks it is simply
-    // always told there was none.
-    const overflow = {};
-    for (const [part, n] of Object.entries(parts || {})) {
-        stored[part] = n;
-        await db.query(
-            `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
-             ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
-            [buyerId, part, n],
-        ).catch(() => {});
-    }
-
-    const newlySeen = [];
-    for (const part of Object.keys(parts || {})) {
-        const ins = await db.queryOne(
-            `INSERT INTO mkt_grove_seen (buyer_id, part_id) VALUES ($1, $2)
-             ON CONFLICT DO NOTHING RETURNING part_id`, [buyerId, part],
-        ).catch(() => null);
-        if (ins) newlySeen.push(part);
-    }
-    return { stored, overflow, newlySeen };
-}
+// ── ✂️ storeParts IS GONE, AND WITH IT THE BACKPACK ─────────────────────────────────
+// It owned three things: the sixteen-row slot cap, the `overflow` report for what would not fit, and the
+// permanent seen-set that unlocked recipes. All three were about parts and nothing else.
+//
+// ⚠️ mkt_grove_item AND mkt_grove_seen ARE NOT DROPPED. Food still lives in mkt_grove_item — it always
+// shared the table, split out by identity rather than by column — and mkt_grove_seen is the record of what
+// every member ever found. Same rule as pack_slots and banks_built: dropping a column or a table is how you
+// lose the evidence of what somebody did before the rule changed.
+//
+// ⚠️ THE PART ROWS ARE LEFT IN PLACE RATHER THAN DELETED. Nothing reads them, they cost nothing to keep,
+// and whoever answers item R may well want to know what people were carrying when the bench closed.
 
 /**
  * Hand over one hyper-rare.
@@ -802,27 +662,15 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // and never received.
     await bumpHunts(buyerId, got.slain, Number(zone?.map) || 0).catch(() => {});
 
-    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
 
-    // ── ⚠️ AND THE QUEST CHAINS, WHICH WERE NEVER TICKING AT ALL ────────────────────────────────────
-    // bumpQuests has existed since the chains shipped, is exported, and was imported by NOTHING. Grepped
-    // across src and scripts: zero call sites. Every bar on the quest board sat at 0 for the life of the
-    // feature, every step was permanently unclaimable, and nothing errored — the panel rendered a row with
-    // an honest 0/12 on it forever.
+    // ── ✂️ THE QUEST TICK WAS HERE, AND ITS STORY IS WORTH KEEPING ──────────────────────────────────
+    // bumpQuests shipped with the chains, was exported, and was imported by NOTHING for the whole life of
+    // the feature: every bar on the quest board sat at an honest 0 forever and nothing errored. It was
+    // eventually wired in right here, beside the town hunts, so that the same server-side tally that
+    // decided loot decided quest progress and a client could not inflate it.
     //
-    // It belongs HERE, beside the town hunts, for the reason written over them: the same server-side tally
-    // that decides what loot you got decides what your quest counts, so a client cannot inflate it. Same
-    // failure tolerance too — a missed tick is a quest that takes slightly longer; a throw is loot somebody
-    // watched drop and never received.
-    //
-    // `parts: stored` rather than got.parts: a harvest step should count what actually reached the pack,
-    // not what the floor offered before the bag cap took its share.
-    //
-    // ⚠️ AND IT FIRES LATE, AFTER `cleared` IS KNOWN. The first version of this call ran here with only
-    // slain/parts/zone, which fed four of the SIX event types bumpQuests reads — so forge, survive and
-    // ticket steps could never advance: 22 of 71 steps, blocking 13 of 21 chains partway, several of them
-    // before the last step where the Coliseum token lives. A fix that moves the dead end is not a fix.
-    // `cleared` is computed below from the banked kill count, so the call waits for it.
+    // Kept as a comment because it is the clearest example in this file of [[declared-but-never-read]] —
+    // a whole subsystem that rendered, looked healthy, and did nothing.
 
     // ── STATUES ─────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ GRANTED, NOT APPLIED. A statue does nothing until it is poured into a line -- see turnInStatue.
@@ -921,14 +769,6 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // ENDS the zone and opens the next one. See openTheWay, which is the only thing that moves unlocked_n.
     const cleared = Number(z?.kills) >= zone.toUnlock;
 
-    // Now that `cleared` exists, the quest board can be told everything this settle did.
-    const questTicks = await bumpQuests(buyerId, {
-        slain: got.slain,
-        parts: stored,
-        zone: zoneN,
-        cleared,
-    }).catch(() => []);
-
     // One UPDATE, folded into what settle already writes — the window costs no extra round trip. A stale
     // window is reset here rather than by a cron: the only thing that needs to know is the next settle.
     await db.query(
@@ -951,8 +791,8 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
 
     return {
         ok: true,
-        parts: stored,
-        overflow,
+        // ✂️ `parts` and `overflow` were here. The bag cannot overflow any more because the only thing
+        // that filled it was parts; food is capped per row, not per slot.
         belt: beltNow,
         emblems: got.emblems,
         gold: got.gold,
@@ -971,10 +811,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         // [[declared-but-never-read]] and [[reward-with-no-screen-is-not-shipped]].
         gear: gearGot,
         xp: got.xp,
-        newlySeen,
-        // What moved on the quest board because of this settle, so the scene can SAY SO. Progress that
-        // only appears if you go and open a panel is progress most people never see happen.
-        questTicks,
+        // ✂️ `newlySeen` and `questTicks` were both here.
         ate,
         rejected,
         zoneKills: Number(z?.kills) || 0,
@@ -1065,7 +902,6 @@ export async function groveBoss(buyerId, zoneId) {
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const got = rollBoss(boss, zone.n, Number(p.seed), index, bonusesFrom(emblemRows, p), bossHyperChance(zone.n), GROVE_HYPER);
 
-    const { stored, overflow, newlySeen } = await storeParts(buyerId, got.parts);
 
     if (got.emblem) {
         await db.query(
@@ -1123,29 +959,29 @@ export async function groveBoss(buyerId, zoneId) {
     // ⚠️ AND IT IS RETURNED, because a reward with no screen is not shipped: a recipe that silently
     // appears in a list of two hundred is a recipe nobody will ever notice they earned. The kill card
     // announces it. See [[reward-with-no-screen-is-not-shipped]].
-    const teaches = GROVE_RECIPES.find((r) => r.taughtBy === boss.id) || null;
-    let taught = null;
-    if (teaches) {
-        const row = await db.queryOne(
-            `UPDATE mkt_grove_player SET taught = array_append(taught, $2), updated_at = NOW()
-              WHERE buyer_id = $1 AND NOT ($2 = ANY(taught)) RETURNING taught`,
-            [buyerId, teaches.id],
-        ).catch(() => null);
-        if (row) taught = { id: teaches.id, name: teaches.name, blurb: teaches.blurb };
-    }
+    // ✂️ THE BOSS NO LONGER TEACHES A CHARM RECIPE, 2026-11-08.
+    //
+    // `taughtBy` was the one EARNED row on a bench of two hundred always-visible ones, and the charm it
+    // unlocked is now uncraftable — so announcing "you learned Rootwood Seeking" on the kill card would
+    // be a reward screen for a thing the player cannot then go and do. That is worse than silence.
+    //
+    // ⚠️ THE `taught` COLUMN STAYS AND IS NOT CLEARED. Same rule as pack_slots and banks_built: dropping
+    // a column is how you lose the record of what somebody earned before the rule changed. Whoever answers
+    // item R wants to know which bosses a member has already beaten, and this array is that record.
 
     await trackActivity(buyerId, "grove_boss", {
-        zone: zoneId, boss: boss.id, hyper: hyper?.id || null, taught: taught?.id || null,
+        zone: zoneId, boss: boss.id, hyper: hyper?.id || null,
     }).catch(() => {});
 
     return {
         ok: true,
         boss: { id: boss.id, name: boss.name, art: boss.art },
-        parts: stored,
-        overflow,
+        // ✂️ parts, overflow and newlySeen were here. A boss paid every row of its loot table at once,
+        // which was the entire difference between it and a wanderer; what is left is the emblem it is the
+        // only source of, the hyper sliver, and the zone it opens. Luke, asked what a boss should pay
+        // instead: "Nothing." The reward is openTheWay.
         emblem: got.emblem,
         xp: got.xp,
-        newlySeen,
         hyper,
         // Both reported back so the kill card can show them rather than the player discovering a chest in
         // their bag later and not knowing what dropped it.
@@ -1154,332 +990,33 @@ export async function groveBoss(buyerId, zoneId) {
         // The zone this kill just opened, or null if it was already open (a repeat kill, or zone twelve).
         // The dopamine pop is driven off this, which is why it has to be the boss response that carries it.
         unlocked,
-        // The recipe this boss just handed over, the first time it does. Null on every repeat kill.
-        taught,
         cooldownMs: BOSS_COOLDOWN_MS,
     };
 }
 
 
 
-export async function groveMove(buyerId, { partId, from, to, qty = 1 } = {}) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    if (!GROVE_PARTS[partId] || !["pack", "bank"].includes(from) || !["pack", "bank"].includes(to) || from === to) {
-        return { ok: false, error: "bad_move" };
-    }
-    const p = await playerRow(buyerId);
-    const n = Math.max(1, Math.round(Number(qty) || 1));
+// ── ✂️ groveMove IS GONE ────────────────────────────────────────────────────────────
+// Moving a part between the bag and the bank. The bank itself was removed in October; this was the last
+// thing that still spoke to it, and the only objects it could ever move were parts.
 
-    // Conditional debit: two taps must not move the same part twice.
-    const taken = await db.queryOne(
-        `UPDATE mkt_grove_item SET qty = qty - $4 WHERE buyer_id = $1 AND place = $2 AND part_id = $3 AND qty >= $4
-         RETURNING qty`, [buyerId, from, partId, n],
-    ).catch(() => null);
-    if (!taken) return { ok: false, error: "not_enough" };
-
-    const dstSlots = to === "bank" ? (Number(p.bank_slots) || 16) : (Number(p.pack_slots) || 16);
-    const dstHeld = await db.query(
-        `SELECT part_id FROM mkt_grove_item WHERE buyer_id = $1 AND place = $2 AND qty > 0`, [buyerId, to],
-    ).catch(() => []);
-    const dstSet = new Set((dstHeld || []).map((r) => r.part_id));
-    if (!dstSet.has(partId) && dstSet.size >= dstSlots) {
-        // Put it back rather than destroying it.
-        await db.query(`UPDATE mkt_grove_item SET qty = qty + $4 WHERE buyer_id = $1 AND place = $2 AND part_id = $3`,
-            [buyerId, from, partId, n]).catch(() => {});
-        return { ok: false, error: "no_room" };
-    }
-    await db.query(
-        `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $4`,
-        [buyerId, to, partId, n],
-    ).catch(() => {});
-    return { ok: true };
-}
-
-/** Craft a discovered recipe. Parts come out of the BAG. */
-export async function groveCraft(buyerId, recipeId) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const recipe = recipeById(recipeId);
-    if (!recipe) return { ok: false, error: "no_recipe" };
-
-    const p = await playerRow(buyerId);
-
-    // ⚠️ A RECIPE A BOSS HAS NOT TAUGHT YOU IS NOT A RECIPE YOU HAVE. Checked on the server and not merely
-    // hidden on the bench: the workbench filters these out of the list, but a hidden row is a UI decision
-    // and this is a rule. Without it the charm for a map you have never finished is one POST away.
-    if (recipe.taughtBy && !(p.taught || []).includes(recipe.id)) return { ok: false, error: "not_taught" };
-
-    // ⚠️ ONE-TIME THINGS ARE CHECKED BEFORE ANYTHING IS SPENT. A backpack expansion crafted twice is four
-    // slots paid for and four slots given once.
-    if (recipe.kind === "pack" && (p.packs_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
-    if (recipe.kind === "bank" && (p.banks_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
-    if (recipe.kind === "plot" && (p.plots_built || []).includes(recipe.id)) return { ok: false, error: "already_built" };
-    if (recipe.kind === "tool") {
-        const held = await db.queryOne(`SELECT tier FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
-            [buyerId, recipe.slot]).catch(() => null);
-        const have = Number(held?.tier) || 0;
-        if (have >= Number(recipe.tier)) return { ok: false, error: "already_built" };
-        // ── ⚠️ A RUNG IS CLIMBED FROM THE ONE BELOW IT ───────────────────────────────────────────────
-        // Luke: "every tier requires the previous to craft." Without this the ladder is a menu: carry map
-        // nine's materials home on your first trip and the tier IX tool is craftable from tier 0, which
-        // skips eight rungs, eight maps' worth of grind, and the entire reason the ladder exists.
-        //
-        // The tool is REMADE rather than replaced — one row per slot holding the tier reached — so the
-        // previous tier is spent by being upgraded. There is no tier I rod left over to sell or keep.
-        if (have !== Number(recipe.tier) - 1) {
-            return { ok: false, error: "needs_previous_tier", need: Number(recipe.tier) - 1, have };
-        }
-    }
-
-    // Discovery gate: you cannot craft what you have not found.
-    const seen = await db.query(`SELECT part_id FROM mkt_grove_seen WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const seenSet = new Set((seen || []).map((r) => r.part_id));
-    if (!Object.keys(recipe.parts).every((x) => seenSet.has(x))) return { ok: false, error: "not_discovered" };
-
-    // ⚠️ EVERY PART DEBITED CONDITIONALLY, AND ROLLED BACK IF ANY FAILS. neon() over HTTP has no
-    // transactions (see CLAUDE.md), so the rollback is by hand — without it a half-paid craft eats parts and
-    // gives nothing.
-    // ⚠️ ONE COST MAP, ONE DEBIT. This used to fold tempering's surcharge in here before debiting,
-    // deliberately, so that one conditional-debit-and-roll-back covered both. Tempering is gone (Luke,
-    // 2026-10-30: "Spending more parts to roll better, remove that") and the single map stays — a craft
-    // that pays for a recipe in two places is a craft that can half-pay for it.
-    const cost = { ...recipe.parts };
-
-    const spent = [];
-    for (const [part, need] of Object.entries(cost)) {
-        const row = await db.queryOne(
-            `UPDATE mkt_grove_item SET qty = qty - $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2 AND qty >= $3
-             RETURNING qty`, [buyerId, part, need],
-        ).catch(() => null);
-        if (!row) {
-            for (const [backPart, backN] of spent) {
-                await db.query(`UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
-                    [buyerId, backPart, backN]).catch(() => {});
-            }
-            return { ok: false, error: "not_enough_parts", missing: part };
-        }
-        spent.push([part, need]);
-    }
-
-    // ── ⚠️ THE ROLL HAPPENS BEFORE THE GRANT NOW, BECAUSE THE GRANT DEPENDS ON IT ───────────────────
-    // It used to sit below, after everything had already been handed over, which was fine while only tools
-    // rolled -- a tool's quality is written on the tool afterwards. It is not fine now that a band decides
-    // how many poultices come out of a batch and how many slots a vault adds: the number has to exist
-    // before the INSERT that uses it.
-    //
-    // ⚠️ ROLLED AGAINST THE LEVEL THE PLAYER HAD BEFORE THIS CRAFT. Reading it after would let the craft
-    // that levels you up also benefit from the level it just earned.
-    const beforeXp = Number(p.craft_xp) || 0;
-    const beforeLevel = craftLevel(beforeXp).level;
-    const gained = craftXpFor(recipe);
-    // ── ⚠️ THE ROLL IS THE GAME'S AGAIN, NOT A PERFORMANCE ────────────────────────────────────────
-    // Luke, 2026-11-04: "I want to remove the crafting minigame ... I know that that plays into the
-    // variance ... for now I'm going to tell you to just have it randomly select variance while I figure
-    // out what to replace it with."
-    //
-    // So this is deliberately a PLACEHOLDER with a known shape, not a design. What stood here was the
-    // plinko board: five buckets cut as wide as the player's odds, and where the ball landed WAS the
-    // quality. The honesty of that is worth keeping in mind for whatever replaces it — the band was not
-    // decided elsewhere and then animated.
-    //
-    // ⚠️ THE CURVE DID NOT CHANGE, ONLY WHO THROWS. rollQuality is the same function groveRework has
-    // always used and the same one qualityOdds publishes, so the odds the bench prints are still the odds
-    // a craft rolls against. Removing the act removes its bias term (ACT_MAX_BIAS, up to +0.52) and
-    // nothing else: the crafting LEVEL still bends the exponent exactly as before, which means a
-    // level-25 crafter is no worse off than yesterday and a level-1 crafter is no better.
-    //
-    // ⚠️ AND THE BENCH'S PRINTED ODDS ARE NOW EXACTLY RIGHT RATHER THAN A FLOOR. qualityOdds(level) is
-    // what the screen shows and, with no act to widen it, what the craft actually uses. Before, a player
-    // who played the beats well rolled against better odds than the ones on screen.
-    //
-
-    // ⚠️ SEEDED ON THE RUNNING XP *AND* THE RECIPE, and the second half matters. Seeded on xp alone, two
-    // different recipes crafted at the same xp total roll the identical band — and a batch is ten crafts
-    // off one starting xp, so the id is what keeps "one craft, one draw" true for the second item in a
-    // batch of a cheap recipe. Same reasoning as the rework's seed, which rides its own counter.
-    const rand = (() => {
-        let x = ((beforeXp + 1) * 2654435761) >>> 0;
-        for (const ch of String(recipe.id)) x = (x ^ ch.charCodeAt(0)) * 16777619 >>> 0;
-        return () => {
-            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-            return x / 4294967296;
-        };
-    })();
-    // ⚠️ EVERY KIND ROLLS. This was `recipe.kind === "tool" ? ... : null`, which is the single line that
-    // made three crafts in four a vending machine — see craftBonusFor for what each kind does with it.
-    const quality = rollQuality(beforeLevel, rand);
-    const bonus = craftBonusFor(recipe, quality);
-
-    // ── WHAT IT MAKES ───────────────────────────────────────────────────────────────────────────────
-    if (recipe.kind === "pack") {
-        // ⚠️ bonus.slots IS ADDED TO THE AUTHORED `adds`, not instead of it. The recipe still promises +4;
-        // a good roll makes it +5 or +6 and the card says so.
-        await db.query(
-            `UPDATE mkt_grove_player SET pack_slots = pack_slots + $2, packs_built = array_append(packs_built, $3), updated_at = NOW()
-              WHERE buyer_id = $1`, [buyerId, Number(recipe.adds) + bonus.slots, recipe.id],
-        ).catch(() => {});
-    } else if (recipe.kind === "bank") {
-        // ⚠️ 64 IS THE CEILING Luke named. LEAST() rather than a check so no sequence of crafts can pass it
-        // — and that includes a Masterwork roll's bonus slots, which go through the same clamp.
-        await db.query(
-            `UPDATE mkt_grove_player SET bank_slots = LEAST(64, bank_slots + $2), banks_built = array_append(banks_built, $3), updated_at = NOW()
-              WHERE buyer_id = $1`, [buyerId, Number(recipe.adds) + bonus.slots, recipe.id],
-        ).catch(() => {});
-    } else if (recipe.kind === "food") {
-        // Into the bag, where it takes a slot like anything else. A good roll is a bigger batch.
-        await db.query(
-            `INSERT INTO mkt_grove_item (buyer_id, place, part_id, qty) VALUES ($1, 'pack', $2, $3)
-             ON CONFLICT (buyer_id, place, part_id) DO UPDATE SET qty = mkt_grove_item.qty + $3`,
-            [buyerId, recipe.id, Math.max(1, Number(recipe.makes) || 1) + bonus.extra],
-        ).catch(() => {});
-    } else if (recipe.kind === "charm") {
-        // ⚠️ KEYED ON (charm, quality) SO TWO POTENCIES NEVER MERGE. A Rough and a Masterwork Rootwood
-        // Seeking are not two of the same thing, and stacking them into one pile of two would throw away
-        // the only reason to make a second one.
-        await db.query(
-            `INSERT INTO mkt_grove_charm (buyer_id, charm_id, band, qty) VALUES ($1, $2, $3, 1)
-             ON CONFLICT (buyer_id, charm_id, band) DO UPDATE SET qty = mkt_grove_charm.qty + 1`,
-            [buyerId, recipe.id, bonus.band],
-        ).catch(() => {});
-    } else if (recipe.kind === "tool") {
-        // ⚠️ THE TIER ONLY EVER GOES UP. GREATEST means crafting a tier you already hold, or one below it,
-        // cannot quietly downgrade a tool you climbed twenty maps for — and the guard above refuses the
-        // craft outright so the parts are not spent on nothing.
-        await db.query(
-            `INSERT INTO mkt_grove_tool (buyer_id, slot, tier) VALUES ($1, $2, $3)
-             ON CONFLICT (buyer_id, slot) DO UPDATE SET tier = GREATEST(mkt_grove_tool.tier, $3), made_at = NOW()`,
-            [buyerId, recipe.slot, Math.max(1, Number(recipe.tier) || 1)],
-        ).catch(() => {});
-    } else if (recipe.kind === "deco") {
-        // ⚠️ THE RECIPE ID *IS* THE DECORATION ID. Both tables were authored to the same key so there is no
-        // mapping to keep in agreement; grantDecoration refuses anything that is not in the catalogue, so a
-        // typo in either file is a failed craft rather than a part silently eaten.
-        await grantDecoration(buyerId, recipe.id, 1, "grove_craft").catch(() => {});
-    } else if (recipe.kind === "plot") {
-        // Into the farm's own upgrades jsonb, so the farm reads it for free off a row it already loads.
-        // ⚠️ LEAST() AT THE CAP, not a read-then-write: two crafts racing must not reach three plots, and
-        // this driver has no transactions to lean on. plotCount clamps on the way out as well, so a value
-        // that somehow got past this is still only ever worth two.
-        await db.query(
-            `UPDATE mkt_buyer
-                SET farm_upgrades = jsonb_set(
-                        COALESCE(farm_upgrades, '{}'::jsonb), '{grove_plots}',
-                        to_jsonb(LEAST($2::int, COALESCE((farm_upgrades->>'grove_plots')::int, 0) + 1)))
-              WHERE id = $1`,
-            [buyerId, GROVE_PLOT_CAP],
-        ).catch(() => {});
-        await db.query(
-            `UPDATE mkt_grove_player SET plots_built = array_append(plots_built, $2), updated_at = NOW() WHERE buyer_id = $1`,
-            [buyerId, recipe.id],
-        ).catch(() => {});
-    }
-
-    // ── ⚠️ THE FIRST CRAFT EVER ─────────────────────────────────────────────────────────────────────
-    // This used to hand over a Mossbound Cache: the one teaching beat that explained the loop by giving
-    // the player a thing to open. The chest went with the rest of them, and nothing replaced it -- so if
-    // the on-ramp needs that beat back it has to be built out of something that still exists. The quest
-    // chains are the obvious home.
-    //
-    // ⚠️ THE FLAG ITSELF STAYS, because it is not about chests. The craft card announces it and
-    // trackActivity records it, and "was this their first ever craft" is still worth both.
-    //
-    // ⚠️ AND IT IS GATED ON THE CRAFT LOG, NOT ON A FLAG SOMEBODY HAS TO REMEMBER TO SET. The log already
-    // records every craft; a question answered from the real record cannot drift out of step with it.
-    const everCrafted = await db.queryOne(
-        `SELECT 1 AS x FROM mkt_grove_craft_log WHERE buyer_id = $1 LIMIT 1`, [buyerId],
-    ).catch(() => ({ x: 1 }));
-    const firstCraft = !everCrafted;
-
-    await trackActivity(buyerId, "grove_craft", {
-        recipe: recipe.id, kind: recipe.kind, first: firstCraft, quality, band: bonus.band,
-    }).catch(() => {});
-
-    // ── ⚠️ THE BAND PAYS MERITS ON THE TWO KINDS THAT HAVE NO "MORE" TO GIVE ────────────────────────
-    // A plot is capped at two and a decoration is one object, so a good roll cannot hand over a bigger
-    // one. Merits are the Grove's own currency with its own sink (the five boss sets), which keeps the
-    // payout inside this system rather than inventing a third plot or minting gold on a kill loop.
-    // ⚠️ THE QUALITY BAND PAID MERITS on the two recipe kinds with no "more" to give. Removed with
-    // merits; those kinds now pay the band's other rewards only.
-
-    // The xp is priced off the recipe's own PART COST, never flat per craft -- a flat award makes the
-    // cheapest recipe the fastest ladder, which turns crafting into poultice spam. Food is additionally
-    // the worst-paying kind, because it is the one recipe that makes a stack and is meant to be made
-    // constantly.
-    const afterRow = await db.queryOne(
-        `UPDATE mkt_grove_player SET craft_xp = craft_xp + $2, updated_at = NOW()
-          WHERE buyer_id = $1 RETURNING craft_xp`,
-        [buyerId, gained],
-    ).catch(() => null);
-    const afterLevel = craftLevel(Number(afterRow?.craft_xp) || beforeXp + gained);
-
-    // ⚠️ THE QUALITY IS WRITTEN ON THE TOOL, THE BONUS IT IMPLIES IS NOT. Quality is the roll -- a fact
-    // about history that no curve change can invalidate -- and what it is worth is computed at read time
-    // from tier and quality together. Storing "this rod gives 4.2%" would need a backfill the first time
-    // the ladder moved. Same rule as TOOL_PCT_PER_TIER.
-    if (recipe.kind === "tool" && quality != null) {
-        await db.query(
-            `UPDATE mkt_grove_tool SET quality = $3 WHERE buyer_id = $1 AND slot = $2`,
-            [buyerId, recipe.slot, quality],
-        ).catch(() => {});
-    }
-
-    await db.query(
-        `INSERT INTO mkt_grove_craft_log (buyer_id, recipe_id, kind, xp, quality)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [buyerId, recipe.id, recipe.kind, gained, quality],
-    ).catch(() => {});
-
-    // ⚠️ WHAT IT COST COMES BACK WITH WHAT IT MADE. The craft used to answer with a name and nothing
-    // else, so the screen could say "Made Moss Poultice" and not what had just left the bag -- a
-    // system that silently eats sixteen parts and reports four words. The spent array is the exact list
-    // the transaction decremented, so the panel can show the trade rather than assert it.
-    // ── ⚠️ A FORGE STEP TICKS HERE, NOWHERE ELSE ───────────────────────────────────────────────────
-    // bumpQuests reads `forged` keyed on the part a forge step names, and nothing ever supplied it, so
-    // all eleven forge steps sat at 0/1 forever. One craft that CONSUMES the named part is the whole
-    // requirement (stepSize returns 1 for forge), so each spent part counts once.
-    //
-    // ⚠️ DYNAMIC IMPORT, because grove-quests.js is imported by this file at the top and a static import
-    // the other way is a cycle. Same shape arena-progress.js and chests.js already use for addParts.
-    const forgeTicks = await (async () => {
-        const forged = {};
-        for (const [part] of spent) forged[part] = 1;
-        if (!Object.keys(forged).length) return [];
-        return bumpQuests(buyerId, { forged }).catch(() => []);
-    })();
-
-    return {
-        ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name,
-        questTicks: forgeTicks,
-        // The screen announces this; a chest granted silently is a chest nobody knows they have.
-        firstCraft,
-        spent: spent.map(([part, n]) => ({ part, n })),
-        // ⚠️ THE TOTALS, NOT THE AUTHORED NUMBERS. A card that printed `recipe.makes` after a Masterwork
-        // roll would say five while eight landed in the bag — the same class of lie as the tool card that
-        // once announced "Rough to Fine" over an unchanged 3%.
-        makes: recipe.makes ? Number(recipe.makes) + bonus.extra : null,
-        adds: recipe.adds ? Number(recipe.adds) + bonus.slots : null,
-        tier: Number(recipe.tier) || null,
-        slot: recipe.slot || null,
-        // What the band bought on top of the recipe, so the card can show the roll paying for itself.
-        bonus,
-        // ⚠️ NO BOARD RIDES BACK ANY MORE. `set` carried the rack, the landing and the rattle for the
-        // act to animate; with no act there is nothing to animate and a result card that reads it would be
-        // drawing a board nobody threw. The band and the score it fell in still travel below.
-        // A charm's whole payoff is its rolled potency; the card has nothing else to show for it.
-        charm: recipe.kind === "charm" ? { stat: recipe.stat, value: charmValueOf(recipe.id, quality) } : null,
-        // The ladder, reported back so the result card can show the bar moving and say when it levelled.
-        craft: {
-            xpGained: gained,
-            level: afterLevel.level,
-            levelled: afterLevel.level > beforeLevel,
-            progress: afterLevel.progress,
-            intoLevel: afterLevel.intoLevel,
-            needForNext: afterLevel.needForNext,
-        },
-        quality,
-        qualityBand: quality == null ? null : qualityBand(quality).id,
-    };
-}
+// ── ✂️ groveCraft IS GONE — THE WHOLE BENCH, 2026-11-08 ─────────────────────────────
+// Luke: "I think we remove monster part items, remove crafting all together."
+//
+// This was the largest function in the file: the taught-gate, the one-off guards for plots and tools, the
+// "every tier requires the previous" ladder rule, the part debit, the quality roll, the craft-xp award and
+// six per-kind grants (pack, bank, food, charm, tool, deco).
+//
+// ⚠️ WHAT IT WAS THE ONLY WRITER OF, SO THE NEXT PERSON DOES NOT HAVE TO FIND OUT THE HARD WAY:
+//   · mkt_grove_tool       — the twelve systems that read groveToolPct now see only what members already hold
+//   · mkt_grove_charm       · mkt_grove_craft_log       · the food rows in mkt_grove_item
+//   · plots_built           · the three source:"grove" decorations in decorations.js
+// Every one of those is an acquisition gap logged as item R in docs/grove-feedback-backlog.md. The reader
+// side of all of it is deliberately untouched: a tool a member owns still pays, a charm still burns on
+// entry, a food still rides the belt.
+//
+// ⚠️ DO NOT RESURRECT THIS FROM GIT TO "FIX" AN UNOBTAINABLE TOOL. Item R is a design question with three
+// candidate answers and Luke parked it; re-adding a bench is not one of them. The code is at HEAD~1.
 
 /**
  * Put a food on the belt, or take it off.
@@ -1542,211 +1079,15 @@ export async function groveBelt(buyerId, foodId) {
 // the record of what people had worn, and it costs nothing to leave. If equipping ever returns it returns as
 // a NEW idea, not by restoring this.
 
-export { GROVE_RECIPES };
+// ✂️ `export { GROVE_RECIPES }` was here, re-exported for GroveBench and GroveToolSheet.
 
 
-/**
- * Open one Grove chest.
- *
- * ⚠️ THE DECREMENT IS THE GUARD, NOT A READ-THEN-WRITE. "Check you have one, then take one" is two
- * statements with a gap between them, and a player tapping twice on a slow connection walks through that
- * gap and opens a chest they do not have. The UPDATE carries its own `qty > 0` and RETURNING tells us
- * whether it actually took anything -- if no row comes back, there was nothing to open and nothing was
- * paid. Same shape as every other claim in this file.
- *
- * ⚠️ AND IT PAYS INTO THE BAG, WHICH CAN BE FULL. storeParts already owns the slot rule and reports what
- * would not fit; a chest that silently vaporised an overflowing reward would be the worst possible version
- * of a reward. The overflow comes back so the screen can say so.
- */
-/**
- * Rework a tool already on the bench: re-roll its quality and KEEP THE BETTER of the two.
- *
- * Luke: "the output should have some rng, and maybe some more layering of improvments."
- *
- * ⚠️ WHY THIS EXISTS AT ALL. A tool's tier only ever goes up and its quality was fixed for ever at the
- * moment it was made, so once a player had crafted the best tier their parts could reach, the workbench had
- * nothing left to want from them. Measured on the live database: five crafts in the game's history, and the
- * player who has gone deepest holds 93 Bound Straw and has never crafted anything. The parts had no sink.
- *
- * ⚠️ IT CAN NEVER MAKE A TOOL WORSE, AND THAT IS NOT GENEROSITY. A re-roll that can downgrade what you
- * already own is a trap: the correct play becomes never pressing the button, and a button whose best use is
- * to leave it alone is worse than no button. Keeping the better of the two makes the cost the only thing
- * being risked, which is a decision a player can actually make.
- *
- * ⚠️ AND IT PAYS NO CRAFTING XP. Crafting a tier is a one-time act -- the tier only goes up, so the ladder
- * is self-limiting. Reworking is not: with a surplus of parts it can be repeated for ever, and paying XP for
- * it would be an uncapped faucet on a loop that already has no daily cap. The reward for a rework is the
- * quality. See [[economy-nerf-measure-daily-total]].
- */
-// ── ⚠️ CRAFT ALL: THE SAME CRAFT, N TIMES, AND NOT A SECOND IMPLEMENTATION OF IT ────────────────────────────
-// Luke: "I also think you should be able to craft all if you're trying to make a bunch of something."
-//
-// Food is the recipe meant to be made constantly -- it is the worst-paying kind on the xp ladder for exactly
-// that reason -- and making it meant playing a three-beat minigame per poultice. That is the friction.
-//
-// ⚠️ IT LOOPS groveCraft. It does not inline a cheaper version of it, and the temptation to is strong: one
-// combined debit and one log row would be a third of the round trips. It would also be a SECOND PAYOUT PATH,
-// and the two would drift the first time either moved -- the first craft's chest, the band's merits, the xp
-// priced off part cost, the one-off guards, the tool tier's GREATEST, the hand-rolled rollback. Every one of
-// those is a rule that exists because it was once missing. See [[atomic-split-into-steps-drops-lines]]: two
-// paths for one payout always drift, so make it ONE function. Cost is bounded by CRAFT_ALL_CAP instead.
-//
-// ⚠️ EVERY ITERATION ROLLS ITS OWN BAND, and that is the point rather than a side effect. groveCraft seeds
-// off the player's running craft_xp, which this loop moves on every pass -- so ten poultices come out as ten
-// separate rolls with their own landings, not one roll applied ten times. A batch that rolled once would
-// make craft-all strictly better or strictly worse than crafting one at a time, and it is meant to be
-// neither: it is the same crafts, without the ceremony.
-//
-// ⚠️ AND IT PASSES NO ACT. The skill beats are not played, so the rack is the neutral one -- which is the
-// honest price of the convenience and the reason to still play the act when a roll matters. The bench says
-// so on the button rather than leaving it to be discovered.
-//
-// ⚠️ IT STOPS, IT DOES NOT FAIL. A batch that runs out of parts on the seventh has made six real things and
-// must report six -- returning an error would be a lie about a bag that has already changed. Only a refusal
-// on the FIRST pass is an error, because then nothing happened.
-// ── ⚠️ TEN CRAFTS STILL ROLL TEN BANDS ─────────────────────────────────────────────────────────────────────
-// The act used to be played once and handed to all ten. With it gone this is simply ten rolls, and the thing
-// that keeps them ten DIFFERENT rolls is unchanged: each groveCraft re-seeds off the player's current xp,
-// which moves with every craft. See the seed note in groveCraft for why the recipe id is in there too.
-export async function groveCraftMany(buyerId, recipeId, { times = 1 } = {}) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const recipe = recipeById(recipeId);
-    if (!recipe) return { ok: false, error: "no_recipe" };
-    // ⚠️ THE SHARED RULE, NOT A LOCAL LIST OF KINDS. A backpack has no "how many" -- see ONE_OFF_KINDS.
-    if (!repeatable(recipe)) return { ok: false, error: "not_repeatable" };
+// ── ✂️ groveCraftMany IS GONE ───────────────────────────────────────────────────────
+// The batch craft — "Craft N" against one performance of the act, with the stepper that shipped as item 14
+// of the feedback backlog. It looped groveCraft, so it died with it.
 
-    const want = Math.max(1, Math.min(CRAFT_ALL_CAP, Math.floor(Number(times) || 1)));
-    const made = [];
-    let stopped = null;
-    for (let i = 0; i < want; i += 1) {
-        const one = await groveCraft(buyerId, recipeId);
-        if (!one?.ok) {
-            // The first refusal is the whole answer; a later one just ends the batch.
-            if (!made.length) return one;
-            stopped = one.error || "stopped";
-            break;
-        }
-        made.push(one);
-    }
-
-    // ── WHAT THE SCREEN NEEDS TO SAY ────────────────────────────────────────────────────────────────
-    // Totalled from the real results, never from recipe.makes × n: a batch of ten rolls ten bands and the
-    // good ones hand over extra. The same rule as the single card -- report the totals, not the authored
-    // numbers.
-    const last = made[made.length - 1];
-    const spent = {};
-    for (const one of made) for (const x of one.spent || []) spent[x.part] = (spent[x.part] || 0) + x.n;
-    const bands = {};
-    for (const one of made) {
-        const id = one.set?.band?.id || one.bonus?.band || "?";
-        bands[id] = (bands[id] || 0) + 1;
-    }
-    return {
-        ok: true, made: recipe.id, kind: recipe.kind, name: recipe.name, count: made.length,
-        asked: want, stopped,
-        // Any pass could have been the account's first craft, though in practice only the first can be.
-        firstCraft: made.some((x) => x.firstCraft),
-        spent: Object.entries(spent).map(([part, n]) => ({ part, n })),
-        // How many things actually landed in the bag across the batch, bonuses included.
-        makes: recipe.makes ? made.reduce((a, x) => a + (Number(x.makes) || 0), 0) : null,
-        bands,
-        xpGained: made.reduce((a, x) => a + (Number(x.craft?.xpGained) || 0), 0),
-        craft: last?.craft || null,
-        levelled: made.some((x) => x.craft?.levelled),
-    };
-}
-
-export async function groveRework(buyerId, slot) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    const want = String(slot || "");
-    if (!want) return { ok: false, error: "no_slot" };
-
-    const tool = await db.queryOne(
-        `SELECT slot, tier, quality, reworks FROM mkt_grove_tool WHERE buyer_id = $1 AND slot = $2`,
-        [buyerId, want],
-    ).catch(() => null);
-    if (!tool) return { ok: false, error: "no_tool" };
-
-    const recipe = toolRecipeFor(tool.slot, tool.tier);
-    if (!recipe) return { ok: false, error: "no_recipe" };
-
-    // ⚠️ REFUSED AT THE TOP BAND, SO NOBODY SPENDS PARTS ON NOTHING. Quality is a 0-100 score but what it
-    // is WORTH is the band it falls in -- a 91 and a 99 are both Pristine and both pay x1.60. Allowing a
-    // rework there would take real parts for a change the player cannot see and that does not exist in any
-    // number the game shows them.
-    const band = qualityBand(Number(tool.quality) || 0);
-    if (band?.id === QUALITY_BANDS[0].id) return { ok: false, error: "already_best", band: band.id };
-
-    const cost = reworkCost(recipe);
-    if (!cost) return { ok: false, error: "no_cost" };
-
-    const p = await playerRow(buyerId);
-
-    // The same conditional-debit-and-roll-back-by-hand as a craft: neon() over HTTP has no transactions,
-    // and a half-paid rework that eats parts and returns nothing is the worst outcome available here.
-    const spent = [];
-    for (const [part, need] of Object.entries(cost)) {
-        const row = await db.queryOne(
-            `UPDATE mkt_grove_item SET qty = qty - $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2 AND qty >= $3
-             RETURNING qty`, [buyerId, part, need],
-        ).catch(() => null);
-        if (!row) {
-            for (const [backPart, backN] of spent) {
-                await db.query(`UPDATE mkt_grove_item SET qty = qty + $3 WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2`,
-                    [buyerId, backPart, backN]).catch(() => {});
-            }
-            return { ok: false, error: "not_enough_parts", missing: part, cost };
-        }
-        spent.push([part, need]);
-    }
-
-    // ⚠️ SEEDED ON THE REWORK COUNT, WHICH IS WHY THE COLUMN EXISTS. A roll derived from state that does not
-    // change between attempts hands back the same answer every time; seeded on the counter, every rework is
-    // its own draw and a retried request cannot shop for a better one. Same reasoning as the craft's own
-    // roll, which rides the player's running XP total.
-    const before = Number(tool.quality) || 0;
-    const level = craftLevel(Number(p?.craft_xp) || 0).level;
-    const rand = (() => {
-        let x = ((Number(tool.reworks) + 1) * 2654435761 ^ (before + 1) * 40503 ^ want.length * 97) >>> 0;
-        return () => {
-            x ^= x << 13; x >>>= 0; x ^= x >> 17; x ^= x << 5; x >>>= 0;
-            return x / 4294967296;
-        };
-    })();
-    const rolled = rollQuality(level, rand);
-    const after = Math.max(before, rolled);
-    // ── ⚠️ "IMPROVED" MEANS THE BAND MOVED, NOT THE SCORE ───────────────────────────────────────────
-    // Quality is stored 0-100 but what it is WORTH is the band it falls in -- toolBonusFor multiplies by
-    // qualityBand(q).mult and nothing else, so a 0 and a 44 are both Rough and both pay x1.00. The first
-    // rework in testing rolled 0 -> 32 and the card proudly announced "Rough -> Rough": a real cost paid,
-    // a cheerful arrow drawn, and mechanically nothing had happened. Reporting the score as an improvement
-    // is the same class of lie as the tool card that once printed "ore yield 3% -> 3%".
-    const bandIndex = (q) => QUALITY_BANDS.findIndex((b) => b.id === qualityBand(q)?.id);
-    const improved = bandIndex(after) < bandIndex(before);
-
-    await db.query(
-        `UPDATE mkt_grove_tool SET quality = $3, reworks = reworks + 1 WHERE buyer_id = $1 AND slot = $2`,
-        [buyerId, want, after],
-    ).catch(() => {});
-    await trackActivity(buyerId, "grove_rework", {
-        slot: want, tier: tool.tier, before, rolled, after, improved,
-    }).catch(() => {});
-
-    return {
-        ok: true,
-        slot: want,
-        tier: Number(tool.tier) || 1,
-        name: recipe.name,
-        // ⚠️ THE ROLL AND THE RESULT ARE BOTH REPORTED, because "you rolled Rough and kept your Fine" is a
-        // different and much better story than a screen that silently says Fine again. The player paid for
-        // the roll; they are owed the sight of it.
-        before, rolled, after,
-        improved,
-        bandBefore: qualityBand(before)?.id || null,
-        bandAfter: qualityBand(after)?.id || null,
-        bandRolled: qualityBand(rolled)?.id || null,
-        spent: spent.map(([part, n]) => ({ part, n })),
-        reworks: Number(tool.reworks) + 1,
-    };
-}
+// ── ✂️ groveRework IS GONE ──────────────────────────────────────────────────────────
+// Re-rolling a tool's quality and keeping the better of the two, paid for in parts. The tool KEEPS its
+// quality and its rework count — toolBonusFor still reads both, so a reworked tool goes on being worth what
+// it was worth. There is simply no longer a way to pay for another roll.
 

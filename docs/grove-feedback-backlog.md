@@ -338,6 +338,188 @@ colours must stay faithful or it stops being their avatar.
 
 ---
 
+## ✂️ Q. MONSTER PARTS AND CRAFTING ARE REMOVED — 2026-11-08
+
+> Luke: *"I dont want the loot noise in the grove"* → *"I think we remove monster part items, remove crafting
+> all together"* → and on where tools come from afterwards: *"I think we backlog a way to get tools later."*
+
+This supersedes items **C**, **D**, **G**, **H**, **I**, **J**, **K** and **L** below — every one of them is
+feedback about a bench that no longer exists. They stay on the page because a struck item is the proof it was
+heard, and because two of them record lessons that outlived their subject (the tier-vs-band note in `D`, and
+`K`'s "a jump that lands on nothing is worse").
+
+**It started as a complaint about noise.** Every pickup fired three things at once — a floating label with the
+item's art over whoever collected it, a row down the left edge at 42% with a bump animation on the count, and
+a two-note chirp. The answer was not to quiet them. Parts were the only thing dropping in that volume, and
+they were dropping in that volume because a bench needed twelve of everything.
+
+### What goes
+
+- **Monster parts**, at the source: creatures stop dropping them, so the haul list, the pops and the chirp all
+  go quiet on their own. The gear drops stay loud, which is the point — the thing worth announcing announces.
+- **The bench**, entirely: recipes, the craft act, the batch stepper, the part sheet, the recipe sheet.
+- **Charms and foods** lose their source along with the tools, because the bench was the only thing that made
+  any of the three.
+
+### ⚠️ What deliberately STAYS, and why
+
+**The tool plumbing is untouched.** `mkt_grove_tool` keeps its rows and `groveToolPct` keeps answering, because
+it is read by **twelve systems** — arena, boss, cooking, crafting, delves, delve-floors, farm-crops, fishing,
+mining, sailing, pet-level and acts. Deleting it would have silently returned `+0%` in all twelve, which is the
+Grove's entire answer to "why does this matter to my account". Anyone holding a tool today keeps exactly the
+bonus they have.
+
+So the hole is **acquisition only**, and that is the backlog item:
+
+> ### R. A way to get Grove tools — BACKLOGGED, Luke's call
+> Tools are strictly unobtainable until this is answered. Three shapes were on the table when it was parked:
+> they **drop** off creatures and bosses like gear does, a town vendor **sells** the next rung for gold (the
+> Grove becomes a gold sink rather than a parts sink), or they are a **quest** payout. Same open question for
+> **charms and foods**, which are now also sourceless.
+>
+> ⚠️ Until it lands, a new player can never hold a tool, so `groveToolPct` reads `+0%` for everyone who has
+> not already got one. That is a known, accepted gap — not a bug to be fixed by quietly re-adding a bench.
+> ⚠️ And it collides with `migrating-a-category-strands-its-drop-paths`: an unobtainable thing that is still
+> *described* on a screen reads to a player as bad luck, not as absent.
+>
+> ⚠️ **AND IT IS NOT JUST TOOLS.** The bench was the only source of six kinds, found by counting `R()` across
+> `grove-recipes.js` — 209 recipes in all:
+>
+> | kind | how many | what is stranded |
+> |---|---|---|
+> | `tool` | 144 (12 slots × 12 tiers) | the twelve systems above |
+> | `food` | ~48, one set per map | the combat belt has nothing to put on it |
+> | `charm` | 12, one per map, each taught by that map's last boss | `taughtBy` was the one earned row on the bench |
+> | `plot` | 2 | **the bench is a FARM PLOT source** |
+> | `decor` | 3 | see below |
+> | `pack` | 0 live | kind survives in `CRAFT_XP_KIND` only; the bank died earlier |
+>
+> ⚠️ **The three farm decorations are the nastiest of these.** Carved Stump, Mothlight Lantern and Barrow
+> Cairn are `source: "grove"`, `price: null`, epic, and each carries a real farm stat (+3 seedLuck,
+> harvestLuck, growSpeed). `source: "grove"` was deliberately chosen so that every hand-out path in the game
+> — the wheel, the glint, the level track, both shops — filters them out, leaving `groveCraft` as the only
+> door. Remove it and they are three epic decorations that still appear in a 129-row catalogue and can never
+> be obtained by anybody. That is `migrating-a-category-strands-its-drop-paths` exactly: an empty path reads
+> to a player as bad luck, not as absent.
+>
+> ✅ **What makes backlogging all of this SAFE, and it was checked before a line was cut:** nothing gates
+> Grove depth on a tool tier. The only tier requirement in `grove.js` is "every tier requires the previous
+> to craft", which lived entirely inside the bench. With the bench gone the Grove is still completable to
+> map twelve by anyone holding no tool at all.
+
+### What the Grove's loop is now
+
+Kill → gear → deeper. `grove-loot.js` was always independent of the bench: one row per (zone, creature), each
+with a normal, a rare and a super-rare piece, running common → mythic. The ladder that made the Grove worth
+playing never went through crafting.
+
+### Knock-ons to handle in the same pass
+
+- **Quest verbs.** Two step kinds are `harvest` (collect N of a part) and `forge` (craft N) — `grove-quests.js`
+  line 167 — and quest rewards pay parts. Both die; the chains need their remaining verbs to carry them.
+- **Maps 8–12.** `docs/grove-maps-8-12-design.html` is twelve materials per map plus 36 redrawn tool rungs.
+  Most of that spec evaporates, which SAVES art money rather than costing it. Re-price before drawing anything.
+
+---
+
+## ✂️ S. ALL QUEST GIVERS AND QUESTS ARE REMOVED — 2026-11-08
+
+> Luke, asked how to handle the 29 quest steps that lost their verb when crafting went: *"Remove all quest
+> givers and quests."*
+
+The question was narrow — 29 of 94 steps across 17 of 28 chains were `harvest` or `forge`, six chains would
+have *ended* on a deleted step (and the last step is what carries the chest and the Coliseum token), and one
+NPC, `dune` (`harvest, harvest, forge`), would have been emptied completely. The answer was wider.
+
+### What went
+
+| | |
+|---|---|
+| `grove-quests.js` | progress, accept, claim, the board — 483 lines |
+| `grove-npcs.js` | 28 chains, 94 steps, 21 givers and their dialogue — 361 lines |
+| `grove-quest-text.js` | the template filler — 51 lines |
+| `GroveQuests.js` · `GroveGiver.js` · `GroveQuestLab.js` | the panel, the dialogue, the owner bench |
+| `/api/marketplace/grove/quests` | the whole route |
+| 4 scripts | `gen-grove-npcs`, `grove-npc-audit`, `grove-quest-audit`, `grove-quest-chests` |
+
+`mkt_grove_quest` keeps its rows — same rule as every other column here.
+
+### ⚠️ What this nearly broke, and what caught each one
+
+- **The Coliseum's only door.** The marshal's card sat in the page between the giver's dialogue and the sheets,
+  so the cut that removed the giver took the marshal with it. `lint:undef` caught it as "takeColiseumKey is
+  declared and never referenced — a handler nothing calls is a feature nobody can reach". **That gate paid for
+  itself twice today.**
+- **The daily key's endpoint.** `claimDailyKey` was served by the *quests* route, because a finished chain was
+  the other faucet. Deleting that route would have left the Coliseum unenterable while every screen still
+  offered a key. It lives on `useColiseum.takeKey` and the coliseum route's `daily` action now.
+- **`centralDay`.** Declared at the top of `grove-quests.js`, above the cut that lifted the Coliseum's
+  functions out, so it did not travel with them. `lint:undef` again.
+- ✅ **The Coliseum survives on the daily key alone**, which was checked BEFORE the chains were cut. Without
+  it, removing quests would have made the whole building unreachable.
+
+### ⚠️ And the marshal is the last person in the Grove
+
+`COLISEUM_NPCS` and `COLISEUM_ZONE` moved to `grove-coliseum-plan.js` rather than dying with `grove-npcs.js`.
+He was authored alongside the chain NPCs and shares their shape, but he is not a quest giver — he is the door
+to the Coliseum, and his line is the only dialogue left in the forest.
+
+---
+
+## ⚠️ T. THE COLISEUM CHEST HAS NEVER GRANTED GEAR — FOUND 2026-11-08, FIXED
+
+Not feedback. Found by the build breaking: `grove-coliseum-loot.js` imported `storeParts`.
+
+A chest was *"a bunch of parts, definitely some gear"* — `{ parts: 3, each: [2,4], gear: 0.35 }` up to
+`{ parts: 6, each: [6,14], gear: 1 }`. The parts were real. **The gear was this:**
+
+```js
+gear: rng() < tier.gear ? { tier: row.tier } : null,
+```
+
+A marker. No `grantItem`, nowhere. So "definitely some gear" on the top two tiers handed over **nothing**, for
+the whole life of the Coliseum, and nobody noticed because the part stacks beside it were real.
+[[declared-but-never-read]]. Removing parts is what exposed it — the chest went from paying half of what it
+claimed to paying literally nothing.
+
+**Fixed:** the chest grants real gear through `grantItem(..., "grove_coliseum")`, the same function every other
+source uses, from a pool built out of `GROVE_GEAR` so a chest can never hand over a piece the forest itself
+would not drop. It takes the **super-rare** slot, because a run is a key, two minutes and twelve waves, and
+paying the `normal` piece a rootrat coughs up would make the building pointless.
+
+⚠️ **The per-tier `gear` CHANCE was not carried over as a chance, and that is a judgement call to check.**
+With parts gone it was the only thing in the box, and mossbound at 0.35 would have opened empty on two chests
+in three. Every tier now pays at least one piece and the tier decides how many — 1 / 1 / 2 / 3. If you want a
+chest that can disappoint, that is the line to change.
+
+### ⚠️ AND THE OPENING RESULT IS STILL SHOWN NOWHERE — NOT FIXED
+
+`useColiseum` puts the result into `result` via `setResult({ opened: j })`, and **nothing reads `col.result`
+anywhere in `GroveClient`** — grepped, zero call sites. So a member opens a chest and is told nothing at all
+about what was in it. That is the reason the dead gear went unnoticed for so long: there was no screen on
+which its absence could show.
+
+Deliberately not fixed in this pass. A result screen is a thing to **build**, not a line to change, and it
+wants Luke's eye — it is the same shape as the boss kill card, which already exists and is the obvious model.
+
+---
+
+## ⚠️ U. DEAD CSS, STATED SO NOBODY THINKS IT WAS MISSED
+
+109 of the 283 `.gv-*` classes in `grove-css.js` now have no renderer. **Much of that predates today** — the
+merits shelf, `gv-bench2`, the old area meters were already dead before this cut.
+
+Left alone on purpose: a selector that matches nothing cannot collide with anything, and picking 109 rules out
+of 4,800 lines by hand is its own job with its own chance of taking a live one with it. The detector is four
+lines of `re.findall` over the stylesheet against every remaining JS file if somebody wants to do it properly.
+
+⚠️ The thing to actually watch for is the OTHER failure, and it is written down: `.gv-chest` was owned by two
+different components and the later one won, which is how "a random open button just hanging out over text"
+happened (item P). That is a NAME COLLISION, not a dead rule. Nothing was renamed in this pass, so no new
+collisions were introduced — but [[grep-the-class-name-before-taking-it]] before reusing any of these.
+
+---
+
 ## Rules these all sit under
 
 - **No tutorials, no one-time guides, no text blobs.** Teach with state that moves. `teach-by-showing-not-telling`

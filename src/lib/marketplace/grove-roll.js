@@ -91,44 +91,10 @@ const span = ([lo, hi], r) => Math.round(lo + (hi - lo) * r);
 // ⚠️ AND IT IS DELIBERATELY NOT span() ITSELF. span() also rolls the Crystal Stag's GOLD, and a 16x tail on
 // a [400,900] band is a fourteen-thousand-gold drop. Gold has fourteen faucets already and this feature
 // deliberately mints almost none of it. Parts only. See [[gold-mint-rate-lever]].
-export const DROP_TAIL = [
-    { upTo: 0.820, mult: [1, 1], band: null },
-    { upTo: 0.970, mult: [2, 3], band: "handful" },
-    { upTo: 0.998, mult: [5, 7], band: "haul" },
-    { upTo: 1.000, mult: [12, 16], band: "windfall" },
-];
-
-/**
- * A part count: the authored band most of the time, with a fat tail. Spends exactly one draw.
- *
- * Returns { n, band } -- the band comes OUT of the roll rather than being re-derived from the number,
- * because deriving it is guesswork: a "handful" of a [1,2] part can land on 2, which is also an ordinary
- * roll, and a drop that was special but did not get dressed as special is a drop nobody noticed.
- */
-export function spanTailed([lo, hi], r) {
-    let at = 0;
-    for (const t of DROP_TAIL) {
-        if (r < t.upTo) {
-            // Re-spread the draw inside its own band, so results still vary within a tier rather than
-            // every haul landing on the same number.
-            const k = (r - at) / Math.max(1e-9, t.upTo - at);
-            // ⚠️ A TAIL BAND MULTIPLIES THE TOP OF THE AUTHORED BAND, NOT A RE-SPREAD BASE. Spreading the
-            // base across the band first put a "handful" of a [1,2] part at 1 x 2 = 2 -- which is also an
-            // ordinary roll of that part, so the loudest thing the tail could produce was a number the
-            // player saw every other kill. Filmed as twenty kills with three HANDFUL tags on drops of two.
-            // A band that cannot be distinguished from the ordinary case is not a band.
-            if (!t.band) return { n: Math.max(1, Math.round(lo + (hi - lo) * k)), band: null };
-            // ⚠️ A FLOOR OF 2 ON THE BASE, so a band means the same thing whatever row it came off. Most
-            // secondary parts are authored [1,1], where hi is 1 -- multiplying that gave a "handful" of
-            // two, which is a number the primary part drops on an ordinary roll every other kill. The
-            // band has to be legible without knowing which row produced it.
-            const mult = t.mult[0] + (t.mult[1] - t.mult[0]) * k;
-            return { n: Math.max(hi + 1, Math.round(Math.max(2, hi) * mult)), band: t.band };
-        }
-        at = t.upTo;
-    }
-    return { n: Math.max(1, hi), band: null };
-}
+// ── ✂️ DROP_TAIL AND spanTailed WERE DELETED WITH THE PARTS TABLE ─────────────────────
+// They were the "a haul that looks like one root is a haul nobody noticed" machinery: a long tail that
+// occasionally turned a stack of 3 into a windfall of 14 and handed the scene a `band` to dress the pile
+// with. The parts roll was their only caller. `span` stays — gold and the gear slot split still use it.
 
 /**
  * What one kill produces. The SAME call on both sides of the wire.
@@ -137,7 +103,7 @@ export function spanTailed([lo, hi], r) {
  * @param {number} seed    the session seed the server issued
  * @param {number} index   which kill this is in the session
  * @param {object} bonus   emblem-derived multipliers: { rarityFind, emblemFind }
- * @returns {{parts: object, emblem: string|null, gold: number, chest: string|null, xp: number}}
+ * @returns {{emblem: string|null, gold: number, xp: number, gear: string|null, statue: object|null}}
  */
 // ── WHAT A KILL IS WORTH ────────────────────────────────────────────────────────────────────────────────────
 // Luke: "I think the grove probably gives a little too much EXP, including the bosses and enemies."
@@ -179,61 +145,29 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
     // sides of the wire have to pass the same arguments or the replay disagrees; defaulting to "no hyper
     // roll" means a caller that has not been updated is merely missing a feature instead of quietly
     // rolling a different stream and handing the player a drop the server then declines.
-    const out = { parts: {}, emblem: null, gold: 0, xp: 0, band: null, rare: null, hyper: null, gear: null, gearTier: null, setPiece: null, statue: null };
+    const out = { emblem: null, gold: 0, xp: 0, hyper: null, gear: null, gearTier: null, setPiece: null, statue: null };
     if (!foe) return out;
     const r = killRng(seed, index);
 
-    // ── PARTS ───────────────────────────────────────────────────────────────────────────────────────
-    const row = pickWeighted(foe.loot, r());
-    if (row) {
-        const rolled = spanTailed(row.n, r());
-        let n = rolled.n;
-        // "increased rarity of items found in this feature" — the emblem reads as MORE of the thing, which
-        // is the only reading that works on a table where every row is a part rather than a rarity tier.
-        const rarity = Number(bonus.rarityFind) || 0;
-        if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
-        // part_yield is a share of the stack, floored at the original — a bonus that could round DOWN
-        // would make a card you equipped for more parts occasionally give fewer.
-        const yielded = Math.max(n, Math.round(n * (1 + (Number(bonus.partYield) || 0) / 100)));
-        out.parts[row.part] = (out.parts[row.part] || 0) + yielded;
-        // What the scene dresses the drop as. A haul that looks like one root is a haul nobody noticed.
-        out.band = rolled.band;
-    }
-
-    // ── 1.2 THE RARE ROW ────────────────────────────────────────────────────────────────────────────
-    // Luke: "am I rewarded for killing a unique monster".
+    // ── ✂️ PARTS AND THE RARE ROW ARE GONE ───────────────────────────────────
+    // Luke, 2026-11-08: "I think we remove monster part items, remove crafting all together."
     //
-    // Before this, no. Every creature ran the same machine -- 70% its own part, 30% a neighbour's -- so the
-    // names differed and nothing else did, and killing the rarest thing in a zone paid what the first
-    // rootrat paid.
+    // Two rolls used to stand here: the weighted `foe.loot` table, and a rare row that paid a part from one
+    // map deeper. Both are deleted rather than left paying into a bag nothing reads — a drop that exists and
+    // does nothing is litter, which is the rule the parts table was built under in the first place.
     //
-    // ⚠️ IT DROPS A PART FROM DEEPER IN THE FOREST RATHER THAN A NEW ITEM, and all three reasons matter:
+    // ⚠️ THE STREAM SHIFTED HERE, ONCE, ON PURPOSE. Every r() call moves the sequence for everything after
+    // it, so emblem, statue, gold, hyper and gear now land on numbers the deleted rolls used to take. That
+    // is safe for the three reasons the gear note at the bottom of this function lays out: both sides replay
+    // THIS file from the same seed so they cannot disagree with each other, every rate below is a
+    // probability rather than a stored outcome so nothing re-tunes, and the shift costs exactly one deploy
+    // — a session in flight sees its client show a part that the server then does not grant, which is the
+    // thing being deleted anyway.
     //
-    //   1. NO NEW ART. A part with no sprite is a broken-image glyph on the floor of every zone (see
-    //      [[img-onerror-fires-before-hydration]]), and one new part per creature is 84 new drawings.
-    //   2. IT FEEDS DISCOVERY, which is the best idea in the crafting system and the most starved: a
-    //      recipe unlocks once you have SEEN its parts, and the deepest player had seen 14 of 148. A
-    //      rootrat that occasionally coughs up Elder Heartwood unlocks a recipe many zones early and
-    //      tells you what is waiting down there.
-    //   3. IT CANNOT BREAK ANYTHING. It is a part that already exists, at a tier you would reach anyway.
-    //      One of them is a tease and not a shortcut, because the recipe still wants eight.
-    //
-    // rareLoot is authored per creature in grove-catalog.js, so each creature's rare drop is ITS rare drop.
-    // ── ⚠️ `salvage` IS A RATE, NOT A MECHANISM ──────────────────────────────────────────────────────────
-    // The Geared Mark (map 8) grants it, and this is its only consumer. The row it scales ALREADY pays a
-    // part from one map deeper -- MAP_ENEMIES has handed `deeperMap` to creatureRareLoot since maps 2-12
-    // were declared -- so salvage buys more of a thing that happens, rather than a new thing. The maps
-    // 8-12 draft described it as "a kill has a chance to also drop a part from one map deeper", which
-    // overstated it: every map past the first already does that.
-    //
-    // It multiplies ALONGSIDE rarityFind rather than being folded into it, because they are granted by
-    // different things and a player who stacks both should get both.
-    const salvage = 1 + (Number(bonus.salvage) || 0) / 100;
-    if (foe.rareLoot && r() < (Number(foe.rareChance) || 0) * (1 + (Number(bonus.rarityFind) || 0) / 100) * salvage) {
-        const rare = foe.rareLoot;
-        out.parts[rare.part] = (out.parts[rare.part] || 0) + span(rare.n || [1, 1], r());
-        out.rare = rare.part;
-    }
+    // ⚠️ AND THEY WERE NOT KEPT AS BURNS, which was the other option and is worse. Both draws were
+    // CONDITIONAL — on `bonus.rarityFind` and on `foe.rareLoot` — so a faithful burn means keeping the whole
+    // table, the whole catalogue and the whole branch structure alive to throw their answers away, and
+    // check-grove's "every part is used by a recipe" assertion has no recipes left to satisfy it with.
 
     // ── EMBLEM ──────────────────────────────────────────────────────────────────────────────────────
     const emblemChance = (Number(foe.emblemChance) || 0) * (1 + (Number(bonus.emblemFind) || 0) / 100);
@@ -383,16 +317,22 @@ export function rollKill(foe, seed, index, bonus = {}, zoneN = 0, hyperTable = n
  * @param {object} bonus  emblem-derived { rarityFind, emblemFind }
  */
 export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, hyperTable = null) {
-    const out = { parts: {}, emblem: null, hyper: null, xp: 0 };
+    const out = { emblem: null, hyper: null, xp: 0 };
     if (!boss) return out;
     const r = killRng(seed, index);
 
-    const rarity = Number(bonus.rarityFind) || 0;
-    for (const row of boss.loot || []) {
-        let n = span(row.n, r());
-        if (rarity > 0 && r() < Math.min(0.75, rarity / 100)) n += 1;
-        out.parts[row.part] = (out.parts[row.part] || 0) + n;
-    }
+    // ── ✂️ THE LOOT LOOP IS GONE, and with it the one thing that made a boss a boss ─────────
+    // "IT PAYS EVERY LOOT ROW, NOT ONE" was this function's whole reason to exist as a separate
+    // function: a wanderer rolled its table and usually gave you the common row, a boss handed over the
+    // lot. With parts deleted that distinction has nowhere to land, so what is left to fight a boss FOR
+    // is the emblem at roughly one in nine and the hyper table — both of which were always the real
+    // prize, and both of which a wanderer pays at a fraction of a percent.
+    //
+    // ⚠️ A BOSS NOW PAYS NO GEAR AT ALL, which is a hole item R has to answer. rollKill grew a gear
+    // roll off GROVE_GEAR and this function never did, because a boss already paid twelve parts at once;
+    // it now pays strictly less than the wanderer standing next to it. Logged, not papered over here —
+    // inventing a boss gear table in the same commit that deletes the parts economy is two changes
+    // wearing one diff, and the rate would be a guess.
 
     // The reliable route to an emblem. A wanderer is a fraction of a percent; a boss is roughly one in nine,
     // on a thirty-minute timer. "Emblems are rare" stays true and the player has something to aim AT.
@@ -402,7 +342,9 @@ export function rollBoss(boss, zoneN, seed, index, bonus = {}, hyperChance = 0, 
     // ⚠️ THE HYPER ROLL IS DRAWN LAST AND FROM THE SAME STREAM, so the server lands on the same answer the
     // client already showed. It is NOT re-rolled server-side off a fresh seed — that would mean the scene can
     // celebrate a Mythic Morsel the settle then declines to hand over.
-    if (r() < (Number(hyperChance) || 0) * (1 + rarity / 100)) {
+    // ⚠️ `rarity` WAS READ FROM A CONST THE LOOT LOOP DECLARED, and the loot loop is gone. Read from
+    // `bonus` directly now — same number, no shared local between two unrelated rolls.
+    if (r() < (Number(hyperChance) || 0) * (1 + (Number(bonus.rarityFind) || 0) / 100)) {
         out.hyper = pickHyper(zoneN, r(), hyperTable);
     }
 
@@ -469,11 +411,10 @@ export function rollRareSpawn(baseChance, seed, index, bonus = {}) {
 // roll zero mixes with zero, so a single kill is byte-identical to what it was before this existed.
 export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times = 1) {
     const n = Math.max(1, Math.floor(Number(times) || 1));
-    const out = { parts: {}, emblem: null, gold: 0, chest: null, xp: 0, band: null, rare: null, hyper: null,
+    const out = { emblem: null, gold: 0, chest: null, xp: 0, hyper: null,
         chests: [], hypers: [], emblems: {}, gear: null, gearTier: null, gears: [], setPieces: 0, statues: [] };
     for (let r = 0; r < n; r += 1) {
         const got = rollKill(foe, (Number(seed) || 0) ^ Math.imul(r, 0x85EBCA6B), index, bonus, zoneN, hyperTable);
-        for (const [p, c] of Object.entries(got.parts)) out.parts[p] = (out.parts[p] || 0) + c;
         out.gold += got.gold;
         out.xp += got.xp;
         if (got.chest) out.chests.push(got.chest);
@@ -484,15 +425,15 @@ export function rollKillTimes(foe, seed, index, bonus, zoneN, hyperTable, times 
         if (got.setPiece) out.setPieces += 1;
         if (got.emblem) out.emblems[got.emblem] = (out.emblems[got.emblem] || 0) + 1;
         if (got.statue) out.statues.push(got.statue);
-        // The FIRST roll is the one the scene draws a band and a rare off — those are presentation for the
-        // body that just fell, and there is only ever one body.
-        if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.band = got.band; out.rare = got.rare; out.hyper = got.hyper; out.gear = got.gear; out.gearTier = got.gearTier; }
+        // The FIRST roll is the one the scene draws its presentation off — there is only ever one body.
+        // ⚠️ `band` and `rare` were here too and went with the parts table: both described a PART, the
+        // band being how big the pile looked on the floor and `rare` being which deeper-map part it was.
+        if (r === 0) { out.emblem = got.emblem; out.chest = got.chest; out.hyper = got.hyper; out.gear = got.gear; out.gearTier = got.gearTier; }
     }
     return out;
 }
 
 export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTable = null) {
-    const parts = {};
     const emblems = {};
     const statues = [];
     let gold = 0;
@@ -520,7 +461,6 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
         // `c` is the multi-kill credit the scene claimed, rounded down to a rung this rule could have
         // produced and capped — see safeCredit. Absent means one, which is every ordinary kill.
         const got = rollKillTimes(foe, seed, k.i, bonus, zoneN, hyperTable, safeCredit(k?.c));
-        for (const [p, n] of Object.entries(got.parts)) parts[p] = (parts[p] || 0) + n;
         for (const [em, n] of Object.entries(got.emblems)) emblems[em] = (emblems[em] || 0) + n;
         gold += got.gold;
         xp += got.xp;
@@ -531,5 +471,5 @@ export function settleKills(kills, lookup, seed, bonus = {}, zoneN = 0, hyperTab
         setPieces += got.setPieces || 0;
         slain[k.id] = (slain[k.id] || 0) + Math.max(1, safeCredit(k?.c) || 1);
     }
-    return { parts, emblems, gold, xp, chests, hypers, gears, setPieces, slain, statues };
+    return { emblems, gold, xp, chests, hypers, gears, setPieces, slain, statues };
 }

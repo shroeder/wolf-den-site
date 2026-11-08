@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroveAtlas from "@/components/grove/GroveAtlas";
-import { zonesOfMap } from "@/lib/marketplace/grove-npcs.js";
 import { TOWNS } from "@/lib/marketplace/towns.js";
 import { groveSpot, stampGroveReturn } from "@/lib/marketplace/grove-return.js";
 import { createPortal } from "react-dom";
@@ -13,7 +12,7 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_PARTS, GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, groveArt, toolArt, zoneHasParts,
+    GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, groveArt, toolArt, zonesOfMap,
 } from "@/lib/marketplace/grove-catalog.js";
 // ── THE ORDER OF THE SHELF ────────────────────────────────────────────────────────────────────────
 // Catalog order, which is the order you meet the creatures: map one's thirteen, then one per map going
@@ -24,16 +23,12 @@ import {
 // second copy of the grouping here would be the same rule in two homes.
 const CARD_TOTAL = Object.keys(GROVE_EMBLEMS).length;
 
-import { useWishlist } from "@/components/grove/useWishlist.js";
 import GroveCards from "@/components/grove/GroveCards.js";
 import GroveStatues from "@/components/grove/GroveStatues.js";
 import GroveMenu from "@/components/grove/GroveMenu.js";
-import GroveBench, { SHOW_RECIPE_EVENT } from "@/components/grove/GroveBench";
-import { readyCount } from "@/lib/marketplace/grove-recipes.js";
-import Area, { OPEN_AREA_EVENT } from "@/components/grove/GroveArea.js";
+import Area from "@/components/grove/GroveArea.js";
 import dynamic from "next/dynamic";
 
-import GrovePartSheet from "@/components/grove/GrovePartSheet.js";
 import GroveToolSheet from "@/components/grove/GroveToolSheet.js";
 
 // ⚠️ LOADED ONLY WHEN SOMEBODY WALKS TO IT. TownClient is 5,500 lines with its own camera, polling
@@ -45,13 +40,14 @@ import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
 import GroveGear from "@/components/grove/GroveGear.js";
-import GroveQuests from "@/components/grove/GroveQuests";
 import { useColiseum } from "@/components/grove/useColiseum";
 import GroveMarshal from "@/components/grove/GroveMarshal";
-import GroveGiver from "@/components/grove/GroveGiver";
 import { CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
+// ⚠️ THE TOOL VOCABULARY SURVIVES THE BENCH. A member who already holds a tool still has a slot, a tier
+// and a numeral to show, and GroveToolSheet still reads all three — only the recipes that MADE them are
+// gone. See item R in docs/grove-feedback-backlog.md.
 import {
-    GROVE_RECIPES, recipeById, canCraft, newlyReady, TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
+    TOOL_SLOTS, toolBonusPct, TOOL_TIER_CAP, toolNumeral,
 } from "@/lib/marketplace/grove-recipes.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
 import { MAP_LAYOUT, nodeArt, spotForDepth, trailForZones, trailPath } from "@/lib/marketplace/grove-map.js";
@@ -68,8 +64,6 @@ import { CLASSES } from "@/lib/marketplace/arena-classes.js";
 const post = (body) => fetch("/api/marketplace/grove", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }).then((r) => r.json()).catch(() => ({ ok: false }));
-
-const partName = (id) => GROVE_PARTS[id]?.name || id;
 
 // ── HOW A GROVE STAT READS ──────────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE ORDER IS THE READING ORDER, not alphabetical: what you hit for, then how often it lands big, then
@@ -114,59 +108,30 @@ const GROVE_STAT_READOUT = {
 // ⚠️ THE SAME FAMILIES AS THE ZONE'S, so a player learns one menu rather than two arrangements of the
 // same six doors. ZONE_FAMILIES in GroveScene.js carries the identical grouping minus Quests, which has
 // no meaning while you are standing inside a zone.
-// ── ⚠️ THE ROWS CARRY LIVE COUNTS, AND UNTIL NOW NONE OF THEM DID ───────────────────────────────────────────
-// Luke, 2026-10-30: "when you get a bunch of items from enemies, it is not clear at all what you're supposed
-// to do with them... it's also not clear that there's a menu on the left. So we need a ramp to teach people
-// what the game loop is."
+// ── ⚠️ THE ROWS CARRY LIVE COUNTS ───────────────────────────────────────────────────────────────────────────
+// Luke, 2026-10-30: "when you get a bunch of items from enemies, it is not clear at all what you're
+// supposed to do with them... it's also not clear that there's a menu on the left. So we need a ramp to
+// teach people what the game loop is."
 //
-// GroveMenu has supported `r.badge` since it was written, and shows the SUM on the closed button so a shut
-// menu can still say there is something inside — and nothing ever set one. The zone dock got its number
-// (benchReady, below) and the hub got nothing, so standing in the hub holding ninety parts there was no
-// signal anywhere that the Workbench was the answer.
+// GroveMenu shows the SUM of every row's badge on the closed button, so a shut menu can still say there is
+// something inside.
 //
-// ⚠️ IT IS NOT A TUTORIAL AND MUST NOT BECOME ONE. [[teach-by-showing-not-telling]]: the ramp is the number
-// MOVING. Kill something, a part drops, the closed menu grows a count, the Workbench row is the one lit —
-// that teaches parts-make-things with no words at all, at the moment the question occurs.
+// ⚠️ THE RAMP THIS WAS BUILT FOR IS GONE, AND SO IS MOST OF THE BADGING. The ramp was "kill something, a
+// part drops, the closed menu grows a count, the Workbench row is the one lit" — which taught
+// parts-make-things with no words at all. Parts and the Workbench were both deleted on 2026-11-08, so
+// Statues is the only row still carrying a number. If a new ramp is ever wanted it has to be built out of
+// what the Grove still does, not restored from here.
 //
-// ⚠️ EVERY BADGE HERE MUST BE CLEARABLE. readyCount's own note is the scar: most of the book is repeatable,
-// so "could make this now" is permanently true and a badge that cannot be completed teaches you to ignore
-// every other badge. Luke: "you can like never get rid of the bubbles." So the Workbench counts only recipes
-// never finished, Statues counts only ones still unspent, and the Backpack — which is never empty once you
-// are playing — deliberately carries nothing.
+// ⚠️ EVERY BADGE MUST STILL BE CLEARABLE. Luke: "you can like never get rid of the bubbles." Statues
+// counts only ones still unspent; the Backpack, which is never empty once you are playing, deliberately
+// carries nothing.
 // ⚠️ NO SUBTITLES. Luke, looking at the open drawer: "we dont need descriptions for the menu items."
-// Every row carried a line under it — "choose a zone", "what you are wearing", "who wants what" — which
-// doubled the height of the list and explained words that were already the explanation. A menu that
-// annotates itself is a menu that does not trust its own labels, and nine of them on one screen is the
-// list telling you to read rather than to pick. GroveMenu still renders `note` when a row carries one;
-// nothing does any more.
-const familiesFor = ({ benchFresh = 0, statuesHeld = 0, questsReady = 0, questsActive = 0 } = {}) => [
+// GroveMenu still renders `note` when a row carries one; nothing does any more.
+const familiesFor = ({ statuesHeld = 0 } = {}) => [
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
-            // ⚠️ THE TRACKER NEEDS A DOOR OR IT IS NOT SHIPPED. Three givers hidden across twelve zones
-            // is a good surprise once and a search forever after, so the panel that names the zone has to
-            // be one tap away.
-            //
-            // ⚠️ IT POINTED AT A WALL FOR WEEKS. The art here was ui-board.webp, and the comment that
-            // stood here claimed that file "was drawn long ago and never used by anything". Both halves
-            // were wrong: it is a seamless plank TEXTURE whose own prompt says "Completely EMPTY: no
-            // objects, no props... a plain background material", and it IS used — as a panel background
-            // in grove-css. Pointed at a 46px icon slot it rendered as a flat brown rectangle, which is
-            // what Luke saw: "Quests need a better sprite."
-            //
-            // I grabbed an asset because it was lying around and its name sounded right, which is
-            // [[grep-the-class-name-before-taking-it]] wearing a different hat. ui-quests.webp is a
-            // notice board drawn for this row.
-            // ⚠️ THE SAME BADGE RULE AS THE ZONE'S, because it is the same door and a player should
-            // not have to learn that the number means something different depending on where they are
-            // standing. Ready-to-hand-in badges; in-progress is only a note. See ZONE_FAMILIES.
-            {
-                k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp",
-                badge: questsReady > 0 ? String(questsReady) : null,
-                note: questsReady > 0
-                    ? `${questsReady} ready to hand in`
-                    : questsActive > 0 ? `${questsActive} on the go` : null,
-            },
+            // ✂️ THE QUESTS ROW WAS HERE, between Map and Town, carrying a ready-to-hand-in badge.
             // ⚠️ TOWN IS A PLACE IN THE GROVE, NOT A WAY OUT OF IT. Luke: "if you go to town, you
             // completely get booted out of the Grove. Like, the whole experience is lost... when you're
             // in the town, it should be like you're in any other zone of the Grove with the menu on the
@@ -199,11 +164,7 @@ const familiesFor = ({ benchFresh = 0, statuesHeld = 0, questsReady = 0, questsA
             { k: "class", label: "Your Class", art: "/images/grove/ui-class.webp" },
         ],
     },
-    {
-        title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2", badge: benchFresh || 0 },
-        ],
-    },
+    // ✂️ THE "Make" FAMILY WAS HERE, holding the Workbench. Go / Carry / Train is three verbs now.
 ];
 
 
@@ -230,11 +191,12 @@ const TOOL_GLYPH = {
 // The band's own word, from the band table rather than a second copy of the five names.
 const bandWord = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || "";
 
-const emptyCells = (slots, held) => Array.from(
-    { length: Math.max(0, (Number(slots) || 0) - held) },
-    (_, i) => <span key={`e${i}`} className="gv-cell is-empty" aria-hidden="true" />,
-);
+// ✂️ `emptyCells` was here. It drew the Backpack's unused slots so the void read as room rather than
+// as a mistake — "a lot of void in the area where we show the items." No grid, no capacity, no cells.
 
+// ⚠️ IT DRAWS FOOD NOW, NOT PARTS. groveArt resolves any Grove id, and the belt is the one shelf left
+// that needs a sprite beside a name. The name is kept because every caller already reads this way and
+// renaming it would be a diff across a file that has just had a lot taken out of it.
 const PartIcon = ({ id, size = 34 }) => {
     const art = groveArt(id);
     if (!art) return null;
@@ -262,10 +224,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // it: that sits after the "not signed in" early return, and a hook called conditionally changes
     // the hook ORDER between renders, which React treats as a different component.
     const [paperMap, setPaperMap] = useState(null);
-    // The shopping list, shared with the bench and the zone. Client-only — see useWishlist.
-    const { wish, toggle: toggleWish, clear: clearWish } = useWishlist();
     // Which part's sheet is open, or null. See GrovePartSheet.
-    const [partView, setPartView] = useState(null);
     // Which tool's sheet is open, or null. See GroveToolSheet.
     const [toolView, setToolView] = useState(null);
     const [st, setSt] = useState(initial);
@@ -412,105 +371,35 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // is not checking that it is DEFINED; the build cannot catch it and neither did I.
     const col = useColiseum({ onChanged: refresh });
 
-    // The marshal handing over the day's key, from the world rather than from the quest panel. Idempotent
-    // against the shop's own date on the server, so a double tap cannot mint two.
-    // The last quest step this settle moved, shown as a toast over the zone. Keyed so an identical
-    // follow-up tick re-triggers the animation rather than sitting there looking stale.
-    const [questTick, setQuestTick] = useState(null);
-    useEffect(() => {
-        if (!questTick) return undefined;
-        const t = setTimeout(() => setQuestTick(null), questTick.done ? 4200 : 2600);
-        return () => clearTimeout(t);
-    }, [questTick]);
-
-    // Whether the giver standing in this zone is being talked to.
-    const [giverOpen, setGiverOpen] = useState(false);
-
-    // ── ⚠️ THE BOARD GOES STALE THE MOMENT YOU AGREE TO ANYTHING ────────────────────────────────────
-    // Luke: "When I tall to the npc after already having their quest I can re accept it which is wrong."
-    // And: "0 of 5 doesnt make sense."
+    // ── ✂️ THE QUEST MACHINERY WAS ALL HERE ─────────────────────────────────────────────────────────
+    // Luke, 2026-11-08: "Remove all quest givers and quests." Five things went:
     //
-    // Both are the same defect. `session` is written ONCE, by enter(), and refresh() above only ever
-    // calls setSt — so `session.npcHere` is frozen for the whole visit to a zone. Everything the giver
-    // and his pip are drawn from therefore describes the moment you walked in:
+    //   · `questTick`   — the toast over the zone when a step advanced mid-fight
+    //   · `giverOpen`   — whether the person standing in this zone was being talked to
+    //   · `refreshBoard` — a small GET that re-read the board after anything that could change it,
+    //                      because `session` is written once by enter() and froze the giver otherwise
+    //   · `claimStep` / `acceptStep` — both POSTs to the deleted /grove/quests route
     //
-    //   · accept a step and `started` stays false, so re-opening him offers it again and the accept
-    //     button is still there — a second QUEST RECEIVED plate over a step you already have
-    //   · the dialogue keeps replaying the `problem` beats, because the state never leaves "offered"
-    //   · kill the five things and the pip still reads 0/5, because `progress` never moves
-    //
-    // So the board is re-read and folded back into the session after anything that can change it. One
-    // small GET of a table the session already reads — see the note on questBoard riding the session —
-    // and NOT the big /api/marketplace/grove state, which is 60+ round trips for a counter.
-    //
-    // ⚠️ npcHere IS RECOMPUTED THE SAME WAY THE SERVER DID IT: the giver whose zone matches this one.
-    // Picking it off the fresh board rather than patching the old object means a step that ADVANCED to
-    // the next link in the chain arrives correctly instead of being merged on top of the previous one.
-    const refreshBoard = useCallback(async (mapN = null) => {
-        const q = mapN ? `?map=${mapN}` : "";
-        const j = await fetch(`/api/marketplace/grove/quests${q}`, { cache: "no-store" })
-            .then((r) => r.json()).catch(() => null);
-        if (!j?.ok || !Array.isArray(j.quests)) return null;
-        setSession((prev) => (prev
-            ? {
-                ...prev,
-                quests: j.quests,
-                npcHere: j.quests.find((qq) => qq.zone === prev.zone?.n) || null,
-                // ⚠️ AND THE COLISEUM, which is the other thing enter() wrote once and nothing refreshed.
-                // Only when the server actually answered with one -- a call that did not ask for a map
-                // must not blank the card that is on screen.
-                coliseum: j.coliseum ? { ...prev.coliseum, ...j.coliseum } : prev.coliseum,
-            }
-            : prev));
-        setSt((prev) => (prev ? { ...prev, quests: j.quests } : prev));
-        return j.quests;
-    }, []);
-
-    // ⚠️ RETURNS THE SERVER'S ANSWER so the dialogue can say what changed hands — including the token,
-    // which is the only part of a payout that unlocks something to go and do.
-    const claimStep = useCallback(async (stepId) => {
-        const j = await fetch("/api/marketplace/grove/quests", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ stepId }),
-        }).then((r) => r.json()).catch(() => null);
-        refresh();
-        await refreshBoard();
-        return j || { ok: false };
-    }, [refresh, refreshBoard]);
-
-    // ⚠️ RETURNS A BOOLEAN, so the dialogue only raises QUEST RECEIVED when the server actually took
-    // it. A plate over a failed write is a lie the player then goes and acts on for an hour.
-    //
-    // ⚠️ AND `already` IS NOT A SUCCESS. acceptStep answers { ok: true, already: true } when the row
-    // exists, which is right for the server — the write is idempotent — but raising QUEST RECEIVED over
-    // it tells the player they just took something they have been carrying for an hour.
-    const acceptStep = useCallback(async (stepId) => {
-        const j = await fetch("/api/marketplace/grove/quests", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "accept", stepId }),
-        }).then((r) => r.json()).catch(() => null);
-        refresh();
-        await refreshBoard();
-        return Boolean(j?.ok) && !j?.already;
-    }, [refresh, refreshBoard]);
-
+    // ⚠️ refreshBoard ALSO REFRESHED THE COLISEUM, which is why takeColiseumKey below had to change
+    // rather than simply lose a line: it leaned on this function to get the new key count back.
     // Whether the marshal's card is open. Not a zonePanel: those replace the scene, and this is a thing
     // standing IN the scene that you are talking to without leaving it.
     const [marshalOpen, setMarshalOpen] = useState(false);
 
     // ⚠️ RETURNS WHETHER IT WORKED, so the card can say so. The silent version of this call is the bug the
     // card exists to fix; a claim that fails and also says nothing is the same bug wearing a hat.
+    //
+    // ⚠️ IT GOES THROUGH useColiseum NOW, not the deleted quests route. takeKey hands back this map's
+    // fresh state, which is merged into the session here — without it `dailyReady` stays true and `keys`
+    // stays 0 for the rest of the visit, so the button re-offers a key you already took and the card
+    // still says you have none.
     const takeColiseumKey = useCallback(async (map) => {
-        const j = await fetch("/api/marketplace/grove/quests", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ daily: true, map }),
-        }).then((r) => r.json()).catch(() => null);
-        refresh();
-        // ⚠️ ASK FOR THIS MAP'S COLISEUM BACK. Without it dailyReady stays true and keys stays 0 for the
-        // rest of the visit: the button re-offers a key you already took, and the card still says none.
-        await refreshBoard(map);
+        const j = await col.takeKey(map);
+        if (j?.state) {
+            setSession((prev) => (prev ? { ...prev, coliseum: { ...prev.coliseum, ...j.state } } : prev));
+        }
         return Boolean(j?.ok);
-    }, [refresh, refreshBoard]);
+    }, [col]);
 
     // ── ENTER A ZONE ────────────────────────────────────────────────────────────────────────────────
     const enter = useCallback(async (zone) => {
@@ -574,50 +463,21 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // server re-rolls from the same seed and grants what IT computes. See grove-roll.js.
     const settle = useCallback(async (kills, eaten) => {
         if (!kills?.length || !session) return;
-        const before = st;
         const d = await post({ action: "settle", zone: session.zone.id, kills, eaten: eaten || {} });
         if (!d?.ok) return;
-        const after = await refresh();
-        // ── ⚠️ WHAT THE DROP FINISHED, NOT WHAT THE DROP WAS ───────────────────────────────────────
-        // Luke: "The recipe unlock should be dopamine inducing and inspectsble with a call to action to
-        // craft it." What this said instead was "Found Gnawed Root" -- the name of a twig, which tells a
-        // player nothing about why the last twenty minutes were worth anything.
+        await refresh();
+        // ── ✂️ FOUR OTHER NOTES USED TO COMPETE FOR THIS LINE ───────────────────────────────────────
+        // In priority order they were: a FULL BAG ("left Damp Moss behind, bank something"), a recipe
+        // that just became craftable (newlyReady, comparing the two bags so the transition announced
+        // itself once rather than on fifty consecutive kills), and a part seen for the first time.
         //
-        // newlyReady has been sitting in grove-recipes.js since it was written and was never called by
-        // anything: the thing that knows a recipe just became craftable existed, and no screen asked it.
-        // It compares the two bags rather than asking "is it ready now", so a fifth root on a recipe that
-        // needed four does not announce the same rod on fifty consecutive kills -- the moment is the
-        // TRANSITION, and it is the only one worth a line.
+        // All three were about parts, and all three are gone with them — including the overflow line,
+        // which is worth a word because it was the hardest-won of the four: the server had returned
+        // `overflow` since it was written and no screen had ever read it, so a player with a full bag
+        // watched loot pop, heard it collected, and never received it. There is no bag cap any more.
         //
-        // Ordered: a thing you can now MAKE beats a thing you have now SEEN. Both still fire the found
-        // line when nothing crossed, because first sight of a part is the other half of the tablet.
-        // ── ⚠️ A FULL BAG OUTRANKS EVERY OTHER LINE ────────────────────────────────────────────────
-        // The server has been returning `overflow` from the settle since it was written and no screen
-        // has ever read it. A player with a full bag watches loot pop, hears it collected, and never
-        // receives it -- which is the single most confusing thing this feature can do, and it does it
-        // silently. It goes above the recipe line because it is the only one that is costing the player
-        // something RIGHT NOW and the only one with an action attached: the Bank is the answer, and it
-        // is the screen nobody opens.
-        const lost = Object.keys(d.overflow || {});
-        const made = before && after ? newlyReady(before, after) : [];
-
-        // ── ⚠️ QUEST PROGRESS, SAID OUT LOUD, IN PLAY ───────────────────────────────────────────────
-        // Luke: "What does it look like when im pkaying and I het quest progress" — and until now the
-        // answer was NOTHING, twice over. bumpQuests was never called, so no bar moved; and even once it
-        // does, a bar that only exists behind a menu is progress almost nobody watches happen.
-        //
-        // The toast is the moment. A step that FINISHED outranks one that merely moved, because finishing
-        // is the thing that sends you walking back across the map to hand it in.
-        const ticks = Array.isArray(d.questTicks) ? d.questTicks : [];
-        const finished = ticks.find((t) => t.done);
-        if (finished) setQuestTick({ ...finished, key: `${finished.step}-done` });
-        else if (ticks.length) setQuestTick({ ...ticks[0], key: `${ticks[0].step}-${ticks[0].progress}` });
-        // ⚠️ AND THE PIP OVER HIS HEAD HAS TO MOVE WITH IT. The toast is a moment; the number standing on
-        // the giver is the thing you look at to decide whether to go back yet, and it is drawn from
-        // session.npcHere — which nothing else updates. Only when a step actually moved, so an ordinary
-        // settle is still one request.
-        if (ticks.length) refreshBoard();
-
+        // Gear is the only thing a settle can now announce, which makes this simpler than it has ever
+        // been: one kind of thing drops, and the note names it.
         // ── ⚠️ GEAR ON THE RECEIPT, NOT JUST IN THE BAG ───────────────────────────
         // settle grants it and now returns it; the scene already shouted the piece's name on the kill.
         // This is the half that survives the shout: the note names what you walked away with, and it
@@ -627,16 +487,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             setNote(gearGot.length === 1
                 ? `${gearGot[0].name} dropped — it is in your bag`
                 : `${gearGot[0].name} and ${gearGot.length - 1} more dropped`);
-        } else if (lost.length) {
-            setNote(`Bag full — left ${lost.map(partName).join(", ")} behind. Bank something.`);
-        } else if (made.length) {
-            setNote(made.length === 1
-                ? `${made[0].name} is ready to craft`
-                : `${made[0].name} and ${made.length - 1} more ready to craft`);
-        } else if (d.newlySeen?.length) {
-            setNote(`Found ${d.newlySeen.map(partName).join(", ")}`);
         }
-    }, [session, refresh, refreshBoard, st]);
+    }, [session, refresh]);
 
     // ── THE BOSS ────────────────────────────────────────────────────────────────────────────────────
     // ⚠️ ITS OWN REQUEST, NOT A LINE IN THE SETTLE BATCH. The server checks the zone was cleared and that
@@ -655,62 +507,25 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // ⚠️ THE POP IS DRIVEN FROM HERE NOW, NOT FROM SETTLE. The boss kill is what moves unlocked_n
         // (see openTheWay in grove.js), so it is the only response that can carry the new zone.
         if (d.unlocked) setUnlockedNow(d.unlocked);
-        const before = st;
-        const after = await refresh();
-        // ⚠️ AND IT ANNOUNCES WHAT IT UNLOCKED TOO. A boss hands over the largest single pile of parts in
-        // the feature, so it is the likeliest thing to finish a recipe -- and the kill card lists what
-        // dropped without ever saying what that now lets you make. The card owns the celebration; this is
-        // the line that survives it, which is why it is not duplicated onto the card.
-        const made = before && after ? newlyReady(before, after) : [];
-        if (made.length) {
-            setNote(made.length === 1
-                ? `${made[0].name} is ready to craft`
-                : `${made[0].name} and ${made.length - 1} more ready to craft`);
-        }
-    }, [session, refresh, st]);
+        await refresh();
+        // ✂️ THE BOSS USED TO ANNOUNCE WHAT ITS HAUL FINISHED. It handed over the largest single pile
+        // of parts in the feature, so it was the likeliest thing to complete a recipe. It pays no parts
+        // and there are no recipes; the kill card owns the celebration on its own now.
+    }, [session, refresh]);
 
     const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
 
-    // ── ⚠️ "WHERE DID IT GO" IS A NAVIGATION PROBLEM, NOT A COPY PROBLEM ────────────────────────────
-    // Luke: "we also need the ability to go see where to go look at the item, because people have no
-    // idea where to go after they craft it. Like, it's just completely like disappeared."
+    // ── ✂️ `goToArea` WAS HERE ──────────────────────────────────────────────────────────────────────
+    // Luke: "we also need the ability to go see where to go look at the item, because people have no idea
+    // where to go after they craft it. Like, it's just completely like disappeared."
     //
-    // A tool, a food and a charm all land in three different Areas of the SAME panel, so telling someone
-    // where their thing went is one view switch and a scroll. Saying it in words on the card would be the
-    // lazy version -- the card can just take them there.
+    // It switched view, opened the target Area, scrolled to it and flashed it — and optionally scrolled on
+    // to one row inside it. Every caller was a craft result or a tool sheet pointing at a bench row.
     //
-    // ⚠️ THE SCROLL WAITS A FRAME. setView re-renders the panel, and the target Area does not exist in
-    // the DOM until that paint lands -- scrolling in the same tick finds nothing and silently does
-    // nothing, which looks exactly like a dead button.
-    // elId: an optional element INSIDE the area to finish on — a single recipe row rather than the whole
-    // workbench. The area still has to be opened and scrolled first, because the row does not exist in the
-    // DOM at all while its shelf is collapsed.
-    const goToArea = useCallback((view, areaId, elId = null) => {
-        setView(view);
-        if (!areaId) return;
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-            // ⚠️ OPEN IT BEFORE SCROLLING TO IT. A shelf the player collapsed earlier would otherwise
-            // answer "where did it go" with a closed lid, which is worse than not offering the button.
-            window.dispatchEvent(new CustomEvent(OPEN_AREA_EVENT, { detail: areaId }));
-            const el = document.getElementById(`area-${areaId}`);
-            if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-            // A flash on arrival, because a smooth scroll that lands on a wall of panels leaves the
-            // player hunting for which one moved.
-            el.classList.add("is-found");
-            setTimeout(() => el.classList.remove("is-found"), 1800);
-            if (!elId) return;
-            // One more frame: the shelf was collapsed a moment ago and its children have only just
-            // mounted, so the row is not addressable until after this paint.
-            requestAnimationFrame(() => {
-                const row = document.getElementById(elId);
-                if (!row) return;
-                row.scrollIntoView({ behavior: "smooth", block: "center" });
-                row.classList.add("is-found");
-                setTimeout(() => row.classList.remove("is-found"), 1800);
-            });
-        }));
-    }, []);
+    // ⚠️ TWO THINGS IT LEARNED THE HARD WAY, FOR WHOEVER NEEDS THIS AGAIN: the scroll has to wait a frame
+    // (setView re-renders the panel, and the target does not exist in the DOM until that paint lands, so
+    // scrolling in the same tick silently does nothing and looks like a dead button), and a collapsed
+    // shelf has to be OPENED before being scrolled to, or "where did it go" is answered with a closed lid.
 
     // ── WHAT YOU BUILT, AND IT IS BUILT ON THE SERVER ───────────────────────────────────────────────
     // Luke: "Every stat should be important that you have on your gear, as well as all the passives that
@@ -726,23 +541,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // the Grove's emblems folded into the SAME stat pool so an emblem's Might rides the same curve a
     // sword's does. Nothing is summed here any more — a second copy of the arithmetic is how the two would
     // drift. See grove-kit.js.
-    // ── ⚠️ WHAT IS WAITING FOR YOU, ON THE BUTTON, IN THE ZONE ──────────────────────────────────────
-    // Luke: "little wolf not crafting, we should find a way to guide and condition him."
-    //
-    // The workbench already says "5 READY" -- but only once you have opened it, and nothing ever gives a
-    // player a reason to open it. A kid with 93 Bound Straw and twenty-five makeable recipes has no way of
-    // knowing any of that from inside the fight, which is where he spends his whole session.
-    //
-    // So the number comes out to the button. It counts BOTH things that are waiting -- recipes you could
-    // make now and chests you have not opened -- because from the player's side those are one question:
-    // is there anything to go and do. No tutorial, no prompt, no modal: a number on a door, which is how
-    // this game teaches everything else. See [[teach-by-showing-not-telling]].
-    const benchReady = useMemo(() => {
-        if (!st) return 0;
-        // ⚠️ THIS USED TO ADD UNOPENED CHESTS to the craftable count, because from the player's side
-        // "is there anything to do at the bench" was one question. Chests are gone; it is just the count.
-        return readyCount(st);
-    }, [st]);
+    // ── ✂️ `benchReady` WAS HERE ────────────────────────────────────────────────────────────────────
+    // Luke: "little wolf not crafting, we should find a way to guide and condition him." The bench said
+    // "5 READY" but only once opened, so the count came out onto the zone dock button — a number on a
+    // door, which is how this game teaches everything. There is no door and nothing to count.
 
     const stats = useMemo(() => {
         const h = st?.hero;
@@ -918,8 +720,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // So the panels are computed here, once, and rendered either as the hub body or as a sheet over a
     // PAUSED zone. `panel` is what decides which one shows: the dock view on the hub, and the zone's own
     // separate selection while in a node, because `view` is "zone" the whole time you are in one.
-    const bagRows = Object.entries(st.pack || {});
-    const known = new Set(st.recipes || []);
     // ⚠️ THE TRAIL STOPS WHERE YOU DID. Drawing the whole route in confident ink would tell a new player
     // the shape of a map they have not earned; drawing none of it loses the one thing the chart is for.
     // Faint for the whole journey, inked as far as you have actually walked.
@@ -1063,50 +863,17 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         places on the second. The pips are kept rather than the count because they say
                         strictly more — per zone, cleared or boss or locked, and which one is next —
                         and the count rides along as the quick version of the same fact. */}
-                    {/* ⚠️ ONLY WHEN IT HAS SOMETHING IN IT. The plate used to hold the map name, the
-                        arrows and the pips, so it always had content; with those gone it is just the
-                        wishlist, and on a save with an empty wishlist it rendered as a bare parchment
-                        dot floating over the first row — a control with nothing in it. */}
-                    {wish.length ? (
-                    <div className="gv-paper-chrome">
-                        {/* ── ⚠️ THE PAPER HEAD AND PIPS CAME OUT WITH THE CHART ─────────────────
-                            They were the map's name, two arrows to page between maps, and twelve pips
-                            of progress — a floating plate that made sense when the chart showed ONE map
-                            at a time. The atlas shows every map at once with its name and count on its
-                            own row, so the plate was a second, disagreeing answer to the same question
-                            (it counted CLEARED zones while the row counts UNLOCKED ones) parked on top
-                            of the first row. One place says how far you are now. */}
-                        {/* ── THE LIST ITSELF, AND THE ONE WAY OFF IT ──────────────────────────────
-                            Luke: "you can tap to remove similar to how yoi add. And an abikity to clear
-                            your wishlist."
+                    {/* ── ✂️ THE WISHLIST PLATE WAS HERE ─────────────────────────────────────────────
+                        A shopping list of PARTS, kept client-side, shared between the map, the bag
+                        and the bench. Luke: "you can tap to remove similar to how yoi add. And an
+                        abikity to clear your wishlist."
 
-                            ⚠️ IT IS ONLY HERE WHEN THERE IS ONE. A permanently docked empty strip saying
-                            "wishlist" would spend a row of the map on a feature most sessions never use,
-                            and the map is the surface Luke has already called out four times for being
-                            cramped on a phone. No list, no bar.
-
-                            ⚠️ AND THE SAME TAP TAKES IT OFF. Adding is a tap on a part; removing has to be
-                            a tap on the same part, or the player has to learn two gestures for one idea.
-                            Clear is a separate shape on the far side so it cannot be hit by aiming at the
-                            last chip. */}
-                        {wish.length ? (
-                            <div className="gv-wishbar">
-                                <ul>
-                                    {wish.map((pt) => (
-                                        <li key={pt}>
-                                            <button type="button" onClick={() => toggleWish(pt)}
-                                                title={`${partName(pt)} — tap to take off the list`}>
-                                                <PartIcon id={pt} size={20} />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <button type="button" className="gv-wish-clear" onClick={clearWish}
-                                    aria-label="Clear the whole list"><GiBroom aria-hidden="true" /></button>
-                            </div>
-                        ) : null}
-                    </div>
-                    ) : null}
+                        It only ever held parts, so it went with them. Two rules it was built on are
+                        worth keeping in mind for whatever replaces it: the plate was rendered ONLY
+                        when it had something in it, because a permanently docked empty strip spends a
+                        row of the most cramped surface in the game on a feature most sessions never
+                        use — and adding and removing were the SAME tap, because two gestures for one
+                        idea is a thing the player has to learn instead of just doing. */}
                     </div>
                 ) : null}
 
@@ -1117,85 +884,32 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     started dropping it. `refresh` is passed because equipping recomputes st.hero on the
                     server, and st.hero is what the scene fights with. */}
                 {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
-                {panel === "quests"
-                    ? (
-                        /* ⚠️ BOTH SOURCES. In a zone the board rides the session; at the hub there is
-                           no session, and the hub is the only place this panel can be opened from.
-                           Reading one of the two is how it was always empty. */
-                        <GroveQuests
-                            quests={session?.quests || st?.quests || []}
-                            coliseum={session?.coliseum || null}
-                            // ⚠️ THE PANEL TAKES KEYS TOO, so it hands back the map it acted on.
-                            onChanged={(mapN) => { refresh(); refreshBoard(mapN || session?.zone?.map || null); }}
-                            busy={col.busy || Boolean(col.run)}
-                            onEnter={(map) => { col.start(map); setZonePanel(null); }}
-                            // ⚠️ THE SHORTCUT, AND IT GOES THROUGH THE SAME claimStep THE GIVER USES —
-                            // the server re-reads the requirement and the payout from the catalogue
-                            // either way, so a hand-in from a menu cannot pay differently from a
-                            // hand-in in the world. See the note at the top of GroveQuests for why it
-                            // is back at all.
-                            onHandIn={claimStep}
-                            // ⚠️ "Go to" WALKS YOU THERE, which is the half that makes "where" useful —
-                            // a log that names a room you then have to go and find on the map has only
-                            // moved the search. travel() takes the GLOBAL zone number, which is what the
-                            // board already speaks, and enter() flips the view to the zone itself.
-                            //
-                            // Checked against st.zones first, because entering a locked room answers
-                            // "That one is still closed." as a note over a panel that just closed —
-                            // saying so here keeps the refusal next to the button that caused it.
-                            onGo={(n) => {
-                                const z = (st?.zones || []).find((x) => Number(x.n) === Number(n));
-                                if (z && !z.unlocked) { setNote(`${z.name} is still closed.`); return; }
-                                setZonePanel(null);
-                                travel(Number(n));
-                            }}
-                        />
-                    )
-                    : null}
+                {/* ── ✂️ THE QUESTS PANEL WAS HERE ───────────────────────────────────────────────────
+                    The board, the Coliseum card inside it, a hand-in shortcut that went through the
+                    same claimStep the giver used so a menu hand-in could not pay differently from one
+                    in the world, and a "Go to" that walked you to the zone rather than naming it.
+
+                    ⚠️ THE COLISEUM IS STILL REACHABLE — it was a card INSIDE this panel, but it is
+                    also a building standing in its own zone, which is how the marshal is reached.
+                    That was checked before this came out. */}
 
                 {panel === "bag" ? (
                     <div className="gv-bag">
-                        {/* ⚠️ A COUNT, NOT A CAPACITY. It said "6/20" when twenty was a ceiling you had
-                            to craft your way past; now it says how many KINDS of thing you are carrying,
-                            which is the only part of that number that was ever interesting. */}
-                        <Area id="bag" icon="ui-bag" title="Backpack"
-                            count={`${bagRows.length} kind${bagRows.length === 1 ? "" : "s"}`}>
-                            {/* -- THE EMPTY SLOTS ARE DRAWN -------------------------------------
-                                Luke: "a lot of void in the area where we show the items."
+                        {/* ── ✂️ THE PARTS GRID AND THE BANK'S EPITAPH WERE BOTH HERE ───────────────
+                            The grid was the Backpack proper: every kind of part you were carrying,
+                            drawn into its painted capacity so the void read as room rather than as a
+                            mistake, each cell a button into the part's sheet. Parts were deleted on
+                            2026-11-08 and it would now draw an empty board for everybody.
 
-                                The grid only ever held what you were carrying, so six parts in a bag of
-                                twenty left most of a painted board empty, and empty board reads as a
-                                mistake. Every inventory in every game draws its capacity instead, which
-                                turns the void into what it actually is: room. It also states 6/20 twice,
-                                once as a number and once as a shape, and the shape is the half a counter
-                                on its own can never tell you. */}
-                            <div className="gv-inv">
-                                {/* ⚠️ NOT BUTTONS ANY MORE. Their only job was tap-to-bank, and there is no
-                                    bank to tap into. A control that looks pressable and does nothing is
-                                    worse than a label. */}
-                                {/* ⚠️ BUTTONS AGAIN, BECAUSE THERE IS FINALLY SOMETHING BEHIND THEM. They
-                                    were demoted to inert spans when the bank went away and tap-to-bank
-                                    went with it — correctly, at the time. A tap now opens the part's
-                                    sheet: what drops it, where those live, and every recipe that wants
-                                    it, each one a door back to its row at the bench. */}
-                                {bagRows.map(([p, n]) => (
-                                    <button key={p} type="button" className="gv-cell" title={`${partName(p)} — tap to see what it is for`}
-                                        onClick={() => setPartView(p)}>
-                                        <span className="gv-cell-face"><PartIcon id={p} size={46} /><i>{n}</i></span>
-                                        <span className="gv-cell-name">{partName(p)}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </Area>
-                        {/* ── ⚠️ THE BANK IS GONE ───────────────────────────────────────────────
-                            Luke: "I think we get rid of the idea of a bank. And get rid of bag slot
-                            limits. And get rid of bank and backpack expansions. Its just a lame mechanic
-                            that is a meaningless tax on the player."
+                            The bank had already gone, and its note is worth carrying forward because
+                            it is the same judgement twice. Luke: "I think we get rid of the idea of a
+                            bank. And get rid of bag slot limits. And get rid of bank and backpack
+                            expansions. Its just a lame mechanic that is a meaningless tax on the
+                            player."
 
-                            A bank only means something when a bag is full, and the bag no longer fills.
-                            What stood here was a second grid, a second counter, a tap-to-bank on every
-                            item and a tap-to-take on every item back — an entire screen of shuffling
-                            that existed to service a limit nobody wanted. */}
+                            ⚠️ THE PANEL KEEPS ITS NAME. What is left under "Backpack" is the belt, the
+                            charms and the tools — three things you are carrying — so the door is still
+                            honest even though the grid behind it is gone. */}
                         {/* ── THE BELT ────────────────────────────────────────────────────────────────
                             Luke: "a way to equip food or potions that auto heal you if you get below 60
                             percent hp." One slot: choosing which is the decision. */}
@@ -1261,8 +975,15 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                                 // because you have none reads identically to one that is blank because the
                                 // feature is broken, and a charm recipe is the one thing on the bench a
                                 // player cannot find by looking for it.
-                                <p className="gv-empty">None yet. A map&apos;s last boss teaches its charm
-                                    &mdash; beat one and the recipe appears at the workbench.</p>
+                                // ⚠️ IT NO LONGER NAMES A SOURCE, BECAUSE THERE IS NOT ONE. This used to
+                                // read "A map's last boss teaches its charm" — true until 2026-11-08,
+                                // when the bench that made them went and the boss stopped teaching. A
+                                // blank shelf still has to say SOMETHING or it reads as broken, but it
+                                // must not send somebody to go and do a thing that cannot be done:
+                                // [[migrating-a-category-strands-its-drop-paths]] is exactly this
+                                // failure, where an empty pool read to players as bad luck. See item R.
+                                <p className="gv-empty">None yet, and no way to get one at the
+                                    moment.</p>
                             )}
                         </Area>
 
@@ -1332,23 +1053,15 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                             </div>
                         </Area>
 
-                        {/* The stone tablet, which is a record of what the Grove has shown you. */}
-                        <Area id="tablet" icon="ui-tablet" title="The Tablet"
-                            count={`${st.tablet.seen}/${st.tablet.total}`}>
-                            <p><b>{st.tablet.seen}</b> of <b>{st.tablet.total}</b> parts discovered</p>
-                            <ul>{st.tablet.bonuses.map((b) => <li key={b.at}>{b.label} — +{b.value}{b.kind === "pct" ? "%" : ""} {b.stat.replace(/_/g, " ")}</li>)}</ul>
-                        </Area>
+                        {/* ✂️ THE TABLET WAS HERE — "14 of 16 parts discovered", and a list of the
+                            bonuses that came with the breakpoints. Both halves died with parts, and
+                            the bonus half had never been real: tabletBonuses was read by the state
+                            payload and by nothing else, so every breakpoint it showed as earned never
+                            reached a roll. See the note in groveState. */}
                     </div>
                 ) : null}
 
-                {/* ── THE WORKBENCH ────────────────────────────────────────────────────────────────── */}
-                {panel === "bench" ? (
-                    <GroveBench
-                        st={st} known={known} partName={partName} PartIcon={PartIcon}
-                        post={post} refresh={refresh} setNote={setNote}
-                        onGoTo={goToArea}
-                    />
-                ) : null}
+                {/* ✂️ THE WORKBENCH PANEL WAS HERE. 905 lines of GroveBench, deleted 2026-11-08. */}
 
                 {/* ── EMBLEMS ──────────────────────────────────────────────────────────────────────── */}
                 {panel === "statues" ? (
@@ -1534,34 +1247,19 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     //
     // ⚠️ PORTALLED, because GroveScene portals its full-screen layer to the body — anything left in the
     // page tree paints UNDERNEATH the zone however high its z-index is set.
-    const partSheet = partView && mounted ? createPortal((
-        <GrovePartSheet
-            part={partView} have={Number(st.pack?.[partView] || 0)}
-            wished={wish.includes(partView)}
-            partName={partName} PartIcon={PartIcon}
-            onToggleWish={toggleWish}
-            onClose={() => setPartView(null)}
-            onGoRecipe={(recipeId) => {
-                setPartView(null);
-                // Clear the bench's chips first: a player narrowed to Tools would otherwise be scrolled
-                // at a food row that is not in the DOM. See SHOW_RECIPE_EVENT.
-                window.dispatchEvent(new CustomEvent(SHOW_RECIPE_EVENT, { detail: recipeId }));
-                goToArea("bench", "bench", `gv-rec-${recipeId}`);
-            }}
-        />
-    ), fsHost || document.body) : null;
+    // ✂️ `partSheet` WAS HERE — the part's own sheet, which answered both directions of the loop:
+    // backwards to which creatures carry it and which zones they live in, and forwards to every recipe
+    // that wanted it. The forwards half had nowhere left to point.
+    const partSheet = null;
 
     // Same two-returns rule as partSheet above, and the same portal target for the same reason.
     const toolSheet = toolView && mounted ? createPortal((
         <GroveToolSheet
-            tool={toolView} pack={st.pack || {}}
-            partName={partName} PartIcon={PartIcon}
+            tool={toolView}
             onClose={() => setToolView(null)}
-            onGoRecipe={(recipeId) => {
-                setToolView(null);
-                window.dispatchEvent(new CustomEvent(SHOW_RECIPE_EVENT, { detail: recipeId }));
-                goToArea("bench", "bench", `gv-rec-${recipeId}`);
-            }}
+            // ✂️ `onGoRecipe` was here. The sheet priced the next rung against the bag and offered a
+            // door straight to that row at the bench — "it came out Fine, which a rework can still
+            // re-roll". Every route it offered ended on a bench row, so all of them are gone.
         />
     ), fsHost || document.body) : null;
 
@@ -1570,13 +1268,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             <div className="gv">
                 <GroveScene
                     zone={session.zone} seed={session.seed} bonuses={session.bonuses} gearArt={session.gearArt}
-                    // Whoever is standing in THIS zone, if anyone. Most zones have nobody — three givers
-                    // across twelve rooms — so the scene draws a figure only when this is non-null.
-                    npcHere={col.run ? null : (session.npcHere || null)}
-                    // ⚠️ FROM THE SESSION'S OWN BOARD, which refreshBoard keeps current -- so the badge
-                    // moves the moment a step finishes rather than at the next zone entry.
-                    questsReady={(session.quests || []).filter((q) => q.active?.ready).length}
-                    questsActive={(session.quests || []).filter((q) => q.active?.started && !q.active.ready).length}
+                    // ✂️ npcHere, questsReady and questsActive were passed here — the figure the scene
+                    // drew in a zone a giver stood in, and the two counts behind its badge.
                     // ── ⚠️ THE COLISEUM IS IN A ZONE, SO IT IS DRAWN IN THAT ZONE ───────────────
                     // coliseumState is keyed on MAP, which is why its card showed up identically in
                     // all twelve rooms and "Coliseum · zone 7" was a sentence about a place that did
@@ -1596,10 +1289,9 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         setZonePanel(null);
                     }}
                     onMarshal={() => setMarshalOpen(true)}
-                    // ⚠️ THE GIVER, NOT THE PANEL. This used to open the quest list, which made walking up
-                    // to somebody a long way of pressing a menu button. Luke: "Needs to feel like an mmo
-                    // where you turn in next to them, not a panel ui form game."
-                    onTalk={() => setGiverOpen(true)}
+                    // ✂️ `onTalk` was here — walking up to the giver opened his dialogue in the world
+                    // rather than a menu. Luke: "Needs to feel like an mmo where you turn in next to them,
+                    // not a panel ui form game." The marshal keeps that treatment; he is onMarshal above.
                     // ⚠️ THE ARENA REPLACES THE ZONE'S WORLD, it does not sit beside it. Handing both would
                     // put the zone's doors and its three-hundred-unit floor into a twenty-six unit room.
                     arena={col.run ? { ...col.run.plan.arena, runMs: col.run.plan.runMs } : null}
@@ -1625,7 +1317,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // bites in the actual game: the bench passes its own value, so every rig would
                     // still have shown it working. Declared but never mounted, in its purest form.
                     petBite={session.petBite ?? st?.petBite ?? 0}
-                    benchReady={benchReady}
                     bagRoom={bagRoom}
                     belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
@@ -1639,7 +1330,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // same as "does not pause", and the zone has a clock: the note on this prop says an
                     // unpaused sheet "would quietly spend your food while you were not looking". Reading
                     // four lines of dialogue is exactly not looking.
-                    paused={zonePanel !== null || giverOpen || marshalOpen}
+                    paused={zonePanel !== null || marshalOpen}
                     onPanel={setZonePanel}
                     // Luke: "when you die it should send you back to town." ⚠️ router.push, NOT the
                     // leave handler — leaving drops you on the Grove map, which is the screen inviting you
@@ -1659,22 +1350,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also
                     not a zonePanel: a panel REPLACES the scene, and this is a person you are talking to
                     while standing in front of them. */}
-                {questTick && mounted ? createPortal((
-                    <div key={questTick.key}
-                        className={`gv-qtick${questTick.done ? " is-done" : ""}`}
-                        role="status">
-                        <span className="gv-qtick-top">
-                            {questTick.done ? "Ready to hand in" : "Quest"}
-                        </span>
-                        <b>{questTick.title}</b>
-                        <span className="gv-qtick-bar" aria-hidden="true">
-                            <i style={{ width: `${questTick.need > 0
-                                ? Math.min(100, (100 * questTick.progress) / questTick.need) : 0}%` }} />
-                        </span>
-                        <span className="gv-qtick-num">{questTick.progress}/{questTick.need}</span>
-                    </div>
-                ), fsHost || document.body) : null}
-
+                {/* ✂️ THE QUEST-PROGRESS TOAST WAS HERE — the bar that moved over the fight when a
+                    step advanced, with a finished step outranking one that merely ticked. */}
                 {/* ── ⚠️ PORTALLED, LIKE EVERY OTHER THING THAT COVERS THE ZONE ──────────────────────
                     Luke: "Clicking npc freezes."
 
@@ -1701,16 +1378,24 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     ⚠️ fsHost || document.body, NOT document.body. A browser in native full screen
                     paints only the full-screen element's subtree, so a dialogue portalled to the body
                     is a SIBLING of the scene: in the DOM, correct in the stylesheet, and never drawn. */}
-                {giverOpen && session.npcHere && mounted ? createPortal((
-                    <GroveGiver
-                        npcHere={session.npcHere}
-                        busy={col.busy || Boolean(col.run)}
-                        onClaim={claimStep}
-                        onAccept={acceptStep}
-                        onClose={() => setGiverOpen(false)}
-                    />
-                ), fsHost || document.body) : null}
+                {/* ✂️ THE GIVER'S DIALOGUE WAS HERE. He stood in the zone and you talked to him
+                    without leaving it — problem, ask, work, payoff, QUEST RECEIVED. */}
 
+                {/* ⚠️ PORTALLED, LIKE EVERY OTHER THING THAT COVERS THE ZONE. GroveScene portals its
+                    full-screen layer to the body (or to its own host in native full screen), so anything
+                    left in the page tree is laid out inside a `.gv` with no content in it and the zone is
+                    painted over the top. Measured on a 412x915 phone, a card left behind came out a 377x34
+                    box at (17,135) and elementFromPoint over the middle of it returned `div.gv-world` —
+                    every tap went to the forest instead, which is what "Clicking npc freezes" was.
+
+                    ⚠️ fsHost || document.body, NOT document.body. A browser in native full screen paints
+                    only the full-screen element's subtree, so a card portalled to the body is a SIBLING of
+                    the scene: in the DOM, correct in the stylesheet, and never drawn.
+
+                    ⚠️ AND THIS IS THE COLISEUM'S ONLY DOOR NOW. The Quests panel used to hold a Coliseum
+                    card as well; with that panel deleted, walking up to the marshal is the whole of the
+                    way in. It was briefly cut along with the giver beside it — lint:undef caught it,
+                    because takeColiseumKey was suddenly a handler nothing called. */}
                 {marshalOpen && session.coliseum && mounted ? createPortal((
                     <GroveMarshal
                         coliseum={session.coliseum}
@@ -1720,67 +1405,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         onClose={() => setMarshalOpen(false)}
                     />
                 ), fsHost || document.body) : null}
-                {/* ⚠️ PORTALLED TOO, and for the same reason as the giver above — this is a click-to-dismiss
-                    card over the zone, and the zone is somewhere else in the DOM. It does not pause the
-                    scene, so it was never a freeze; it was a boss-kill card and its loot laid out inside a
-                    `.gv` box with nothing left in it, underneath the forest. */}
-                {bossWon && mounted ? createPortal((
-                    <div className="gv-unlock gv-won" onClick={() => setBossWon(null)}>
-                        <div>
-                            <span>{bossWon.first ? "First kill" : `Kill ${bossWon.kills}`}</span>
-                            <b>{bossWon.boss?.name}</b>
-                            {bossWon.boss?.art ? <img src={bossWon.boss.art} alt="" /> : null}
-                            <p className="gv-won-loot">
-                                {Object.entries(bossWon.parts || {}).map(([k, n]) => `${n} ${partName(k)}`).join(" · ")}
-                                {bossWon.emblem ? ` · ${GROVE_EMBLEMS[bossWon.emblem]?.name || "an emblem"}` : ""}
-                            </p>
-                            {/* The hyper-rare gets its own line and its own weight. It is roughly one boss in
-                                forty-five at the deepest zone, so when it lands it must not be a word in a
-                                list of roots. */}
-                            {bossWon.hyper ? <strong className="gv-hyper">{bossWon.hyper.name}</strong> : null}
-                            {/* ⚠️ THE CHEST AND THE MERIT TOTAL WERE ANNOUNCED HERE. Both removed with
-                                the systems behind them; the card still shows the parts, the emblem, the
-                                hyper-rare and the recipe, which is where the dopamine actually was. */}
-                            {/* ── ⚠️ THE RECIPE IT TAUGHT, AND IT GETS THE LOUDEST LINE ON THE CARD ──
-                                This happens once per map, ever, and it is the only way a recipe reaches
-                                the bench that is not simply being alive. A row quietly appearing in a
-                                list of two hundred is a reward nobody notices they earned — see
-                                [[reward-with-no-screen-is-not-shipped]], which is the same scar as the
-                                chest line above it. */}
-                            {bossWon.taught ? (
-                                <strong className="gv-won-taught">
-                                    <GiStoneCrafting aria-hidden="true" focusable="false" />
-                                    It taught you {bossWon.taught.name}
-                                    <em>a new recipe, at the workbench</em>
-                                </strong>
-                            ) : null}
-                            <button type="button" onClick={() => setBossWon(null)}>Good</button>
-                        </div>
-                    </div>
-                ), fsHost || document.body) : null}
-                {/* ── ⚠️ THE PANEL IS A SHEET OVER THE ZONE, NOT A SCREEN INSTEAD OF IT ────────────
-                    Luke: "The buttons to access crafting and backpack and map should be available when in
-                    a node on the Grove." The scene stays mounted underneath — see the hoist note for why
-                    unmounting it would hand out a free full heal — and the dock that opens this lives in
-                    GroveScene, because the scene owns the unsettled kill log and has to bank it before a
-                    backpack is worth looking at. */}
-                {/* ── ⚠️ THE NOTE HAD NO SCREEN IN THE ONE PLACE IT FIRES ───────────────────────────
-                    setNote is called from the settle, from the boss and from the door -- all of which
-                    happen while you are standing IN a zone -- and the zone branch rendered it nowhere.
-                    The only .gv-note in this view was inside the panel sheet, so the line appeared if you
-                    happened to open your backpack afterwards and never otherwise. "Found Gnawed Root" has
-                    been firing into nothing since it was written, which is most of why crafting is
-                    invisible from the zone: the game has been telling nobody.
-
-                    ⚠️ PORTALLED, FOR THE SAME REASON THE SHEET IS. GroveScene portals its full-screen
-                    layer to the body (or to its own host in native full screen), so anything rendered in
-                    the page tree paints UNDERNEATH the zone however high its z-index is set -- see the
-                    note on the sheet below, which cost a reload to discover. Sibling of the scene at 78:
-                    above the zone at 70, below the sheet at 80, so opening a panel covers it. */}
-                {note && mounted ? createPortal(
-                    <p className="gv-note is-zone" onClick={() => setNote(null)}>{note}</p>,
-                    fsHost || document.body,
-                ) : null}
 
                 {partSheet}
                 {toolSheet}
@@ -1847,14 +1471,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 open={menuOpen}
                 onOpen={() => setMenuOpen(true)}
                 onClose={() => setMenuOpen(false)}
-                families={familiesFor({
-                    benchFresh: st ? readyCount(st) : 0,
-                    statuesHeld: statueCount,
-                    // The hub has no session, so the board comes off st -- the same list, read from the
-                    // other of its two homes. See the note where GroveQuests is mounted.
-                    questsReady: (st?.quests || []).filter((q) => q.active?.ready).length,
-                    questsActive: (st?.quests || []).filter((q) => q.active?.started && !q.active.ready).length,
-                })}
+                families={familiesFor({ statuesHeld: statueCount })}
                 current={view}
                 onPick={(k) => setView(k)}
             />

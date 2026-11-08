@@ -26,6 +26,24 @@ export function useColiseum({ onChanged } = {}) {
         return r.json().catch(() => ({ ok: false, error: "bad_response" }));
     }, []);
 
+    // ── ⚠️ THE DAILY KEY LIVES HERE NOW ────────────────────────────────────────────────────────────
+    // It used to POST to /api/marketplace/grove/quests, because a finished quest chain was the other way
+    // to get one. The chains were deleted on 2026-11-08 and that route went with them, so the daily is
+    // the ONLY faucet — which made moving it a correctness job rather than tidying: a marshal still
+    // offering a key against a deleted endpoint is a dead button on the only door into the Coliseum.
+    //
+    // It returns the FRESH STATE, not just ok. The caller has a copy of this map's coliseum card on
+    // screen, and without the new keys/dailyReady the button re-offers a key you have already taken and
+    // the card still reads none — which is the bug the old call had to fix with a second refresh.
+    const takeKey = useCallback(async (map) => {
+        const j = await post({ action: "daily", map });
+        if (!j?.ok) return { ok: false, error: j?.error || "no_key" };
+        const r = await fetch(`/api/marketplace/grove/coliseum?map=${map}`)
+            .then((x) => x.json()).catch(() => null);
+        onChanged?.();
+        return { ok: true, state: r?.state || null };
+    }, [post, onChanged]);
+
     const start = useCallback(async (map) => {
         if (busy || run) return;
         setBusy(true);
@@ -69,5 +87,5 @@ export function useColiseum({ onChanged } = {}) {
         return j;
     }, [post, onChanged]);
 
-    return { run, chests, busy, result, start, finish, open, clearResult: () => setResult(null) };
+    return { run, chests, busy, result, start, finish, open, takeKey, clearResult: () => setResult(null) };
 }

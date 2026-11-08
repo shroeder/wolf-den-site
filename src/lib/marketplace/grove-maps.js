@@ -201,7 +201,13 @@ export const GROVE_MAPS = [
     {
         n: 4, id: "saltwrack", short: "Saltwrack", name: "The Saltwrack Coast",
         blurb: "Everything the sea did not want, arranged in a line.",
-        emblem: { id: "em_saltwrack", name: "The Wrack Mark", stat: "part_yield", per: 2.0, kind: "pct" },
+        // ⚠️ RE-POINTED FROM part_yield, 2026-11-08, WHEN PARTS WERE DELETED. Map 6 is built, so this
+        // card is live and members already hold it — leaving it on a stat nothing reads would have made
+        // an owned collectible silently worth nothing, which bonusesFrom calls "the one failure a
+        // collectible cannot survive". rarity_find is the faithful landing: "the tide brings more than
+        // it owes" still reads true when what it brings is gear, emblems and statues instead of parts,
+        // and it is the stat the parts roll shared with everything else it touched. Same per-level value.
+        emblem: { id: "em_saltwrack", name: "The Wrack Mark", stat: "rarity_find", per: 2.0, kind: "pct" },
         parts: [
             P("oyster_edge", "Oyster Edge", "edge", 1, "Opens a hand as easily as it opens itself."),
             P("driftwood", "Driftwood", "haft", 1, "Smoothed by a thousand miles of going nowhere."),
@@ -398,7 +404,12 @@ export const GROVE_MAPS = [
         // passed `deeperMap` to creatureRareLoot since maps 2-12 were declared. So this adds no mechanism;
         // it raises the rate of one that shipped. The draft said "a kill has a chance to also drop a part
         // from one map deeper", which overstated it -- every map already does that.
-        emblem: { id: "em_cogwork", name: "The Geared Mark", stat: "salvage", per: 1.6, kind: "pct" },
+        // ⚠️ RE-POINTED FROM salvage, 2026-11-08. `salvage` scaled the rare row — a part from one map
+        // deeper — and that row is deleted, so the stat had no reader left. Map 8 is unbuilt and nobody
+        // has ever held this card, so unlike the Wrack Mark above this is a free re-author rather than a
+        // change to something a member owns. gold_find rather than a second rarity_find: map 6 now holds
+        // that one, and two cards with the same effect is the drift this file keeps warning about.
+        emblem: { id: "em_cogwork", name: "The Geared Mark", stat: "gold_find", per: 1.6, kind: "pct" },
         parts: [
             P("brass_burr", "Brass Burr", "edge", 1, "Came off a tooth that was still turning."),
             P("piston_rod", "Piston Rod", "haft", 1, "Straight in a way nothing grown ever is."),
@@ -979,7 +990,7 @@ export const MAP_ZONES = GROVE_MAPS.filter((m) => m.zones).flatMap((m) =>
 //
 //   Undercave   hyper_find   things in the dark are worse than they look
 //   Sunken Fen  chest_find   the bog keeps what it takes
-//   Saltwrack   part_yield   the tide brings more than it owes
+//   Saltwrack   rarity_find  the tide brings more than it owes  (part_yield until 2026-11-08)
 //   Drowned     gold_find    somebody was rich here once
 //   Gilded      xp_find      the only thing in the sand actually worth having
 //   Ashen Reach overkill     the forge: less of a blow needed to count for two

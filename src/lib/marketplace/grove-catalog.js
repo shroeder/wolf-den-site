@@ -1249,6 +1249,20 @@ export function zoneHasParts(zone, parts) {
 }
 
 export const groveZone = (id) => GROVE_ZONES.find((z) => z.id === id) || null;
+
+/**
+ * Every zone belonging to a map, in order.
+ *
+ * ⚠️ MOVED HERE FROM grove-npcs.js ON 2026-11-08, when the quest givers were deleted. It was in that file
+ * because a quest step resolved its target zone from the NPC's map, but it is a plain question about the
+ * catalogue and this is where the catalogue lives — GROVE_ZONES is declared in this file.
+ *
+ * The `z.map || ceil(n / 12)` fallback is kept exactly as it was: zones authored before `map` existed do not
+ * carry one, and deriving it from the global zone number is what has always covered them.
+ */
+export function zonesOfMap(map) {
+    return GROVE_ZONES.filter((z) => (z.map || Math.ceil(z.n / 12)) === Number(map)).sort((a, b) => a.n - b.n);
+}
 export const groveBoss = (id) => GROVE_BOSSES[id] || null;
 export const grovePart = (id) => GROVE_PARTS[id] || null;
 export const groveEmblem = (id) => GROVE_EMBLEMS[id] || null;

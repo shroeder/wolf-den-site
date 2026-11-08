@@ -5,11 +5,10 @@ import { COLISEUM_H, coliseumArt } from "@/lib/marketplace/grove-arena.js";
 import { createPortal } from "react-dom";
 import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 
-import { useWishlist } from "./useWishlist.js";
 import GroveMenu from "./GroveMenu.js";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, dropsAnyOf, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, emblemArt, emblemFace, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKillTimes, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -176,11 +175,8 @@ const ZONE_FAMILIES = [
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
         ],
     },
-    {
-        title: "Make", rows: [
-            { k: "bench", label: "Workbench", art: "/images/grove/ui-bench.webp?v=2" },
-        ],
-    },
+    // ✂️ THE "Make" FAMILY WAS HERE. The dock and the hub menu carry the same families on purpose, so
+    // a player learns one arrangement; both lost this row on 2026-11-08.
 ];
 
 // ── REACH, IN WORLD UNITS ───────────────────────────────────────────────────────────────────────────────────
@@ -249,14 +245,19 @@ const PET_ENGAGE_MS = 900;
 // different places, and at the end of it the honest answer to "what am I actually getting in here" is that
 // you have no idea.
 //
-// So the tally is a SECOND surface, not a replacement: one row per kind, pinned left, counting up. A row's
-// life extends on every arrival rather than restarting, which is the "stays there longer" — a kind that keeps
-// dropping keeps its row, and the row for the thing you stopped finding ages out on its own.
-const HAUL_MS = 4200;            // how long a row survives its last arrival
-const HAUL_MAX_MS = 14_000;      // ⚠️ and the ceiling on that. Without it a common part in a good zone renews
-                                 // its row for ever and the tally becomes permanent furniture down one side
-                                 // of the screen -- which is the HUD the whole Grove was built without.
-const HAUL_ROWS = 5;             // oldest row falls off the bottom; five is what fits above the dock on a phone
+// ── ✂️ THE TALLY, AND ITS THREE CONSTANTS, ARE GONE ─────────────────────────────────────────────────────────
+// Luke, 2026-11-08: "I dont want the loot noise in the grove" — and then, rather than quieting it,
+// "I think we remove monster part items, remove crafting all together."
+//
+// It was one row per kind pinned down the left, counting up, where a row's life EXTENDED on every arrival
+// rather than restarting — so a kind that kept dropping kept its row and the kind you stopped finding aged
+// out on its own. HAUL_MS was 4.2s, HAUL_MAX_MS capped the renewal at 14s (without it a common part in a
+// good zone renewed for ever and the tally became permanent furniture down one side of the screen, which
+// is the HUD the whole Grove was built without), and HAUL_ROWS was 5, what fits above the dock on a phone.
+//
+// ⚠️ GEAR DOES NOT GET A TALLY TO REPLACE IT, AND SHOULD NOT. The tally existed because parts arrived in
+// volume and individually meant nothing; a gear drop is one object every forty kills that already gets a
+// label, a sound and a line on the settle receipt. A running list of one thing is furniture.
 
 // How far the pet will range to collect a drop. Generous on purpose — a fetcher that only picks up what
 // you were nearly standing on anyway has not saved you a single step, which is the entire feature.
@@ -266,8 +267,16 @@ const PET_FLANK_SLACK = 1.6;
 // And how close it has to get before the drop commits to it. Wider than the hero's LOOT_EAT_DIST because
 // the pet is 4.5 units tall against his 7 and reaching rather than walking over the top of it.
 const PET_FETCH_REACH = 3.2;
-// What the fetch bench puts on the floor. A zone-one part, so its sprite certainly exists; named here
-// rather than inline so the one place it is typed is the one place it can be wrong.
+// What the fetch bench puts on the floor, and it is now a FIXTURE ID rather than a live one.
+//
+// ⚠️ IT IS STILL A PART, ON PURPOSE. Parts stopped dropping on 2026-11-08 but GROVE_PARTS survives as
+// data, so grovePart and groveArt still resolve this and the pet-fetch bench still has something to film.
+// A fetch test needs an object on the ground with a real sprite; what that object IS does not matter to
+// the thing being tuned, which is how far the pet will range and whether the hand-off reads.
+//
+// ⚠️ DO NOT "FIX" THIS BY POINTING IT AT A GEAR ID. Gear art comes off the session payload through
+// gearArtRef — the scene has no database and cannot look one up — so a gear id here would photograph as
+// four invisible drops being fetched, which is exactly the bug the note below was written about.
 const LAB_FETCH_PART = "grub_fat";
 
 // ── THE DOORS ────────────────────────────────────────────────────────────────────────────────────────────
@@ -434,7 +443,7 @@ const bodyArt = (art, { swipe = false, claw = false } = {}) => (
 // ⚠️ THAT MEANS REACT WILL NOT REPAINT A LIVING CREATURE. Anything that must change about a body while it
 // lives belongs on the loop's side -- a class or a style the loop writes -- exactly as .gv-status and
 // .gv-ehp already are. Adding a prop here that changes during a life would silently stop updating.
-const FoeBody = memo(function FoeBody({ art, h, rare, isBoss, big, name, wish, onDown, refCb }) {
+const FoeBody = memo(function FoeBody({ art, h, rare, isBoss, big, name, onDown, refCb }) {
     return (
         <button type="button"
             className={`gv-foe${rare ? " is-rare" : ""}${isBoss ? " is-boss" : ""}`}
@@ -454,23 +463,15 @@ const FoeBody = memo(function FoeBody({ art, h, rare, isBoss, big, name, wish, o
                     <u /><i /><s />
                 </span>
             )}
-            {/* Which of these is carrying what you came for. Computed by the parent from the creature's id
-                and the wish list, both of which change on a tap and never on a frame. */}
-            {wish?.length ? (
-                <span className="gv-foe-wish" aria-hidden="true">
-                    {wish.slice(0, 3).map((pt) => (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img key={pt} src={groveArt(pt)} alt="" width={16} height={16} />
-                    ))}
-                </span>
-            ) : null}
+            {/* ✂️ THE WISHLIST BADGE WAS HERE — up to three wishlisted part sprites over a creature that
+                carried one, so you could pick a target out of nineteen bodies by what it was holding. */}
         </button>
     );
 });
 
 export default function GroveScene({
-    npcHere = null,
-    onTalk,
+    // ✂️ `npcHere` and `onTalk` were here — the quest giver standing in this zone, and the tap that
+    // opened his dialogue without leaving the world.
     // ── ⚠️ THE COLISEUM IS A PLACE YOU WALK TO NOW ──────────────────────────────────────────────
     // Luke asked where the Coliseum and its NPC were, and the honest answer was NOWHERE: the arena
     // existed, the marshal was drawn, and the only way in was a card in the quest panel that showed
@@ -509,11 +510,7 @@ export default function GroveScene({
     // meant two places that know how rarity becomes damage. 0 means no pet equipped, and the resolver
     // reads that as "do not bite", not as "bite for nothing".
     petBite: petShare = 0,
-    // How many things are waiting at the workbench -- craftable recipes plus unopened chests. Counted in
-    // GroveClient off the shared recipe rule; see the note there.
-    benchReady = 0,
     onSettle, onBoss, onLeave, onDeath, onTravel, onPanel, paused = false, unlockedN = 1,
-    questsReady = 0, questsActive = 0,
 }) {
     const hostRef = useRef(null);
     const worldLayerRef = useRef(null);
@@ -638,23 +635,16 @@ export default function GroveScene({
     const [gen, bumpGen] = useState(0);
     const rerender = useCallback(() => bumpGen((g) => g + 1), []);
 
-    // ── WHAT THE CREATURES IN THIS ZONE ARE CARRYING OFF YOUR LIST ──────────────────────────────
-    // ⚠️ KEYED BY CREATURE AND BUILT ONCE PER (zone, list). Every body in the zone renders against it, so
-    // the alternative is dropsAnyOf per body per re-render — and the answer is the same for all nineteen
-    // Husks on screen. Memoised on the list joined, not on the array, because the hook hands back a new
-    // array identity on every notify.
-    const { wish } = useWishlist();
-    const wishKey = wish.join(",");
-    const wishHere = useMemo(() => {
-        const out = {};
-        if (!wish.length) return out;
-        for (const id of [...(zone?.enemies || []), GROVE_RARE.id]) {
-            const hit = wish.filter((p) => dropsAnyOf(id, [p]));
-            if (hit.length) out[id] = hit;
-        }
-        return out;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [zone?.id, wishKey]);
+    // ── ✂️ WHAT THE CREATURES IN THIS ZONE WERE CARRYING OFF YOUR LIST ──────────────────────────
+    // Up to three wishlisted PART sprites floated over any creature that dropped one, so you could pick
+    // your target out of nineteen bodies by what it was carrying. Deleted with parts on 2026-11-08, along
+    // with the wishlist itself.
+    //
+    // ⚠️ THE MEMOISATION IS THE PART WORTH KEEPING IN MIND. It was keyed by creature and built once per
+    // (zone, list), because every body in the zone rendered against it and the alternative was dropsAnyOf
+    // per body per re-render — the same answer recomputed for all nineteen Husks on screen. And it keyed on
+    // the list JOINED rather than the array, because the hook handed back a new array identity on every
+    // notify. Anything that marks up bodies by what they carry wants both of those.
 
     // ── ⚠️ THE PAGE BEHIND A FIXED OVERLAY STILL SCROLLS ──────────────────────────────────
     // position: fixed takes the scene out of the flow; it does not stop the document under it moving. On a
@@ -908,8 +898,6 @@ export default function GroveScene({
             waveCleared: arena ? 0 : null,
             endsAt: null,
             runOver: false,
-            // The running tally down the left. Keyed by label so two drops of one kind share a row.
-            haul: new Map(),
             eaten: {},
             foodLeft: Number(belt?.count) || 0,
             boss: null,
@@ -2144,12 +2132,12 @@ export default function GroveScene({
                 const first = Object.keys(gearArtRef.current || {})[0] || null;
                 if (first) { got.gear = first; got.gearTier = "sup"; }
             }
-            const rows = Object.entries(got.parts);
-            // ⚠️ GEAR COUNTS TOWARD THE FAN. spillVelocity spreads n drops across an arc using `total`, so a
-            // count that omits the gear aims every piece as though there were one fewer — the pieces bunch
-            // and the last one leaves the arc. The spill looked right only because gear is rare enough that
-            // the mis-aimed case is the one nobody happens to be watching.
-            const total = rows.length + (got.emblem ? 1 : 0) + (got.gear ? 1 : 0);
+            // ⚠️ EVERYTHING THAT FALLS COUNTS TOWARD THE FAN. spillVelocity spreads n drops across an arc
+            // using `total`, so a count that omits one aims every piece as though there were one fewer —
+            // the pieces bunch and the last one leaves the arc. It used to be dominated by the parts rows;
+            // at most two things fall now, which makes the arc wide and the bug impossible to see. Kept
+            // honest anyway, because it is the kind that only shows up on the rare kill nobody films.
+            const total = (got.emblem ? 1 : 0) + (got.gear ? 1 : 0);
             let n = 0;
             const spill = (uid, part, label, opts = {}) => {
                 const v = spillVelocity(n, total, wd.rand);
@@ -2188,19 +2176,12 @@ export default function GroveScene({
                     });
                 }
             }
-            for (const [part, count] of rows) {
-                const meta = grovePart(part);
-                // ⚠️ WHAT MADE IT SPECIAL RIDES THE DROP. A twelve-fold windfall that lands looking like a
-                // single root is a windfall nobody noticed, and the whole point of the tail is that the
-                // player SEES the roll land. Two different kinds of special, dressed differently: a big
-                // pile is LOUD (band), one uncommon part is VALUABLE (rare).
-                const isRareRow = got.rare === part;
-                spill(`d${i}-${part}`, part, `${count}x ${meta?.name || part.replace(/_/g, " ")}`,
-                    { tier: meta?.tier || 1, rare: Boolean(meta?.rare) || isRareRow,
-                      band: isRareRow ? null : got.band, rareRow: isRareRow,
-                      // ⚠️ THE TALLY KEYS ON THESE, NOT ON `label`. See HAUL_MS.
-                      name: meta?.name || part.replace(/_/g, " "), qty: count });
-            }
+            // ── ✂️ THE PARTS SPILL WAS HERE ─────────────────────────────────────────────────────────
+            // One drop per row of the loot table, dressed by what made it special: a twelve-fold windfall
+            // landed LOUD (`band`) because a windfall that looks like a single root is a windfall nobody
+            // noticed, and a deeper-map part landed VALUABLE (`rare`). Both of those dressings, and the
+            // `name`/`qty` the tally keyed on, went with the parts.
+
             // ── ⚠️ A HYPER OFF AN ORDINARY KILL IS THE RAREST THING IN THE FEATURE ──────────────────
             // About one kill in two thousand. It gets the emblem's treatment -- the world stops, a ring
             // goes out, the screen takes a boss-weight knock -- because a drop this rare arriving with the
@@ -2350,15 +2331,11 @@ export default function GroveScene({
             }
             if (now >= w.nextRespawn) spawn(w, now);
 
-            // ⚠️ PRUNED IN THE LOOP AND RE-RENDERED ONLY WHEN SOMETHING ACTUALLY LEFT. A setTimeout per row
-            // is a timer per pickup, and a pickup is the single most frequent event in the Grove; the loop is
-            // already running and already knows the time. The guard is what keeps this from being a React
-            // render sixty times a second for as long as the tally is on screen.
-            if (w.haul.size) {
-                let gone = false;
-                for (const [k, row] of w.haul) if (now >= row.until) { w.haul.delete(k); gone = true; }
-                if (gone) rerender();
-            }
+            // ✂️ THE TALLY'S EXPIRY SWEEP WAS HERE, and the reason it was a sweep rather than a timer is
+            // worth keeping: a setTimeout per row is a timer per pickup, and a pickup was the single most
+            // frequent event in the Grove, while this loop was already running and already knew the time.
+            // It re-rendered only when a row had actually left, which is what kept it from being a React
+            // render sixty times a second for as long as the tally was on screen.
 
             const plats = w.platforms;
             // Walkable bounds, inset by a body so nothing can stand with half of itself outside the zone.
@@ -3419,34 +3396,33 @@ export default function GroveScene({
                         // Hidden rather than removed, for the same reason as a dying foe above.
                         if (d.node) d.node.style.display = "none";
                         w.drops.splice(i, 1);
-                        // ⚠️ THE THING YOU PICKED UP, NOT THE NAME OF IT. Luke: "You should actually see
-                        // the sprite and the name of it." The drop spends its whole life as a sprite on
-                        // the floor and then became a line of text at the moment of collection, which is
-                        // the one moment it is a reward. The art rides the label now.
+                        // ── ⚠️ THE THING YOU PICKED UP, NOT THE NAME OF IT ──────────────────────────
+                        // Luke: "You should actually see the sprite and the name of it." A drop spends
+                        // its whole life as a sprite on the floor and then became a line of text at the
+                        // moment of collection, which is the one moment it is a reward. The art rides
+                        // the label.
                         //
-                        // ⚠️ THE LABEL POPS AT WHOEVER COLLECTED IT. A drop the pet ran twenty units to
-                        // fetch announcing itself over the hero's head says the player picked it up, and
-                        // the one thing this feature has to communicate is that the PET did — otherwise
-                        // it reads as loot teleporting and the whole errand went unnoticed.
+                        // ⚠️ AND IT POPS AT WHOEVER COLLECTED IT. A drop the pet ran twenty units to
+                        // fetch announcing itself over the hero's head says the player picked it up,
+                        // and the one thing that has to read is that the PET did — otherwise it looks
+                        // like loot teleporting and the whole errand goes unnoticed.
                         addPop("loot", d.label, by.x + (by.face || 1) * 1.5, by.y + by.h * 0.75,
                             null, d.art || null);
-                        // ⚠️ EXTENDED, NOT RESTARTED, AND CAPPED. See HAUL_MS. An arrival pushes the row's
-                        // expiry out by one more HAUL_MS from NOW, so a steady trickle of one kind holds its
-                        // row open; HAUL_MAX_MS from the row's birth is the furthest that can ever reach.
-                        {
-                            const key = d.part || d.label;
-                            const row = w.haul.get(key);
-                            if (row) {
-                                row.qty += d.qty || 1;
-                                row.at = now;
-                                row.until = Math.min(now + HAUL_MS, row.born + HAUL_MAX_MS);
-                                if (d.rare) row.rare = true;
-                            } else {
-                                w.haul.set(key, { key, label: d.name || d.label, art: d.art || null,
-                                    rare: Boolean(d.rare), qty: d.qty || 1,
-                                    born: now, at: now, until: now + HAUL_MS });
-                            }
-                        }
+                        // ── ✂️ THE TALLY ROW AND THE PICKUP CHIRP WERE BOTH HERE ────────────────────
+                        // This was the loot noise Luke named: three things fired on every single
+                        // pickup — this pop, a row down the left edge whose count bumped, and a
+                        // two-note chirp (higher if the drop was rare).
+                        //
+                        // ⚠️ THE POP IS THE ONE THAT SURVIVED, and deliberately. The noise was a
+                        // volume problem rather than a per-event one: parts arrived in a stream, so
+                        // three announcements each were three streams. What is left on the floor is
+                        // gear and the odd emblem — one object every forty-odd kills — and announcing
+                        // THAT once is not noise, it is the reward being legible.
+                        //
+                        // ⚠️ playPickup IS STILL IMPORTED AND STILL USED, by the zone-unlock moment
+                        // further up this file. Do not remove the import chasing this comment.
+                        rerender();
+                        continue;
                         playPickup(Boolean(d.rare));
                         rerender();
                         continue;
@@ -4383,44 +4359,22 @@ export default function GroveScene({
                     </>
                 ) : null}
 
-                {npcHere ? (
-                    <button type="button" ref={npcRef}
-                        className={`gv-npc${npcHere.active?.ready ? " is-ready" : ""}`
-                            + `${npcHere.active && !npcHere.active.started ? " is-new" : ""}`
-                            + `${npcHere.active ? "" : " is-done"}`}
-                        onPointerDown={(e) => { e.stopPropagation(); onTalk?.(); }}
-                        aria-label={npcHere.active
-                            ? `${npcHere.name} — ${npcHere.active.ready ? "ready to hand in"
-                                : !npcHere.active.started ? "has something to ask"
-                                    : `${npcHere.active.title}, ${npcHere.active.progress} of ${npcHere.active.need}`}`
-                            : `${npcHere.name} — nothing more to ask`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/images/grove/npc-${npcHere.npc}.webp`} alt="" draggable={false} />
-                        {/* ── ⚠️ NO FRACTION ON A STEP NOBODY HAS AGREED TO ──────────────────────────
-                            Luke: "0 of 5 doesnt make sense." It did not: an UNTAKEN step rendered
-                            `0/5` over the giver's head, which reads as five things you have somehow
-                            already failed to do — for a job you have not been offered yet. The card
-                            inside has had this rule since it was written ("⚠️ NO BAR ON AN UNTAKEN
-                            STEP"); the pip out in the world never got it.
+                {/* ── ✂️ THE QUEST GIVER STOOD HERE ──────────────────────────────────────────────────
+                    A tappable figure, drawn only in the zone he was hidden in, with three states and
+                    three marks — the convention every player already knows: "!" he wants something,
+                    the count while you are doing it, "✓" when it is done and he is waiting for you.
 
-                            Three states, three marks, which is also the convention every player
-                            already knows: "!" he wants something, the count while you are doing it,
-                            "✓" when it is done and he is waiting for you. */}
-                        {npcHere.active ? (
-                            <span className="gv-npc-pip">
-                                {npcHere.active.ready ? "✓"
-                                    : !npcHere.active.started ? "!"
-                                        : `${npcHere.active.progress}/${npcHere.active.need}`}
-                            </span>
-                        ) : null}
-                    </button>
-                ) : null}
+                    ⚠️ AND NO FRACTION ON A STEP NOBODY HAD AGREED TO. Luke: "0 of 5 doesnt make
+                    sense." It did not: an untaken step rendered `0/5` over his head, which reads as
+                    five things you have somehow already failed to do, for a job you had not been
+                    offered. Worth keeping written down — it is a rule about progress marks, not
+                    about quests, and the next thing with a pip over it will have the same choice. */}
 
                 {world.foes.map((f) => {
                     const cb = foeCbFor(f);
                     return (
                         <FoeBody key={f.uid} art={f.art} h={f.h} rare={f.rare} isBoss={f.isBoss}
-                            big={f.big} name={f.name} wish={wishHere[f.id]}
+                            big={f.big} name={f.name}
                             onDown={cb.down} refCb={cb.ref} />
                     );
                 })}
@@ -4466,27 +4420,12 @@ export default function GroveScene({
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
-            {/* ── THE HAUL, DOWN THE LEFT ───────────────────────────────────────────────────────
-                Newest at the TOP, because the row that just changed is the one being read. aria-hidden:
-                every one of these also fired a pop at the collector and every one of them is banked in the
-                pack -- a screen reader announcing each arrival twice is noise, not access. */}
-            {world.haul?.size ? (
-                <ul className="gv-haul" aria-hidden="true">
-                    {[...world.haul.values()].sort((a, b) => b.at - a.at).slice(0, HAUL_ROWS).map((row) => (
-                        <li key={row.key} className={row.rare ? "is-rare" : undefined}>
-                            {row.art ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img src={row.art} alt="" width={26} height={26} />
-                            ) : null}
-                            <span>{row.label}</span>
-                            {/* ⚠️ KEYED ON THE COUNT so React replaces the node and the bump animation
-                                re-runs. Mutating the text of a live element does not restart a CSS
-                                animation, which is the whole tell that the number went up. */}
-                            <b key={row.qty}>{row.qty}</b>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
+            {/* ✂️ THE HAUL LIST RENDERED HERE — newest row at the top, because the row that just
+                changed is the one being read, and aria-hidden because every row had already fired a
+                pop at the collector and was already banked in the pack: a screen reader announcing
+                each arrival twice is noise, not access. The count was keyed on itself so React
+                replaced the node and re-ran the bump animation — mutating the text of a live element
+                does not restart a CSS animation, which was the whole tell that the number went up. */}
 
             {world.herald ? (
                 <div className={`gv-herald is-${world.herald.kind}`} aria-hidden="true">
@@ -4603,30 +4542,18 @@ export default function GroveScene({
                     onOpen={() => setMenuOpen(true)}
                     onClose={() => setMenuOpen(false)}
                     handleRef={zdockRef}
-                    families={ZONE_FAMILIES.map((f) => ({
-                        ...f,
-                        rows: f.rows.map((r) => (
-                            // ⚠️ READY TO HAND IN IS THE BADGE; IN PROGRESS IS ONLY A NOTE. A number on
-                            // the closed menu means "there is something to collect in here", which is true
-                            // of a finished step and a lie about one you are halfway through -- and a badge
-                            // that is always lit is a badge nobody looks at.
-                            r.k === "quests"
-                                ? {
-                                    ...r,
-                                    badge: questsReady > 0 ? String(questsReady) : null,
-                                    note: questsReady > 0
-                                        ? `${questsReady} ready to hand in`
-                                        : questsActive > 0 ? `${questsActive} on the go` : null,
-                                }
-                                : r.k === "bench" && benchReady > 0
-                                ? { ...r, badge: benchReady > 99 ? "99+" : String(benchReady), note: `${benchReady} ready` }
-                                // ⚠️ NOTHING TO WARN ABOUT. This said FULL, and then "n slots left",
-                                // because the bag had a ceiling and loot past it was never granted. The
-                                // ceiling is gone (see storeParts) so the warning is too -- a badge that
-                                // can never fire is a badge somebody maintains forever for nothing.
-                                : r
-                        )),
-                    }))}
+                    // ── ✂️ THE BADGE MAPPING IS GONE, SO THE FAMILIES PASS STRAIGHT THROUGH ──────────
+                    // All three of its arms went: the quest row's ready-to-hand-in count, the bench row's
+                    // craftable count, and before those a FULL warning on the bag. With nothing left to
+                    // decorate, the .map() it ran in was an identity over ZONE_FAMILIES.
+                    //
+                    // ⚠️ TWO RULES IT ENCODED, FOR WHATEVER GETS A BADGE NEXT. Ready-to-hand-in was the
+                    // BADGE and in-progress was only a NOTE, because a number on the closed menu means
+                    // "there is something to collect in here" — true of a finished step and a lie about one
+                    // you are halfway through, and a badge that is always lit is a badge nobody reads. And
+                    // the bag's FULL warning came out when the ceiling did, because a badge that can never
+                    // fire is one somebody maintains for ever for nothing.
+                    families={ZONE_FAMILIES}
                     onPick={(k) => openPanel(k)}
                     footer={(
                         /* ── ⚠️ THE SOUND SWITCH IS A SETTING AND NOW IT LOOKS LIKE ONE ──────────

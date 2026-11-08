@@ -9,86 +9,35 @@
 //
 // So these assert the SHAPE of the reward curve rather than any single number.
 //
+// ── ⚠️ MOST OF THIS FILE WAS ABOUT PARTS, AND CAME OUT ON 2026-11-08 ──────────────────────────────────────────
+// Luke: "I think we remove monster part items, remove crafting all together." Four groups of assertions went
+// with their subject, named here so nobody looks for them in the history wondering what broke:
+//
+//   · EVERY CREATURE IS REWARDING TO KILL — that all 84 creatures had a rare drop of their OWN, that it
+//     named a part that exists, that it was never just their own common, and that one rare rate covered the
+//     whole game rather than a table per map. The rare row is deleted from rollKill.
+//   · THE WINDFALL — that spanTailed's long tail turned an authored [1,2] into an occasional big pile, that
+//     the ordinary band stayed the normal case above 75%, and that a windfall stayed under 0.5%. DROP_TAIL
+//     and spanTailed are both deleted.
+//   · the `rare` arm of the surprise sweep, which counted deeper-map parts landing on ordinary kills.
+//   · THE WORKBENCH DOES NOT SHOW A WALL — that reachableRecipes was a strict subset of the book and that
+//     every reachable recipe asked only for parts that exist. There is no workbench.
+//
+// ⚠️ THE RECIPE AND PART CATALOGUES STILL EXIST AS DATA, which is why those last two could have been kept
+// passing. They are not, deliberately: a gate over data nothing reads proves nothing and is the kind of
+// green tick that reads as coverage. check:grove still asserts the catalogues' internal integrity.
+//
 //   node scripts/check-grove-loot.mjs        (or npm run check:grove-loot)
+import { rollKill } from "../src/lib/marketplace/grove-roll.js";
 import {
-    rollKill, spanTailed, DROP_TAIL, rngFrom,
-} from "../src/lib/marketplace/grove-roll.js";
-import {
-    GROVE_ENEMIES, GROVE_HYPER, GROVE_PARTS, wandererHyperChance, bossHyperChance,
+    GROVE_ENEMIES, GROVE_HYPER, wandererHyperChance, bossHyperChance,
 } from "../src/lib/marketplace/grove-catalog.js";
-import { reachableRecipes, GROVE_RECIPES } from "../src/lib/marketplace/grove-recipes.js";
 
 let fails = 0;
 const ok = (name, cond, extra = "") => {
     if (cond) console.log(`  ok   ${name}`);
     else { console.log(`  FAIL ${name} ${extra}`); fails += 1; }
 };
-
-console.log("\nEVERY CREATURE IS REWARDING TO KILL");
-const foes = Object.values(GROVE_ENEMIES);
-// ⚠️ THE ONE THAT MATTERS. Before the rare row, all 84 creatures had exactly two loot rows and the only
-// thing separating a rootrat from the deepest thing in the forest was the NAME of the common it dropped.
-const noRare = foes.filter((f) => !f.rareLoot?.part);
-ok(`all ${foes.length} creatures have a rare drop of their own`, noRare.length === 0,
-    noRare.slice(0, 4).map((f) => f.name).join(", "));
-// ⚠️ AND IT MUST NAME A REAL PART. creatureRareLoot indexes into the NEXT map's part list; running off the
-// end would have written { part: undefined } onto twelve creatures and put a part called "undefined" into
-// a player's bag. A lookup that runs off the end has to land somewhere real.
-// See [[ladder-lookups-must-fail-upward]].
-const ghosts = foes.filter((f) => f.rareLoot?.part && !GROVE_PARTS[f.rareLoot.part]);
-ok("every rare drop names a part that exists", ghosts.length === 0,
-    ghosts.slice(0, 4).map((f) => `${f.name} -> ${f.rareLoot.part}`).join(", "));
-// A rare drop that is the creature's own common is not a rare drop.
-const sameAsCommon = foes.filter((f) => (f.loot || []).some((l) => l.part === f.rareLoot?.part));
-ok("a rare drop is never just the creature's own common", sameAsCommon.length === 0,
-    sameAsCommon.slice(0, 4).map((f) => f.name).join(", "));
-const rates = [...new Set(foes.map((f) => f.rareChance))];
-ok("one rare rate for the whole game, not a table per map", rates.length === 1, `got ${rates.join(", ")}`);
-
-console.log("\nA KILL IS A ROLL, NOT A DEALT CARD");
-const r = rngFrom(20261020);
-const counts = {};
-const bands = {};
-for (let i = 0; i < 200000; i += 1) {
-    const { n, band } = spanTailed([1, 2], r());
-    counts[n] = (counts[n] || 0) + 1;
-    bands[String(band)] = (bands[String(band)] || 0) + 1;
-}
-const distinct = Object.keys(counts).length;
-// Twenty consecutive Bristlebacks used to produce "1x hide", "2x hide", "1x antler" and nothing else, ever.
-ok(`a [1,2] part can land on more than a handful of amounts (${distinct} distinct)`, distinct >= 8,
-    `only ${distinct}: ${Object.keys(counts).join(",")}`);
-ok("the authored band is still the normal case", (bands.null / 200000) > 0.75,
-    `ordinary ${(100 * bands.null / 200000).toFixed(1)}%`);
-ok("a windfall is rare enough to be worth telling somebody about",
-    (bands.windfall / 200000) < 0.005 && bands.windfall > 0,
-    `windfall ${(100 * (bands.windfall || 0) / 200000).toFixed(3)}%`);
-ok("the bands come out of the roll rather than being guessed from the number",
-    DROP_TAIL.every((t) => "band" in t));
-// ⚠️ THE PROPERTY THAT ACTUALLY MATTERS, and the one the first cut of this failed silently. A "handful"
-// that lands on 2 for a [1,2] part is indistinguishable from an ordinary roll -- the tag says something
-// special happened and the number says it did not. Every tail band must exceed every ordinary result.
-for (const band of ["handful", "haul", "windfall"]) {
-    const at = DROP_TAIL.findIndex((t) => t.band === band);
-    const lo = at === 0 ? 0 : DROP_TAIL[at - 1].upTo;
-    let worst = Infinity;
-    for (let i = 0; i <= 200; i += 1) {
-        const u = lo + ((DROP_TAIL[at].upTo - lo) * i) / 200 - 1e-9;
-        const got = spanTailed([1, 2], Math.max(lo, u));
-        if (got.band === band) worst = Math.min(worst, got.n);
-    }
-    ok(`a ${band} of a [1,2] part always beats an ordinary roll (smallest ${worst})`, worst > 2, `got ${worst}`);
-}
-console.log(`     ${Object.entries(bands).map(([k, v]) => `${k}:${(100 * v / 200000).toFixed(1)}%`).join("  ")}`);
-
-console.log("\nTHE ROLL SPENDS THE SAME NUMBER OF DRAWS AS IT ALWAYS DID");
-// ⚠️ THE CONTRACT OF THIS WHOLE FILE. The server replays the seeded stream to verify a settle, so the
-// number of r() calls per kill is part of the wire format: spend one more here and every roll after it in
-// the same kill lands somewhere else, and the player watches a drop fall that never arrives.
-let draws = 0;
-const counting = () => { draws += 1; return 0.5; };
-spanTailed([1, 3], counting());
-ok("spanTailed spends exactly one draw, as span() did", draws === 1, `spent ${draws}`);
 
 console.log("\nTHE SAME KILL ALWAYS ROLLS THE SAME THING ON BOTH SIDES");
 const foe = GROVE_ENEMIES.badger;
@@ -104,15 +53,11 @@ ok("...and rolls no hyper, rather than rolling a different stream",
 
 console.log("\nTHERE IS SOMETHING TO BE SURPRISED BY");
 let hyper = 0;
-let rare = 0;
 for (let i = 0; i < 300000; i += 1) {
     const got = rollKill(foe, 5150 + i, i, {}, 4, GROVE_HYPER);
     if (got.hyper) hyper += 1;
-    if (got.rare) rare += 1;
 }
-const rareEvery = Math.round(300000 / Math.max(1, rare));
 const hyperEvery = Math.round(300000 / Math.max(1, hyper));
-ok(`a rare drop lands about every ${rareEvery} kills`, rareEvery > 15 && rareEvery < 60);
 ok(`a hyper-rare lands about every ${hyperEvery} kills`, hyperEvery > 400 && hyperEvery < 6000);
 // The boss must stay the reliable route; the wanderer roll is the lightning strike.
 ok("a boss is still far likelier to pay a hyper than a wanderer",
@@ -120,14 +65,14 @@ ok("a boss is still far likelier to pay a hyper than a wanderer",
     `boss ${bossHyperChance(4)} vs wanderer ${wandererHyperChance(4)}`);
 ok("both climb with depth", wandererHyperChance(12) > wandererHyperChance(1));
 
+// ── ⚠️ GEAR IS THE WHOLE REWARD NOW, AND IT IS GUARDED NEXT DOOR ─────────────────────────────────────────────
+// With parts gone, a kill pays gear, an emblem, a statue, gold on a rare spawn, xp and the hyper sliver —
+// and the gear tables are asserted by check:grove-roll, which prints the on-ramp rate against the frontier
+// rate and the depth floor for a set piece. Not duplicated here: two gates over one table is two places to
+// update and one of them will be the one that rots.
+
 // ⚠️ "A CHEST CONTAINS SOMETHING YOU CANNOT FARM" STOOD HERE — four assertions about chest contents and
 // the hyperFloor ladder. Removed with the Grove's chests; nothing it guarded exists any more.
 
-console.log("\nTHE WORKBENCH DOES NOT SHOW A WALL");
-const reach = reachableRecipes().length;
-ok(`only reachable recipes are counted (${reach} of ${GROVE_RECIPES.length})`, reach < GROVE_RECIPES.length && reach > 0);
-ok("every reachable recipe needs only parts that exist",
-    reachableRecipes().every((x) => Object.keys(x.parts).every((pt) => GROVE_PARTS[pt])));
-
-console.log(fails ? `\ncheck:grove-loot — ${fails} FAILED\n` : "\nOK — every creature pays its own rare, a kill is a roll, and nothing early is farmable that should not be.\n");
+console.log(fails ? `\ncheck:grove-loot — ${fails} FAILED\n` : "\nOK — a kill is a roll, both sides agree on it, and the hyper table is still the surprise.\n");
 process.exit(fails ? 1 : 0);

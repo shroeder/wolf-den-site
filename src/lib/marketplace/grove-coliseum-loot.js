@@ -14,8 +14,13 @@ import "server-only";
 // one's crafting inputs from map seven.
 
 import { db } from "@/lib/db";
-import { GROVE_PARTS } from "@/lib/marketplace/grove-catalog.js";
-import { storeParts } from "@/lib/marketplace/grove.js";
+// ⚠️ GROVE_GEAR, NOT GROVE_PARTS. The chest paid part stacks until 2026-11-08; it pays gear now, out of
+// the same per-(zone, creature) tables an ordinary kill rolls against, so a chest cannot hand over a
+// piece the forest itself would never drop.
+import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_GEAR } from "@/lib/marketplace/grove-loot.js";
+import { grantItem } from "@/lib/marketplace/inventory.js";
+import { itemById } from "@/lib/marketplace/items.js";
 
 /**
  * What one tier is worth.
@@ -25,20 +30,46 @@ import { storeParts } from "@/lib/marketplace/grove.js";
  * the bottom two are a real chance rather than a tease.
  */
 const TIER = {
-    mossbound:   { parts: 3, each: [2, 4], gear: 0.35 },
-    barrowed:    { parts: 4, each: [3, 6], gear: 0.6 },
-    warrenspun:  { parts: 5, each: [4, 9], gear: 1 },
-    heartwrought:{ parts: 6, each: [6, 14], gear: 1 },
+    // ── ⚠️ `pieces` REPLACED `parts`/`each`/`gear`, AND THE LADDER IS DERIVED FROM THEM ────────────
+    // The old shape was { parts: n, each: [lo, hi], gear: chance } — n part stacks of that depth, plus a
+    // chance of gear riding along. Luke: "a bunch of parts, definitely some gear", which is why the top
+    // two tiers had gear: 1.
+    //
+    // ⚠️ THE `gear` CHANCE IS NOT CARRIED OVER AS A CHANCE, DELIBERATELY. With parts gone it was the only
+    // thing in the box, and mossbound at 0.35 would have opened to NOTHING on two chests in three — a
+    // chest that opens empty is not a reward, it is a bug the player reports. Every tier pays at least one
+    // piece now and the tier decides HOW MANY, which is the same ladder the old numbers described (0.35 →
+    // 0.6 → 1 → 1 climbed, and so does this).
+    mossbound:   { pieces: 1 },
+    barrowed:    { pieces: 1 },
+    warrenspun:  { pieces: 2 },
+    heartwrought:{ pieces: 3 },
 };
 
 const pick = (list, rng) => list[Math.floor(rng() * list.length) % list.length];
-const between = ([lo, hi], rng) => lo + Math.floor(rng() * (hi - lo + 1));
-
-/** Parts belonging to the map this chest was won on. */
-function partsOfMap(mapN) {
-    return Object.entries(GROVE_PARTS)
-        .filter(([, p]) => Number(p.map) === Number(mapN))
-        .map(([id]) => id);
+/**
+ * Every piece of gear the creatures of this map can drop, deduplicated.
+ *
+ * ⚠️ BUILT FROM GROVE_GEAR RATHER THAN AUTHORED. The tables are keyed `zone|creature` and each row holds
+ * a normal, a rare and a super-rare piece, so the map's whole pool is already written down — and taking
+ * it from there means a chest can never hand over something the forest itself would not drop, which is
+ * the invariant a second authored list would eventually break.
+ *
+ * ⚠️ AND IT TAKES THE SUPER-RARE SLOT, which is the one thing that makes the chest worth the key. An
+ * arena run is a key, two minutes and twelve waves; paying it the same `normal` piece a single rootrat
+ * coughs up would make the whole building pointless. The slot split that governs a KILL (SLOT_SPLIT in
+ * grove-roll.js) deliberately does not apply here: this is the reward for clearing the room, not a roll.
+ */
+function gearOfMap(mapN) {
+    const zoneIds = new Set(GROVE_ZONES
+        .filter((z) => Number(z.map || Math.ceil(z.n / 12)) === Number(mapN))
+        .map((z) => z.id));
+    const out = new Set();
+    for (const [key, row] of Object.entries(GROVE_GEAR)) {
+        if (!zoneIds.has(String(key).split("|")[0])) continue;
+        if (row?.sup) out.add(row.sup);
+    }
+    return [...out];
 }
 
 /**
@@ -69,31 +100,48 @@ export async function openColiseumChest(buyerId, chestId) {
 const COLISEUM_TIERS = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
 
     const tier = TIER[row.tier] || TIER[COLISEUM_TIERS[0]];
-    const pool = partsOfMap(row.map_n);
-    if (!pool.length) return { ok: true, tier: row.tier, parts: {}, gear: null };
+    const pool = gearOfMap(row.map_n);
+    // A map with no gear table is a map whose zones are not built. Nothing to hand over, and saying so
+    // is better than throwing — the row is already spent, so the player must still get an answer.
+    if (!pool.length) return { ok: true, tier: row.tier, map: Number(row.map_n), gear: [] };
 
     // Seeded off the chest's own id so re-reading a result cannot re-roll it. The row is already spent by
     // the update above; this only decides what was in it.
     let seed = Number(row.id) * 2654435761 % 2147483647;
     const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
-    const parts = {};
-    for (let i = 0; i < tier.parts; i += 1) {
+    // ── ⚠️ THE GEAR IS GRANTED NOW. IT NEVER WAS. ───────────────────────────────────────────────────
+    // The old line was `gear: rng() < tier.gear ? { tier: row.tier } : null` — a MARKER, with no
+    // grantItem behind it anywhere. So "definitely some gear" on the top two tiers handed over exactly
+    // nothing for the whole life of the Coliseum, and nobody noticed because the part stacks beside it
+    // were real. [[declared-but-never-read]]. Parts coming out is what exposed it: with them gone the
+    // chest paid literally nothing at all.
+    //
+    // ⚠️ THROUGH grantItem, THE FUNCTION EVERY OTHER SOURCE USES, with `via` naming this faucet so the
+    // ledger can tell an arena piece from a wanderer drop. A second INSERT beside it would be a second
+    // path for one payout, which this repo has paid for twice. [[atomic-split-into-steps-drops-lines]].
+    const gear = [];
+    for (let i = 0; i < tier.pieces; i += 1) {
         const id = pick(pool, rng);
-        parts[id] = (parts[id] || 0) + between(tier.each, rng);
+        const ok = await grantItem(buyerId, id, "grove_coliseum").catch(() => null);
+        if (ok === null) continue;
+        // ⚠️ THE NAME AND RARITY COME FROM THE CATALOGUE, NOT FROM HERE. Same rule as the settle: the
+        // roll knows an id, and a card reading "grove_sup" is a card nobody can read.
+        const it = itemById(id);
+        gear.push({ id, name: it?.name || id, rarity: it?.rarity || null, slot: it?.slot || null, icon: it?.icon || null });
     }
-
-    const p = await db.queryOne(`SELECT pack_slots FROM mkt_grove_player WHERE buyer_id = $1`, [buyerId]).catch(() => null);
-    const { stored, overflow } = await storeParts(buyerId, parts, Number(p?.pack_slots) || 16);
 
     return {
         ok: true,
         tier: row.tier,
         map: Number(row.map_n),
-        parts: stored,
-        // Overflow is REPORTED rather than silently dropped — a full pack is a thing the player can act on,
-        // and a chest that eats its own contents without saying so is the worst kind of reward.
-        overflow,
-        gear: rng() < tier.gear ? { tier: row.tier } : null,
+        // ⚠️ AN ARRAY, AND `parts`/`overflow` ARE GONE FROM THE SHAPE — WHICH BREAKS NO SCREEN, BECAUSE
+        // THERE IS NO SCREEN. useColiseum puts this into `result` via setResult({ opened: j }) and
+        // nothing reads `col.result` anywhere in GroveClient: grepped, zero call sites. So a member
+        // opens a chest and is told nothing at all about what was in it — the same
+        // [[declared-but-never-read]] as the marker above, one layer up, and the reason the dead gear
+        // went unnoticed for so long. Not fixed here: a result screen is a thing to BUILD, not a line
+        // to change, and it wants Luke's eye. Logged in docs/grove-feedback-backlog.md.
+        gear,
     };
 }

@@ -21,7 +21,7 @@
 
 import { GROVE_ZONES, GROVE_BOSSES, scaledFoe, scaledRare } from "@/lib/marketplace/grove-catalog.js";
 import { bossHpAt, bossDmgAt } from "@/lib/marketplace/grove-maps.js";
-import { COLISEUM_ZONE } from "@/lib/marketplace/grove-npcs.js";
+// ✂️ COLISEUM_ZONE was imported from grove-npcs.js here. It is declared at the bottom of THIS file now.
 import { arenaFor, arenaArt, ARENA_W } from "@/lib/marketplace/grove-arena.js";
 
 /** How long a run gets. Luke said about two minutes; the clock is the whole tension so it is one number. */
@@ -155,3 +155,27 @@ const COLISEUM_TIERS = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
     return out;
 }
 
+
+
+// ── THE MARSHALS, AND WHERE THEY STAND ──────────────────────────────────────────────────────────────────────
+// ⚠️ MOVED HERE FROM grove-npcs.js ON 2026-11-08, when the quest givers were removed. Luke: "Remove all quest
+// givers and quests." These two were in that file because the Coliseum's marshal was authored alongside the
+// chain NPCs and shares their shape — but he is not a quest giver. He is the door to the Coliseum, which
+// stays, and his line is the only dialogue left in the Grove.
+//
+// They live in the PLAN half rather than the writes half because they are static content the client reads to
+// draw the Marshal's offer, which is the same reason wavesFor and chestsFor are here.
+
+/** Which zone of each map the Coliseum stands in. */
+export const COLISEUM_ZONE = { 1: 7, 2: 9, 3: 8, 4: 5, 5: 11, 6: 7, 7: 9 };
+
+/** One marshal per map. `line` is what he says when you walk up to him. */
+export const COLISEUM_NPCS = [
+    { id: "thorn", map: 1, name: "Ringmaster Thorn", line: "Twelve rooms of it, all at once, on the clock. Interested?" },
+    { id: "caller", map: 2, name: "The Pit-Caller", line: "Shout down the hole. Whatever answers, you fight." },
+    { id: "dredge", map: 3, name: "Marshal Dredge", line: "We drained a pit for this. Don't waste it." },
+    { id: "brin", map: 4, name: "Tidecaller Brin", line: "Tide's out for two minutes. That's your two minutes." },
+    { id: "herald", map: 5, name: "The Drowned Herald", line: "They still fill the stands. You just can't see them." },
+    { id: "vex", map: 6, name: "Goldmaster Vex", line: "The purse is real, which makes this the only honest thing out here." },
+    { id: "kade", map: 7, name: "Ashmarshal Kade", line: "The sand's warm. It's always warm. Go on." },
+];
