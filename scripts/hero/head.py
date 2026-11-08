@@ -181,7 +181,10 @@ HEAD = [
     # crown was already catching the light as a ring of ridges; at 64 the
     # n-gon fan is twice as bad. The last two rings run it down to 16 mm.
     ("crown", 1.796, 0.0325, 0.0375, -0.002, None),
-    ("crown_tip", 1.802, 0.008, 0.010, -0.002, None),
+    # ⚠️ AN 8 mm CAP RING AT 64 VERTS IS 0.8 mm AN EDGE. Fine enough to
+    # count as collapsed, and a dense pole on top of his head buys nothing
+    # -- at this vertex count a wider cap does not facet.
+    ("crown_tip", 1.802, 0.0165, 0.0195, -0.002, None),
 ]
 
 NAMES = [h[0] for h in HEAD]

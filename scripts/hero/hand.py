@@ -67,6 +67,11 @@ FINGERS = [
 SEGMENTS = [(0.00, 1.00), (0.40, 0.98), (0.72, 0.93), (1.00, 0.82)]
 CURL = 0.34     # radians the fingertip falls toward the palm
 
+# How far distal of the arm's last ring the palm's first one sits, as a
+# fraction of palm length. Zero means coincident loops and a collapsed
+# bridge -- see STATIONS in build().
+WRIST_GAP = 0.09
+
 # The thumb is shorter, thicker and its base segment is the fattest thing on
 # the hand -- it is a whole metacarpal buried in the thenar.
 T_SEG = [(0.00, 1.55), (0.44, 1.02), (0.78, 0.95), (1.00, 0.82)]
@@ -192,7 +197,16 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
     # the palm flattens as it runs distally, so the thickness multiplier
     # starts above 1 and falls -- it does not start at 1 because the palm
     # happens to be 1.
-    STATIONS = [(0.00, 0.64, 1.45), (0.34, 0.86, 1.14),
+    # ⚠️ AND IT MUST NOT START WHERE THE ARM ENDS. Station 0 sat at exactly
+    # the arm's last ring -- same point, same size -- so bridge_loops had to
+    # join 12 verts to 26 across ZERO distance and built a collar of
+    # zero-area faces. It rendered as a deep crushed pinch, worse than
+    # anything the ankle did. The ankle taught that a bridge shears in
+    # proportion to how far it travels; the wrist is the other end of that
+    # rule. Coincident loops are not a short bridge, they are a degenerate
+    # one, and with counts this mismatched the span has to be small and
+    # REAL.
+    STATIONS = [(WRIST_GAP, 0.64, 1.45), (0.34, 0.86, 1.14),
                 (0.68, 0.97, 1.02), (1.00, 1.00, 0.92)]
 
     # ⚠️ THE KNUCKLE END IS AN ARC, NOT A CLIFF. With every column ending at

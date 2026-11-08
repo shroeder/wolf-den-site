@@ -29,6 +29,7 @@ import cage
 NE = 10         # verts per ear ring: matches a 3x2 patch's 10 edges
 NEY = 12        # verts per eye-socket ring: matches a 4x2 patch's 12 edges
 NM = 24         # verts per mouth ring: matches an 8x4 patch's 24 edges
+LIP_LINE_INSET = 0.905   # how far inside the border the slit ends
 
 
 def patch(bm, rings, ri0, n_rings, cols, n):
@@ -279,7 +280,14 @@ def mouth(bm, rings, ri0, cols, n, w=0.0250, h=0.0136, stand=0.0062, slit=0.0014
     # it at 86% of the border left a blunt wall of lip at each end and the
     # whole thing rendered as a rounded rectangle. Both rings finish at the
     # same x, so the two lips meet at a point -- which is what a corner is.
-    line = oval(-0.0014, w * 0.995, slit)
+    # ⚠️ 0.995 PINCHED THE CORNERS INTO A DEGENERATE EDGE. Both rings taper
+    # their offset to nothing at the corner AND end at almost the same x,
+    # so the two corner vertices landed 0.125 mm apart -- the shortest edge
+    # on the whole figure. It looked right and was collapsed geometry; the
+    # fix for the letterbox wall had quietly created a different defect of
+    # the same family as the wrist's. A millimetre and a half of gap closes
+    # the corner to the eye and leaves the mesh real.
+    line = oval(-0.0014, w * LIP_LINE_INSET, slit)
     return _bridge(bm, rim, [border, line], NM)
 
 

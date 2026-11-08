@@ -253,6 +253,45 @@ def measure(ob):
     areas = sorted(p.area for p in cm.polygons)
     med = areas[len(areas) // 2]
     m["area_spread"] = areas[-1] / med if med > 0 else None
+    # ⚠️ THE SHORTEST EDGE CATCHES A WHOLE CLASS OF JOIN BUG. The hand's
+    # first ring sat at exactly the arm's last one, so bridging 12 verts to
+    # 26 across zero distance built a collar of collapsed faces -- and the
+    # wrist rendered as a deep crushed pinch for as long as the hand has
+    # existed. Nothing saw it: the mesh was manifold, closed, correctly
+    # proportioned, and every check passed.
+    #
+    # Smallest AREA was tried first and is the wrong statistic: a nostril
+    # quad is legitimately a hundredth of the median and the check has to
+    # tolerate it, which leaves it too slack to see a collapse. A collapsed
+    # bridge has near-zero EDGES, and nothing on this figure legitimately
+    # does -- the finest real feature is a couple of millimetres.
+    #
+    # ⚠️ AND I FIRST TOLD THIS STORY ABOUT THE WRONG DEFECT. The 0.125 mm
+    # edge was the MOUTH's corner, not the wrist -- measuring the figure
+    # with the wrist put back on top of the arm leaves the shortest edge
+    # completely unchanged. A bridge between two COINCIDENT rings of
+    # different counts does not collapse its edges at all: corresponding
+    # verts sit at different angles round the same circle, so the cross
+    # edges have real length and the FACES have none. Two defects of the
+    # same family and they need two different statistics.
+    #
+    # Scored as a reciprocal, which is not a trick: a floor check needs a
+    # wide tolerance, and a wide tolerance makes "tolerances outside" tiny,
+    # so a genuine collapse would read as a 0.07 move and the
+    # discrimination run would call the check blind. 1/length EXPLODES as
+    # an edge collapses. The floor is set from the data rather than from
+    # what passes -- real fine geometry on this figure bottoms out at
+    # 0.87 mm, a chamfer at the palm's edge, and the mouth corner was
+    # 0.125. 0.6 mm separates them.
+    m["min_edge"] = min((cm.vertices[e.vertices[0]].co
+                         - cm.vertices[e.vertices[1]].co).length
+                        for e in cm.edges)
+    m["collapse"] = 1.0 / max(m["min_edge"] * 1000.0, 1e-6)
+    # ⚠️ AND THIS IS THE ONE THAT SEES A COLLAPSED BRIDGE. Faces with
+    # almost no area are what coincident rings produce, and the wrist built
+    # a whole collar of them: 13 faces under 2% of the median against 2 in
+    # a healthy figure, which is a count that cannot be argued with.
+    m["degenerate"] = sum(1 for f in cm.polygons if f.area < 0.02 * med)
     m["verts"] = len(cm.vertices)
     return m
 
@@ -337,6 +376,11 @@ def checks(m):
               "triangles are resolution steps and pole caps"),
         Check("n-gon fraction", m["ngons"] / float(m["faces"]), 0.0, 0.012, "",
               "every tube has to close; 25 of them are end caps"),
+        Check("edge collapse", m["collapse"], 0.5, 1.1, "1/mm",
+              "floor 0.6 mm; the mouth's pinched corner read 8.0"),
+        Check("degenerate faces", float(m["degenerate"]), 0.0, 4.0, "",
+              "faces under 2% of median area; a bridge between coincident "
+              "rings builds a collar of them, as the wrist did"),
         Check("face area spread", m["area_spread"], 1.0, 34.0, "x median",
               "a face far larger than its neighbours subdivides unevenly"),
     ]
@@ -405,6 +449,10 @@ BREAKS = [
      lambda: _flat_ears()),
     ("mouth widened to a letterbox", "mouth width",
      lambda: _wide_mouth()),
+    ("hand pushed back onto the arm's last ring", "degenerate faces",
+     lambda: _collapse_wrist()),
+    ("mouth corner pinched to a point", "edge collapse",
+     lambda: setattr(face_mod, "LIP_LINE_INSET", 0.999)),
     ("chin merged back into the neck", "chin undercut",
      lambda: _jowl()),
     ("nose wings spread wide", "nose width",
@@ -430,6 +478,11 @@ def _jowl():
     i = head_mod.at("under_jaw")
     n, z, rx, ry, cy, b = head_mod.HEAD[i]
     head_mod.HEAD[i] = (n, z, rx * 1.18, ry * 1.30, cy - 0.016, b)
+
+
+def _collapse_wrist():
+    """Put the palm's first station back where the arm's last ring is."""
+    hand_mod.WRIST_GAP = 0.0
 
 
 def _wide_mouth():
