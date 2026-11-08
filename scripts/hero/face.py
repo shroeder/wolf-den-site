@@ -127,7 +127,7 @@ def nose(bm, rings, ri0, cols, n, width=0.016, out=0.026, down=0.040):
     return _bridge(bm, rim, _tube(bm, path, NN, Vector((0, 0, 1))), NN)
 
 
-def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, segs=14, rings_=10):
+def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, n=3):
     """A sphere set into the socket, as its own closed shell.
 
     ⚠️ THE SOCKET CANNOT BE THE EYE. A hollow in the skull is a hollow; it
@@ -135,46 +135,50 @@ def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, segs=14, rings_=10):
     the brow and cheekbones in and nothing between them. An eye is a hard
     convex thing inside a soft concave one, and that contrast is the entire
     read -- it is the first feature that makes a head look back at you.
-    #
-    ⚠️ AND IT MUST BE SUNK, NOT STUCK ON. A sphere whose centre is at the
-    socket surface is a googly eye: half a ball hanging off the face. Sunk
-    part of its radius, only a cap stands proud, the brow above it casts the
-    shadow that reads as a lid, and the rest is implied.
 
     ⚠️ BUT SINK IT AGAINST THE CAGE AND IT VANISHES. The socket vertex this
     is placed from is a CONTROL point, and Catmull-Clark does not pass
     through its control points -- in a hollow the limit surface sits well
     OUTSIDE the cage, so a ball sunk 9 mm behind a cage vertex ended up
-    entirely inside the head and the face rendered with two empty sockets
-    and no indication anything had been added. Anything positioned against
-    a subdivided surface has to be positioned against the LIMIT, not the
-    cage, or be pushed out far enough that the difference cannot bury it.
+    entirely inside the head and the face rendered with two empty sockets.
     Measured on the evaluated mesh: at the eye's x the brow's limit surface
-    is 5 mm in front of the socket's, so an eye sunk BEHIND the socket was
-    never going to appear. `sink` is negative for that reason -- the ball
-    sits proud of the cage vertex and roughly flush with the brow plane,
-    which is where an eyeball actually sits on a skull.
+    is 5 mm in front of the socket's. `sink` is negative for that reason.
+
+    ⚠️ AND IT IS A SUBDIVIDED CUBE, NOT A UV SPHERE. A UV sphere's poles are
+    triangle fans -- two eyes put 56 triangles into a cage that is otherwise
+    quads, which is most of what held the quad fraction under the 90% a
+    subdivision cage is supposed to hit. A cube projected onto a sphere is
+    all quads and rounds identically once subdivided.
     """
     into = Vector((-at.x, cy - at.y, 0.0))
     into = into.normalized() if into.length > 1e-6 else Vector((0, 1, 0))
     c = at + into * sink
-    grid = []
-    for j in range(1, rings_):
-        t = math.pi * j / rings_
-        grid.append([bm.verts.new((c.x + r * math.sin(t) * math.cos(2 * math.pi * i / segs),
-                                   c.y + r * math.sin(t) * math.sin(2 * math.pi * i / segs),
-                                   c.z + r * math.cos(t)))
-                     for i in range(segs)])
-    top = bm.verts.new((c.x, c.y, c.z + r))
-    bot = bm.verts.new((c.x, c.y, c.z - r))
-    for a, b in zip(grid, grid[1:]):
-        for i in range(segs):
-            j = (i + 1) % segs
-            bm.faces.new((a[i], a[j], b[j], b[i]))
-    for i in range(segs):
-        j = (i + 1) % segs
-        bm.faces.new((top, grid[0][j], grid[0][i]))
-        bm.faces.new((bot, grid[-1][i], grid[-1][j]))
+
+    made = {}
+
+    def V(a, b, k):
+        key = (round(a, 5), round(b, 5), round(k, 5))
+        if key not in made:
+            v = Vector((a, b, k))
+            v.normalize()
+            made[key] = bm.verts.new(c + v * r)
+        return made[key]
+
+    axes = [(0, 1, 2), (1, 2, 0), (2, 0, 1)]
+    for ax, bx, cx in axes:
+        for sign in (1.0, -1.0):
+            for i in range(n):
+                for j in range(n):
+                    quad = []
+                    for du, dv in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                        u = -1.0 + 2.0 * (i + du) / n
+                        w = -1.0 + 2.0 * (j + dv) / n
+                        p = [0.0, 0.0, 0.0]
+                        p[ax], p[bx], p[cx] = u, w, sign
+                        quad.append(V(*p))
+                    if sign < 0:
+                        quad.reverse()
+                    bm.faces.new(quad)
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
     return c
