@@ -1,4 +1,6 @@
 import bmesh, math
+
+import cage
 from mathutils import Vector
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -340,7 +342,7 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges
                 if len(e.link_faces) == 1 and set(e.verts) <= set(tube_rings[0])]
-        bmesh.ops.bridge_loops(bm, edges=holes[fi] + cuff)
+        cage.bridge(bm, holes[fi], cuff, "finger_%s" % name)
         bm.edges.ensure_lookup_table()
         for k in range(len(segs)):
             out.joints["%s_%d" % (name, k)] = segs[k][0]
@@ -391,7 +393,7 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
     bm.edges.ensure_lookup_table()
     cuff = [e for e in bm.edges
             if len(e.link_faces) == 1 and set(e.verts) <= set(t_rings[0])]
-    bmesh.ops.bridge_loops(bm, edges=thumb_hole + cuff)
+    cage.bridge(bm, thumb_hole, cuff, "thumb")
     bm.edges.ensure_lookup_table()
     for k, p in enumerate(t_pts):
         out.joints["thumb_%d" % k] = p

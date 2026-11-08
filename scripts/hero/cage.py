@@ -1,5 +1,8 @@
 import math
 
+import bmesh
+from mathutils import Vector
+
 # ═══════════════════════════════════════════════════════════════════════════
 # THE CAGE PRIMITIVES — the three functions everything here is built out of.
 #
@@ -75,3 +78,61 @@ def step_up(bm, coarse, fine):
         bm.faces.new((coarse[i], a, b))
         bm.faces.new((coarse[i], b, coarse[j]))
         bm.faces.new((coarse[j], b, c))
+
+
+# ── EVERY BRIDGE REPORTS ITSELF ───────────────────────────────────────────
+# ⚠️ THE WRIST WAS CRUSHED FROM THE DAY THE HAND WAS BUILT and nothing in
+# this project could see it. The mesh was manifold, closed, correctly
+# proportioned; the grip test passed; the canon passed. What was wrong was
+# invisible to all of them and obvious in one number: the two loops being
+# joined were at the SAME POINT, so the bridge had zero span and built a
+# collar of zero-area faces.
+#
+# So no bridge is built silently any more. Each one prints how many edges
+# it joined on each side, how far apart the loops were, and the smallest
+# face it produced. A span of 0.0 or an area near zero is a collapsed join,
+# and it now takes one glance at a build log rather than a close render of
+# a part nobody thought to photograph.
+BRIDGES = []
+
+
+def _centroid(edges):
+    vs = set()
+    for e in edges:
+        vs |= set(e.verts)
+    c = Vector((0.0, 0.0, 0.0))
+    for v in vs:
+        c += v.co
+    return c / max(len(vs), 1)
+
+
+def bridge(bm, rim, cuff, label):
+    rim, cuff = list(rim), list(cuff)
+    span = (_centroid(rim) - _centroid(cuff)).length
+    r = bmesh.ops.bridge_loops(bm, edges=rim + cuff)
+    faces = r.get("faces", [])
+    areas = [f.calc_area() for f in faces] or [0.0]
+    BRIDGES.append((label, len(rim), len(cuff), span, len(faces), min(areas)))
+    return r
+
+
+def bridge_report():
+    worst = 0.0
+    lines = ["   bridge      edges    span    faces   smallest face"]
+    for label, a, b, span, n, area in BRIDGES:
+        # ⚠️ A SHORT SPAN ON ITS OWN IS NOT A DEFECT. Flagging everything
+        # under 1.5 mm lit up all eight finger sockets, which are 8->8 and
+        # perfectly healthy -- their loops are offset sideways, so the
+        # faces have area even though the loops are close. What killed the
+        # wrist was a short span AND mismatched counts: with 12 verts
+        # against 26 and nowhere to travel, the quads have nothing to be.
+        # The symptom itself -- a face with no area -- is the other flag.
+        flag = ""
+        if span < 0.0015 and a != b:
+            flag = "  <-- COINCIDENT, MISMATCHED"
+        elif area < 1.5e-6:
+            flag = "  <-- COLLAPSED FACE"
+        lines.append("   %-11s %2d->%-2d %6.1fmm %4d %10.3f mm2%s"
+                     % (label, a, b, span * 1000, n, area * 1e6, flag))
+        worst += 1.0 if flag else 0.0
+    return chr(10).join(lines), worst

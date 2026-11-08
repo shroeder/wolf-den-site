@@ -84,7 +84,11 @@ def _tube(bm, path, n, up):
     return out
 
 
-def _bridge(bm, rim, tube_rings, n):
+_LABEL = ["face"]
+
+
+def _bridge(bm, rim, tube_rings, n, label="face"):
+    _LABEL[0] = label
     for a, b in zip(tube_rings, tube_rings[1:]):
         for i in range(n):
             j = (i + 1) % n
@@ -93,7 +97,7 @@ def _bridge(bm, rim, tube_rings, n):
     bm.edges.ensure_lookup_table()
     cuff = [e for e in bm.edges
             if len(e.link_faces) == 1 and set(e.verts) <= set(tube_rings[0])]
-    r = bmesh.ops.bridge_loops(bm, edges=list(rim) + cuff)
+    r = cage.bridge(bm, rim, cuff, _LABEL[0])
     bm.edges.ensure_lookup_table()
     return len(rim), len(cuff), len(r.get("faces", []))
 
@@ -197,7 +201,7 @@ def eye_socket(bm, rings, ri0, cols, n, w=0.0166, h=0.0082, depth=0.0135):
 
     margin = oval(0.0016, w, h)                     # the lid edge
     inner = oval(-depth, w * 0.54, h * 0.60)        # behind the eyeball
-    _bridge(bm, rim, [margin, inner], NEY)
+    _bridge(bm, rim, [margin, inner], NEY, "eye")
     return centre, outward
 
 
@@ -228,7 +232,7 @@ def nostril(bm, rings, ri0, col, n, depth=0.0115, back=0.55):
                                   + Vector((1.0, 0.0, 0.0)) * (0.0022 * math.cos(t))
                                   + Vector((0.0, -1.0, 0.0)).cross(into).normalized()
                                   * 0.0 + Vector((0.0, 0.2, 0.0)) * (0.0022 * math.sin(t))))
-    return _bridge(bm, rim, [ring_], 4)
+    return _bridge(bm, rim, [ring_], 4, "nostril")
 
 
 def mouth(bm, rings, ri0, cols, n, w=0.0250, h=0.0136, stand=0.0062, slit=0.0014):
@@ -288,7 +292,7 @@ def mouth(bm, rings, ri0, cols, n, w=0.0250, h=0.0136, stand=0.0062, slit=0.0014
     # the same family as the wrist's. A millimetre and a half of gap closes
     # the corner to the eye and leaves the mesh real.
     line = oval(-0.0014, w * LIP_LINE_INSET, slit)
-    return _bridge(bm, rim, [border, line], NM)
+    return _bridge(bm, rim, [border, line], NM, "mouth")
 
 
 def ear(bm, rings, ri0, cols, n, side, out=0.026,
@@ -349,4 +353,4 @@ def ear(bm, rings, ri0, cols, n, side, out=0.026,
     # 0.25 of the way round is the top of the ear, 0.75 the lobe.
     helix = oval(out, rw, rh, [(0.75, 0.24, 0.22), (0.25, 0.20, -0.08)])
     concha = oval(bowl, rw * 0.50, rh * 0.46)
-    return _bridge(bm, rim, [helix, concha], NE)
+    return _bridge(bm, rim, [helix, concha], NE, "ear")

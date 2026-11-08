@@ -472,6 +472,7 @@ def build():
     me = bpy.data.meshes.new("Hero")
     ob = bpy.data.objects.new("Hero", me)
     bpy.context.collection.objects.link(ob)
+    cage.BRIDGES.clear()
     bm = bmesh.new()
 
     rings = [ring(bm, z, rx, ry, cy, n=N, bumps=b) for _n, z, rx, ry, cy, b in TORSO]
@@ -496,7 +497,7 @@ def build():
         tube(bm, a)
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges if len(e.link_faces) == 1 and set(e.verts) <= set(a[0])]
-        r = bmesh.ops.bridge_loops(bm, edges=hole + cuff)
+        r = cage.bridge(bm, hole, cuff, "arm_%s" % side)
         log.append("arm_%s  hole %2d  cuff %2d  -> %2d faces"
                    % (side, len(hole), len(cuff), len(r.get("faces", []))))
 
@@ -514,7 +515,7 @@ def build():
                  if len(e.link_faces) == 1 and set(e.verts) <= set(a[-1])]
         hcuff = [e for e in bm.edges
                  if len(e.link_faces) == 1 and set(e.verts) <= set(h.ring_verts)]
-        r = bmesh.ops.bridge_loops(bm, edges=wcuff + hcuff)
+        r = cage.bridge(bm, wcuff, hcuff, "wrist_%s" % side)
         log.append("hand_%s wrist %2d  palm %2d  -> %2d faces"
                    % (side, len(wcuff), len(hcuff), len(r.get("faces", []))))
 
@@ -581,7 +582,7 @@ def build():
         tube(bm, lg)
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges if len(e.link_faces) == 1 and set(e.verts) <= set(lg[0])]
-        r = bmesh.ops.bridge_loops(bm, edges=sockets[side] + cuff)
+        r = cage.bridge(bm, sockets[side], cuff, "hip_%s" % side)
         log.append("leg_%s  socket %2d  cuff %2d  -> %2d faces"
                    % (side, len(sockets[side]), len(cuff), len(r.get("faces", []))))
 
@@ -593,7 +594,7 @@ def build():
         bm.edges.ensure_lookup_table()
         acuff = [e for e in bm.edges
                  if len(e.link_faces) == 1 and set(e.verts) <= set(lg[-1])]
-        r = bmesh.ops.bridge_loops(bm, edges=acuff + ft.instep)
+        r = cage.bridge(bm, acuff, ft.instep, "ankle_%s" % side)
         log.append("foot_%s ankle %2d  instep %2d  -> %2d faces"
                    % (side, len(acuff), len(ft.instep), len(r.get("faces", []))))
 
@@ -610,6 +611,8 @@ def build():
     for line in log:
         print("   " + line)
     # ⚠️ A HOLE AND A PINCH BOTH RENDER AS "FINE" FROM MOST ANGLES.
+    rep, bad_bridge = cage.bridge_report()
+    print(rep)
     print("HERO cage %d verts %d faces | boundary edges %d | non-manifold %d"
           % (len(me.vertices), len(me.polygons), len(loose), len(bad)))
     ob["hand_joints"] = {s: h.joints for s, h in hands.items()}

@@ -1,4 +1,6 @@
 import bmesh, math
+
+import cage
 from mathutils import Vector
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -224,7 +226,7 @@ def build(bm, side, ankle):
         bm.edges.ensure_lookup_table()
         cuff = [e for e in bm.edges
                 if len(e.link_faces) == 1 and set(e.verts) <= set(tube[0])]
-        bmesh.ops.bridge_loops(bm, edges=holes[ti] + cuff)
+        cage.bridge(bm, holes[ti], cuff, "toe_%s" % name)
         bm.edges.ensure_lookup_table()
         for k in range(len(segs)):
             out.joints["%s_%d" % (name, k)] = segs[k][0]

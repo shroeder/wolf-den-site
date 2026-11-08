@@ -292,6 +292,14 @@ def measure(ob):
     # a whole collar of them: 13 faces under 2% of the median against 2 in
     # a healthy figure, which is a count that cannot be argued with.
     m["degenerate"] = sum(1 for f in cm.polygons if f.area < 0.02 * med)
+    # ⚠️ AND EVERY BRIDGE NOW REPORTS ITSELF AS IT IS BUILT, so the figure
+    # can be asked directly how many joins are collapsed rather than having
+    # each one photographed and squinted at. A systematic pass over all 26
+    # of them -- arms, wrist, hips, ankles, fingers, toes, thumb, ears,
+    # eyes, nostrils, mouth -- found exactly the two already fixed and
+    # nothing else, which is worth knowing with certainty rather than
+    # hoping.
+    m["bad_bridges"] = cage.bridge_report()[1]
     m["verts"] = len(cm.vertices)
     return m
 
@@ -378,6 +386,9 @@ def checks(m):
               "every tube has to close; 25 of them are end caps"),
         Check("edge collapse", m["collapse"], 0.5, 1.1, "1/mm",
               "floor 0.6 mm; the mouth's pinched corner read 8.0"),
+        Check("collapsed bridges", m["bad_bridges"], 0.0, 0.5, "",
+              "a join with no span between mismatched loops, or one that "
+              "produced a face with no area"),
         Check("degenerate faces", float(m["degenerate"]), 0.0, 4.0, "",
               "faces under 2% of median area; a bridge between coincident "
               "rings builds a collar of them, as the wrist did"),
@@ -449,7 +460,7 @@ BREAKS = [
      lambda: _flat_ears()),
     ("mouth widened to a letterbox", "mouth width",
      lambda: _wide_mouth()),
-    ("hand pushed back onto the arm's last ring", "degenerate faces",
+    ("hand pushed back onto the arm's last ring", "collapsed bridges",
      lambda: _collapse_wrist()),
     ("mouth corner pinched to a point", "edge collapse",
      lambda: setattr(face_mod, "LIP_LINE_INSET", 0.999)),
