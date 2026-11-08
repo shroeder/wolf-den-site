@@ -142,8 +142,18 @@ TORSO = [
     ("ab1_top", 1.052, 0.1344, 0.1020, 0.004,
      [(0.700, 0.050, 0.13), (0.800, 0.050, 0.13),
       (T_FRONT, 0.038, -0.07)]),
-    ("ab_gap1", 1.062, 0.134, 0.101, 0.004,
-     [(T_FRONT, 0.12, -0.075)]),                                 # tendinous band
+    # ⚠️ A BAND MUST BE A FRONT BUMP, NEVER A SMALLER RING. A ring's radius
+    # applies to the WHOLE circumference, so pinching one to make an ab
+    # band pulls the back and the flanks in too -- and tightening the bands
+    # from 45 mm apart to 10 put five of those pinches down his spine. From
+    # behind he came out corrugated, with horizontal stripes across a back
+    # that has no horizontal anything on it. Luke's words were that it did
+    # not resemble human form, and on that view he was right.
+    #
+    # These rings now sit exactly on the smooth curve between their
+    # neighbours. The band is the negative at the FRONT and nothing else.
+    ("ab_gap1", 1.062, 0.1356, 0.10255, 0.004,
+     [(T_FRONT, 0.12, -0.10)]),                                  # tendinous band
     ("ab2_bot", 1.072, 0.1368, 0.1031, 0.004,
      [(0.695, 0.055, 0.14), (0.805, 0.055, 0.14),
       (T_FRONT, 0.040, -0.08)]),
@@ -153,8 +163,8 @@ TORSO = [
     ("ab2_top", 1.140, 0.1507, 0.1131, 0.004,
      [(0.695, 0.055, 0.15), (0.805, 0.055, 0.15),
       (T_FRONT, 0.040, -0.08)]),
-    ("ab_gap2", 1.150, 0.152, 0.114, 0.004,
-     [(T_FRONT, 0.12, -0.075)]),
+    ("ab_gap2", 1.150, 0.15395, 0.11535, 0.004,
+     [(T_FRONT, 0.12, -0.10)]),
     ("ab3_bot", 1.160, 0.1572, 0.1176, 0.004,
      [(0.690, 0.060, 0.13), (0.810, 0.060, 0.13),
       (T_FRONT, 0.042, -0.07)]),
@@ -243,32 +253,49 @@ F_ERECTOR_L, F_ERECTOR_R = 0.293, 0.207
 # at the rear (FRONT, BACK = 24, 8) and hip_sockets() indexes a vertex list
 # with it -- shadowing it swapped an integer for a dict and the figure
 # failed to build at the crotch, which is nowhere near where the edit was.
-# (ring -> paired mass either side of the midline, midline groove, width).
+# ⚠️ AND THE BACK FORMS ARE A CURVE IN z, NOT A VALUE PER RING. Per-ring
+# numbers mean every inserted ring is a step, and a step in a bump's height
+# bands the surface exactly the way a step in a radius does. Interpolating
+# from a handful of control heights means adding a ring anywhere changes
+# nothing about the forms running past it.
+#
 # Low down the pair is the GLUTE and the groove is the cleft; higher up the
 # same two numbers are the erector and the spinal furrow. It is the same
-# arrangement at both ends of a back, which is why one table does both.
-BACK_FORMS = {
-    "crotch": (0.20, -0.07, 0.072),
-    "glute": (0.285, -0.12, 0.078),
-    "hips": (0.24, -0.10, 0.074),
-    "ab_low": (0.10, -0.07, 0.060),
-    "ab1_top": (0.08, -0.06, 0.056), "ab_gap1": (0.08, -0.06, 0.056),
-    "ab2_bot": (0.08, -0.07, 0.054), "waist": (0.09, -0.08, 0.052),
-    "ab2_top": (0.09, -0.08, 0.052), "ab_gap2": (0.09, -0.08, 0.052),
-    "ab3_bot": (0.09, -0.08, 0.052), "ribs": (0.10, -0.08, 0.052),
-    "pec_under": (0.10, -0.08, 0.052), "pec_rim": (0.10, -0.08, 0.052),
-    "chest": (0.11, -0.08, 0.052), "chest_up": (0.11, -0.07, 0.052),
-    "clavicle": (0.09, -0.06, 0.052), "shoulder": (0.07, -0.05, 0.052),
-    "trapezius": (0.18, -0.07, 0.052),
-}
+# arrangement at both ends of a back, which is why one curve does both.
+F_ERECTOR_L, F_ERECTOR_R = 0.293, 0.207
+
+#        z       mass   groove  width
+BACK_CURVE = [
+    (0.860, 0.200, -0.070, 0.072),      # under the buttock
+    (0.905, 0.285, -0.120, 0.078),      # the glute
+    (0.960, 0.240, -0.100, 0.074),
+    (1.010, 0.100, -0.070, 0.060),      # into the lumbar
+    (1.105, 0.090, -0.080, 0.052),
+    (1.200, 0.100, -0.080, 0.052),
+    (1.305, 0.110, -0.080, 0.052),
+    (1.432, 0.090, -0.060, 0.052),
+    (1.516, 0.180, -0.070, 0.052),      # trapezius
+]
+
+
+def _back_at(z):
+    if z <= BACK_CURVE[0][0]:
+        return BACK_CURVE[0][1:]
+    if z >= BACK_CURVE[-1][0]:
+        return BACK_CURVE[-1][1:]
+    for (z0, *a), (z1, *b) in zip(BACK_CURVE, BACK_CURVE[1:]):
+        if z0 <= z <= z1:
+            f = (z - z0) / (z1 - z0)
+            return tuple(p + (q - p) * f for p, q in zip(a, b))
+    return BACK_CURVE[-1][1:]
 
 
 def _apply_back():
     """Replace whatever erector and furrow bumps a ring already had."""
-    names = [t[0] for t in TORSO]
-    for name, (mass, fur, w) in BACK_FORMS.items():
-        i = names.index(name)
-        n, z, rx, ry, cy, b = TORSO[i]
+    for i, (n, z, rx, ry, cy, b) in enumerate(TORSO):
+        if not (0.855 <= z <= 1.520):
+            continue
+        mass, fur, w = _back_at(z)
         keep = [t for t in (b or ()) if not (0.175 <= t[0] <= 0.325)]
         TORSO[i] = (n, z, rx, ry, cy,
                     keep + [(F_ERECTOR_L, w, mass),
