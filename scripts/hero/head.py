@@ -95,41 +95,28 @@ HEAD = [
     ("jaw", 1.606, 0.064, 0.080, -0.016,
      [(F_JAW_L, 0.090, 0.09), (F_JAW_R, 0.090, 0.09),            # gonial angles
       (T_FRONT, 0.060, 0.08)]),
-    # ⚠️ LIPS ARE THREE RINGS, NOT A BUMP. A mouth is a horizontal feature
-    # and rings vary with ANGLE, so anything one ring can say runs vertically.
-    # What says mouth is the LINE between the lips, which means a ring that
-    # pulls in with one pushing out above it and one below.
+    # ── THE MOUTH ─────────────────────────────────────────────────────────
+    # ⚠️ RINGS CANNOT MAKE LIPS, AND IT TOOK TWO FAILURES TO ACCEPT IT.
+    # Three rings going out-in-out at 6 mm is a sine wave and rendered as
+    # four parallel ripples; nine rings shaped as two bulges and a notch
+    # rendered as NINE ripples. Adding depth deepened the ripples and
+    # adding rings added ripples, which is the signature of a premise
+    # being wrong rather than a number.
     #
-    # ⚠️ AND THEY HAVE TO BE CLOSE TOGETHER OR SUBDIVISION EATS THE LINE.
-    # Spread 12 mm apart, Catmull-Clark rounded the three rings into one
-    # soft swelling and the mouth did not read at all. The sharpness of a
-    # crease on a subdivided cage is set by how close the loops either side
-    # of it are, not by how deep it is -- pulling it deeper just makes a
-    # wider dent. 8 mm apart, it is a mouth.
-    ("mouth_low", 1.622, 0.071, 0.089, -0.011,
-     [(T_FRONT, 0.054, 0.085)]),                                 # lower lip
-    ("mouth", 1.628, 0.072, 0.090, -0.010,
-     # ⚠️ CORNER BUMPS ON THE LIP RING MADE CHEEK GROOVES, NOT CORNERS. A
-    # negative at a fraction is a VERTICAL stripe -- put one at each end of
-    # the mouth and you get two furrows running down the face, crossing the
-    # lip line into a mess of creases. What ends a mouth is the lip line
-    # simply stopping, which is the bump's WIDTH.
-    [(T_FRONT, 0.058, -0.095)]),                                 # the lip line
-    ("mouth_up", 1.634, 0.073, 0.091, -0.010,
-     [(T_FRONT, 0.050, 0.080)]),                                 # upper lip
-    # ⚠️ THE NOSE IS RINGS, AND THE RING UNDER IT IS WHAT MAKES IT A NOSE.
-    # Built as a bridged tube it came out a beak, then a straw -- see
-    # face.py. What a ring stack cannot do on its own is STOP: push the
-    # midline forward over three rings and the ridge runs on down into the
-    # lip and the chin, and a ridge that does not stop is a muzzle.
-    #
-    # So the ring 10 mm under the nose base takes no bump at all. That gap
-    # is the same trick the lips use -- on a subdivided cage the sharpness
-    # of a feature is set by how close the loops either side of it are --
-    # and the step it cuts is the UNDERCUT, which is the whole difference
-    # between a nose and a swelling.
-    ("subnasal", 1.638, 0.074, 0.088, -0.009,
-     [(T_FRONT, 0.044, -0.05)]),                                 # philtrum
+    # The reason is the one the eyelid had. A ring is a LEVEL BAND round
+    # the head, and the things that make a mouth are none of them level: a
+    # lip line dips at the centre and lifts at the corners, the vermillion
+    # border is a closed curve, and a cupid's bow is a shape in the surface.
+    # So the mouth gets loops of its own -- see face.mouth() -- and these
+    # rings go back to carrying nothing but the sulcus below it and the
+    # philtrum above.
+    ("sulcus", 1.617, 0.0675, 0.0833, -0.0141,
+     [(T_FRONT, 0.062, -0.030)]),
+    ("mouth_lo", 1.625, 0.0697, 0.0853, -0.0130, None),
+    ("mouth", 1.6305, 0.0709, 0.0863, -0.0122, None),
+    ("mouth_up", 1.637, 0.0729, 0.0881, -0.0111, None),
+    ("subnasal", 1.6425, 0.0743, 0.0894, -0.0104,
+     [(T_FRONT, 0.044, -0.030)]),                                # philtrum
     ("nose_base", 1.645, 0.075, 0.090, -0.010,
      [(T_FRONT, 0.052, 0.34),                                    # the nostril base
       (F_NOSE_L, 0.030, 0.09), (F_NOSE_R, 0.030, 0.09),          # the wings

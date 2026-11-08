@@ -182,6 +182,7 @@ def measure(ob):
         m["ear_h"] = max(v.z for v in ear) - min(v.z for v in ear)
     else:
         m["ear_proj"] = m["ear_h"] = None
+    m["mouth_w"] = 2.0 * face_mod.mouth.__defaults__[0]
     m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
     _n, _z, rx, ry, cy, _b = H[ri]
@@ -276,6 +277,9 @@ def checks(m):
         # face -- and stands roughly 17 mm off the skull.
         Check("ear height", (m["ear_h"] or 0) / hh, 0.265, 0.055, "of head height"),
         Check("ear projection", (m["ear_proj"] or 0) * 1000, 17.0, 5.0, "mm"),
+        # The corners of a mouth sit under the pupils -- about a third of
+        # the head's breadth. The first lattice came out 58 mm, a letterbox.
+        Check("mouth width", m["mouth_w"] / hw, 0.335, 0.045, "head-widths"),
         Check("face thirds", (m["brow_z"] - m["nose_z"]) / max(m["nose_z"] - m["chin_z"], 1e-9),
               1.00, 0.22, "", "brow->nose against nose->chin"),
         # ── MESH HYGIENE ──────────────────────────────────────────────────
@@ -349,7 +353,18 @@ BREAKS = [
      lambda: _flatten_joint("arm_path", "elbow", 1)),
     ("ears flattened against the skull", "ear projection",
      lambda: _flat_ears()),
+    ("mouth widened to a letterbox", "mouth width",
+     lambda: _wide_mouth()),
 ]
+
+
+def _wide_mouth():
+    orig = face_mod.mouth
+
+    def wide(bm, rings, ri0, cols, n, **kw):
+        return orig(bm, rings, ri0, cols, n, w=0.0330)
+    face_mod.mouth = wide
+    face_mod.mouth.__defaults__ = (0.0330, 0.0122, 0.0058, 0.0016)
 
 
 def _flat_ears():

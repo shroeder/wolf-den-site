@@ -498,6 +498,15 @@ def build():
                    % ((side,) + face_mod.ear(bm, hrings, head_mod.at("nose_base"),
                                              (c0, c0 + 1, c0 + 2), NH, side)))
 
+    # ── THE MOUTH ─────────────────────────────────────────────────────────
+    # Eight columns centred on the face's midline, four ring gaps tall: a
+    # 24-edge rim for a 24-vert lattice.
+    bm.edges.ensure_lookup_table()
+    mc0 = int(round(0.75 * NH)) - 4
+    log.append("mouth  rim %2d  cuff %2d  -> %2d faces"
+               % face_mod.mouth(bm, hrings, head_mod.at("sulcus"),
+                                tuple(range(mc0, mc0 + 8)), NH))
+
     # ── THE EYES ──────────────────────────────────────────────────────────
     # Four columns centred on the eye's own fraction, two ring gaps tall:
     # a 12-edge rim for a 12-vert socket. The right eye's columns are the
@@ -571,6 +580,8 @@ if __name__ == "__main__":
     HAND_CENTRE = hand_centre("l")
     KNEE_CENTRE = tuple(leg_path("l")[LEG_AT["knee"]][0])
     ELBOW_CENTRE = tuple(arm_path("l")[ARM_AT["elbow"]][0])
+    _m = head_mod.HEAD[head_mod.at("mouth")]
+    MOUTH_CENTRE = (0.0, _m[4] - _m[3] * 0.6, _m[1])
     look.sheet(out, "body", (0, 0, 0.92), 2.05)
     look.sheet(out, "torso", (0, 0, 1.24), 0.85, res=(900, 900))
     look.sheet(out, "arm", (0.30, 0, 1.25), 0.60, res=(900, 900))
@@ -591,6 +602,8 @@ if __name__ == "__main__":
     # of the calf shot. A region with no picture is a region worked on blind.
     look.sheet(out, "knee", KNEE_CENTRE, 0.24, res=(900, 900))
     look.sheet(out, "elbow", ELBOW_CENTRE, 0.22, res=(900, 900))
+    look.sheet(out, "mouth", MOUTH_CENTRE, 0.105, angles=(0, 35, 90),
+               res=(900, 900))
     look.sheet(out, "foot", (0.10, -0.06, 0.06), 0.32, angles=(0, 35, 90, 180),
                res=(900, 900))
     print("LOOK_OK %s" % out)

@@ -28,6 +28,7 @@ import cage
 
 NE = 10         # verts per ear ring: matches a 3x2 patch's 10 edges
 NEY = 12        # verts per eye-socket ring: matches a 4x2 patch's 12 edges
+NM = 24         # verts per mouth ring: matches an 8x4 patch's 24 edges
 
 
 def patch(bm, rings, ri0, n_rings, cols, n):
@@ -199,7 +200,60 @@ def eye_socket(bm, rings, ri0, cols, n, w=0.0166, h=0.0082, depth=0.0135):
     return centre, outward
 
 
-def ear(bm, rings, ri0, cols, n, side, out=0.030,
+def mouth(bm, rings, ri0, cols, n, w=0.0250, h=0.0136, stand=0.0062, slit=0.0014):
+    """The lips -- a vermillion border standing proud, closing on a slit.
+
+    ⚠️ THIS IS THE EYELID LESSON A SECOND TIME. A ring varies its radius
+    with angle, so everything it makes is a level band round the head, and
+    not one feature of a mouth is level: the lip line dips at the centre and
+    lifts at the corners, the vermillion border is a closed CURVE, and a
+    cupid's bow is a shape in the surface. Two attempts to build lips out of
+    rings produced ripples -- three rings gave four of them, nine rings gave
+    nine -- which is what a wrong premise looks like as opposed to a wrong
+    number.
+
+    So, as with the eye: cut the face open and bridge in loops that go
+    AROUND the mouth. The outer ring is the vermillion border and stands
+    proud; it closes on a second ring flattened almost to a line and pushed
+    slightly in, and the sliver capping that IS the mouth line. The two
+    halves of the border either side of the slit become the upper and lower
+    lip without being modelled as separate things.
+    """
+    rim, centre = patch(bm, rings, ri0, 4, cols, n)
+    outward = Vector((0.0, -1.0, 0.0))
+    up = Vector((0.0, 0.0, 1.0))
+    right = Vector((1.0, 0.0, 0.0))
+
+    # ⚠️ A UNIFORM OFFSET MAKES A WALL AT THE CORNERS -- the same mistake
+    # the ear made one axis over. Pinching the two rings together in WIDTH
+    # is not enough: the border stands 6 mm in front of the slit, so where
+    # they meet there is a 6 mm cliff of lip and the mouth renders as a
+    # rounded rectangle however pointed its outline is. The offset tapers
+    # to nothing at the corners, so the lips close there in depth as well.
+    def oval(off, rw, rh, bow=0.0):
+        out_v = []
+        for i in range(NM):
+            t = 2.0 * math.pi * i / NM
+            x, y = math.cos(t), math.sin(t)
+            c = centre + outward * (off * abs(y))
+            # The upper lip peaks either side of the midline -- the bow --
+            # and the corners sit a little lower than the middle of either
+            # lip, which is what stops a mouth reading as a letterbox.
+            lift = bow * math.cos(2.0 * t) if y > 0 else 0.0
+            out_v.append(bm.verts.new(c + right * (rw * x)
+                                      + up * (rh * y + lift)))
+        return out_v
+
+    border = oval(stand, w, h, bow=0.0022)
+    # ⚠️ THE SLIT MUST REACH THE CORNERS OR THE MOUTH IS A LETTERBOX. Ending
+    # it at 86% of the border left a blunt wall of lip at each end and the
+    # whole thing rendered as a rounded rectangle. Both rings finish at the
+    # same x, so the two lips meet at a point -- which is what a corner is.
+    line = oval(-0.0014, w * 0.995, slit)
+    return _bridge(bm, rim, [border, line], NM)
+
+
+def ear(bm, rings, ri0, cols, n, side, out=0.026,
         rw=0.0125, rh=0.0310, bowl=0.0120):
     """An ear, as a DISH: out to a raised helix, then folded back to a bowl.
 
