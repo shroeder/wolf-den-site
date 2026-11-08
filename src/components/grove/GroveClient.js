@@ -303,6 +303,14 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     const [session, setSession] = useState(null);
     const [note, setNote] = useState(null);
     const [unlockedNow, setUnlockedNow] = useState(null);
+    // ── ⚠️ THE BAR'S TOOL CARD, AND WHY ONLY TOOLS GET ONE ──────────────────────────────────────
+    // The bar pays two kinds of thing and they are not the same size of moment. A tool is one of twelve
+    // for the whole map tier and it changes a number in another system — fishing, mining, the arena —
+    // so it earns the full card. A chest is the repeatable reward every six minutes for ever after, and
+    // it lands in the stash where chests already live; a card for that would be a card nobody reads by
+    // the tenth one, which is how a game teaches you to tap through its celebrations. Chests take the
+    // note instead. [[no-pity-progress-bars]] is the same judgement from the other end.
+    const [toolWon, setToolWon] = useState(null);
     const [bossWon, setBossWon] = useState(null);
     // The charm armed for the next dive, or null. ⚠️ NOT PERSISTED AND DELIBERATELY SO — arming is a
     // choice about the run you are about to take, and a choice that survived a reload would be spent on
@@ -483,7 +491,50 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // This is the half that survives the shout: the note names what you walked away with, and it
         // outranks a craft-ready nudge because a piece of gear is the rarer thing by two orders.
         const gearGot = Array.isArray(d.gear) ? d.gear : [];
-        if (gearGot.length) {
+
+        // ── ⚠️ THE BAR MOVES OFF THE SETTLE'S OWN RESPONSE, NOT A REFETCH ───────────────────────────
+        // The server returns the new progress because it just computed it. Asking /api/marketplace/grove
+        // for it instead would be a second round trip per settle for a number that was already in the
+        // reply — the exact shape CLAUDE.md opens with. Merged into the session rather than replacing it,
+        // so nothing else the session holds is lost.
+        if (d.bar) setSession((prev) => (prev ? { ...prev, bar: { ...prev.bar, ...d.bar } } : prev));
+
+        // ── ⚠️ EVERY FILL IS ANNOUNCED, AND A TOOL OUTRANKS EVERYTHING ──────────────────────────────
+        // One settle can cross several fills (see the loop in bumpBar), so this is a list and not a
+        // single reward. A tool is the rarest thing on it — twelve per map tier, and it moves a number in
+        // another system — so it takes the card, and it wins the slot even against a gear drop.
+        //
+        // ⚠️ THE CARD TAKES THE LAST TOOL, NOT THE FIRST. If a long settle paid two, the second is the one
+        // the player now holds the better version of, and showing the first would name a rung they have
+        // already passed.
+        const paid = Array.isArray(d.bar?.paid) ? d.bar.paid : [];
+        const toolsPaid = paid.filter((x) => x?.kind === "tool");
+        const chestsPaid = paid.filter((x) => x?.kind === "chest");
+
+        if (toolsPaid.length) {
+            setToolWon({ ...toolsPaid[toolsPaid.length - 1], key: `${Date.now()}` });
+            // ⚠️ AND THE CHESTS STILL GET SAID, in the note under the card, rather than being swallowed by
+            // it. A reward granted and never mentioned is the defect that hid the Coliseum's dead gear.
+            if (chestsPaid.length) {
+                setNote(`${chestsPaid.length} chest${chestsPaid.length === 1 ? "" : "s"} in your stash too`);
+            }
+        } else if (chestsPaid.length) {
+            // ⚠️ NAMED BY TIER, because "a chest" and "a Mythic Chest" are not the same news, and the
+            // best one leads.
+            //
+            // ⚠️ THE LABEL AND THE RUNG COME FROM THE SERVER. chests.js carries `import "server-only"`,
+            // so this component cannot read CHEST_TIERS or CHEST_ORDER — importing them here fails the
+            // build outright. bumpBar resolves both and sends them.
+            const label = [...chestsPaid].sort((a, b) => (b.rung || 0) - (a.rung || 0))[0]?.label
+                || "A chest";
+            setNote(chestsPaid.length === 1
+                ? `${label} — it is in your stash`
+                : `${label} and ${chestsPaid.length - 1} more in your stash`);
+        } else if (gearGot.length) {
+            // ── ⚠️ GEAR ON THE RECEIPT, NOT JUST IN THE BAG ───────────────────────────
+            // settle grants it and returns it; the scene already shouted the piece's name on the kill.
+            // This is the half that survives the shout. It sits BELOW the bar's rewards because a bar
+            // reward is the thing the player was deliberately working toward, and gear is luck.
             setNote(gearGot.length === 1
                 ? `${gearGot[0].name} dropped — it is in your bag`
                 : `${gearGot[0].name} and ${gearGot.length - 1} more dropped`);
@@ -683,6 +734,15 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         return () => clearTimeout(t);
     }, [unlockedNow]);
 
+    // Same five seconds and the same self-clear as the unlock card above, and the sound fires from here
+    // rather than from the settle handler so it is tied to the card actually being on screen.
+    useEffect(() => {
+        if (!toolWon) return undefined;
+        celebrateUnlock();
+        const t = setTimeout(() => setToolWon(null), 5000);
+        return () => clearTimeout(t);
+    }, [toolWon]);
+
     useEffect(() => {
         if (!note) return undefined;
         const t = setTimeout(() => setNote(null), 3200);
@@ -699,6 +759,27 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 <span className="gv-pop-kicker">New area unlocked</span>
                 <b className="gv-pop-name">{unlockedNow.name}</b>
                 <span className="gv-pop-art" style={{ backgroundImage: `url(${unlockedNow.bg})` }} />
+                <span className="gv-pop-go">Tap to continue</span>
+            </div>
+        </div>
+    ) : null;
+
+    // ⚠️ DECLARED HERE AND DROPPED INTO BOTH RETURNS, for exactly the reason popNode is. The bar fills
+    // on a settle, and the settle that matters most is the one firing as you LEAVE a zone — which is the
+    // moment the zone view unmounts. A card rendered only inside the zone would be destroyed by the
+    // thing that triggered it.
+    const toolNode = toolWon ? (
+        <div className="gv-pop" onClick={() => setToolWon(null)}>
+            <div className="gv-pop-card">
+                <span className="gv-pop-rays" aria-hidden="true" />
+                <span className="gv-pop-kicker">Tool earned</span>
+                <b className="gv-pop-name">{toolWon.name} {toolWon.numeral}</b>
+                {/* The sprite, not a background — a tool is a drawn object and gv-pop-art is a
+                    cover-fitted plate meant for a backdrop. */}
+                {toolWon.art ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img className="gv-pop-tool" src={toolWon.art} alt="" width={96} height={96} />
+                ) : null}
                 <span className="gv-pop-go">Tap to continue</span>
             </div>
         </div>
@@ -1298,6 +1379,9 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     waves={col.run ? col.run.plan.waves : null}
                     onRunEnd={col.finish}
                     groundChests={col.chests}
+                    // ⚠️ FROM THE SESSION, which groveEnter seeds and every settle updates. The scene
+                    // never computes it — the server owns the bar because it owns what the bar pays.
+                    bar={session.bar || null}
                     onOpenChest={col.open}
                     // ⚠️ THE DOOR'S GATE IS THE SERVER'S, NOT THE CLIENT'S KILL COUNT. groveEnter refuses
                     // any zone past unlocked_n, and the door used to decide for itself from local kills --
@@ -1426,6 +1510,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     wrapper IS the full-screen layer and it needs no portal — so it is portalled HERE only,
                     in the branch where the zone has moved out from under it. */}
                 {popNode && mounted ? createPortal(popNode, fsHost || document.body) : null}
+                {/* ⚠️ PORTALLED LIKE EVERYTHING ELSE THAT COVERS THE ZONE, and to fsHost first: a
+                    browser in native full screen paints only the full-screen element's subtree, so a
+                    card sent to the body is a sibling of the scene and never drawn. */}
+                {toolNode && mounted ? createPortal(toolNode, fsHost || document.body) : null}
                 <style>{GROVE_CSS}</style>
             </div>
         );
@@ -1453,6 +1541,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             </button>
 
             {popNode}
+            {toolNode}
             {note ? <p className="gv-note">{note}</p> : null}
 
             {townNode}

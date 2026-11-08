@@ -371,7 +371,7 @@ bonus they have.
 
 So the hole is **acquisition only**, and that is the backlog item:
 
-> ### R. A way to get Grove tools — BACKLOGGED, Luke's call
+> ### R. A way to get Grove tools — ✅ ANSWERED SAME DAY, see item V (the kill bar)
 > Tools are strictly unobtainable until this is answered. Three shapes were on the table when it was parked:
 > they **drop** off creatures and bosses like gear does, a town vendor **sells** the next rung for gold (the
 > Grove becomes a gold sink rather than a parts sink), or they are a **quest** payout. Same open question for
@@ -517,6 +517,88 @@ lines of `re.findall` over the stylesheet against every remaining JS file if som
 different components and the later one won, which is how "a random open button just hanging out over text"
 happened (item P). That is a NAME COLLISION, not a dead rule. Nothing was renamed in this pass, so no new
 collisions were introduced — but [[grep-the-class-name-before-taking-it]] before reusing any of these.
+
+---
+
+## ✅ V. ITEM R IS ANSWERED — THE KILL BAR, BUILT 2026-11-08
+
+> Luke: *"You kill enemies in an area. A bar fills. It reaches full. You get a reward. The reward is a
+> crafting tool. The bar resets, you repeat. The reward is each crafting tool of that zone tier. Once you have
+> all tools. It becomes a low level chest, with a chance to roll higher. For zones 1 and 2 then high tier chest
+> would be iron. 3 and 4 gold, etc"*
+
+**Item R above is closed by this.** Tools have a source again, so the gap that opened when the bench was
+deleted is shut — charms and foods are still open, see the bottom of this item.
+
+`migrations/510-grove-bar.sql` · `src/lib/marketplace/grove-bar.js` · `scripts/check-grove-bar.mjs`
+
+### How it works
+
+**250 kills per fill** — Luke's number, asked directly. The bar belongs to the **map**, not the zone, because
+a tool's tier *is* its map ("that zone tier") and walking through a gate between two zones of one map must not
+reset your progress. It ticks on **settle**, off the clamped kill count, never the count the client claimed.
+
+- **While the map owes tools:** the next slot in `TOOL_SLOTS` order, granted at that map's tier with a rolled
+  quality band. Twelve slots, so twelve fills kits out a tier.
+- **Once all twelve are held:** a chest, promoted up from wooden while the roll keeps succeeding.
+
+⚠️ **"Missing" means `tier < map`, not "no tool".** A rod at tier V is better than anything map three can
+hand over, so an early map owes nothing for that slot. Without that rule, walking back to map one would offer
+to **downgrade every tool you own**.
+
+### ⚠️ The ceiling stops at mythic, and that reverses the obvious reading
+
+`etc` across twelve maps lands on **celestial** — `CHEST_ORDER` is wooden, iron, gold, mythic, ascendant,
+eternal, celestial, primordial, so the pairing fits twelve maps exactly. Asked where it should stop, Luke's
+call was **mythic**, because every tier above it is `source: "elite"` — real money. That is the same decision
+he made when the Grove's own chests were removed (*"drop the top tiers rather than pay them another way"*), and
+an ascendant chest pays its own tier or better **50%** of the time, so maps 7–8 would have quietly become a
+grind route to paid gear. **Map 7 is built and live**, so this was not hypothetical.
+
+| maps | ceiling | what it actually pays |
+|---|---|---|
+| 1–2 | iron | wooden 75%, iron 25% |
+| 3–4 | gold | wooden 71%, gold 8.5% |
+| 5–6 | mythic | wooden 65%, mythic 4.4% |
+| 7–12 | mythic | wooden 53% at map 12, mythic 10.3% |
+
+**Depth buys odds, since it no longer buys a ceiling.** Maps 5–12 share a top, so the promotion chance climbs
+with the map — 25% at map 1 to 47% at map 12. Mythic goes from 3.6% of chests at map 5 to 10.4% at map 12, so
+eight maps of progression still mean something at the one reward they all share.
+
+### ⚠️ THE FAUCET, STATED OUT LOUD
+
+**`BAR_KILLS` is a mint rate, not a difficulty dial.** Tools are finite; every fill after the twelfth is a
+chest, for ever. At the Grove's own 40 kills/min cap:
+
+- a fill is a **6.3 minute** floor
+- a full twelve-tool set is **~75 minutes** of farming
+- after that it is **9.6 chests/hour, per member, permanently**
+
+Halving the constant doubles the Den's chest income from the Grove. `check:grove-bar` prints those three
+numbers on every run so nobody has to rediscover them, and it fails if a fill ever drops under five minutes.
+[[economy-nerf-measure-daily-total]] — measure over three days before touching it.
+
+### Verified
+
+- `check:grove-bar` — twelve tools then chests, each slot exactly once, no map can ever pay an elite chest
+  (that last one is the assertion that stops somebody "finishing" the pairing later), the floor stays the
+  common case, and depth still beats shallow.
+- The **SQL** tested directly against the database, because the gate cannot: the increment is atomic, the
+  remainder **carries** (300 kills pays once and leaves 50 on the clock), and `BAR_MAX_FILLS` **defers** rather
+  than destroys — 2,600 kills at once pays eight and leaves 600 sitting on a 250 bar, which the next kill pays
+  out. The display clamps that so it never reads "600/250".
+- Migration applied and the table's columns read back.
+
+### ⚠️ Still open after this
+
+- **Charms and foods have no source.** The bar pays tools and chests only. Charms are the sharper gap: they are
+  banded, you hold several, and a map's last boss used to teach the recipe — that teaching was removed with
+  the bench, so the Charms shelf now says "None yet, and no way to get one at the moment."
+- **2 farm plots and 3 epic farm decorations** (`source: "grove"`, `price: null`) are still unobtainable.
+- The bar is only drawn **in a zone**. The hub shows nothing about it, so a player choosing where to farm
+  cannot see which map's bar is nearly full. Not a gap in the feature as described — "you kill enemies in an
+  area" — but it is the obvious next place for it.
 
 ---
 

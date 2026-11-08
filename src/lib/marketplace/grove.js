@@ -24,6 +24,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { petBiteShare } from "@/lib/marketplace/grove-world.js";
 import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { settleKills, rollBoss } from "@/lib/marketplace/grove-roll.js";
+import { bumpBar, barState } from "@/lib/marketplace/grove-bar.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { groveFighter } from "@/lib/marketplace/grove-kit.js";
 import { grantStone } from "@/lib/marketplace/pet-ascension.js";
@@ -536,6 +537,10 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
         ok: true,
         seed,
         gearArt,
+        // ⚠️ READ ON ENTER, NOT POLLED. The meter moves off the settle's own response for the whole visit
+        // (see `bar` there); this is the starting value, so a player walking into a zone sees where the bar
+        // already stood rather than watching it animate up from zero.
+        bar: await barState(buyerId, Number(zone?.map) || 1).catch(() => null),
         coliseum,
         zone: {
             ...zone,
@@ -783,6 +788,22 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     ).catch(() => {});
     await trackActivity(buyerId, "grove_settle", { zone: zoneId, kills: list.length }).catch(() => {});
 
+    // ── ⚠️ THE KILL BAR, WHICH IS WHERE TOOLS COME FROM NOW ─────────────────────────────────────────
+    // Luke, 2026-11-08: "You kill enemies in an area. A bar fills... The reward is each crafting tool of
+    // that zone tier... Once you have all tools. It becomes a low level chest."
+    //
+    // ⚠️ IT TICKS ON `list.length`, THE CLAMPED COUNT — never `kills.length`, what the client claimed. The
+    // list has already been through the window ceiling above, which is the only thing standing between a
+    // tampered kill count and a chest printer. See the note on BAR_MAX_FILLS.
+    //
+    // ⚠️ AND IT IS KEYED ON THE ZONE'S MAP, not the zone. A tool's tier IS its map, so the bar has to
+    // belong to the map or walking through a gate would reset it.
+    //
+    // Failure-tolerant like the hunts and the belt: a bar that misses a tick is a reward that arrives a
+    // little later, while a throw here is a settle that fails and loses loot somebody watched drop.
+    const bar = await bumpBar(buyerId, Number(zone?.map) || Math.ceil(zoneN / 12) || 1, list.length)
+        .catch(() => null);
+
     // ⚠️ RE-ARMED AFTER THE FOOD IS DEBITED, NOT BEFORE. The belt empties mid-dive, and a player who
     // crafted two kinds of poultice should carry on healing rather than discover at the bottom of a zone
     // that the slot went empty forty kills ago. armBeltIfEmpty only fills an empty slot, so this is a
@@ -811,7 +832,11 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         // [[declared-but-never-read]] and [[reward-with-no-screen-is-not-shipped]].
         gear: gearGot,
         xp: got.xp,
-        // ✂️ `newlySeen` and `questTicks` were both here.
+        // ── ⚠️ THE BAR AND WHAT IT PAID, ON THE RECEIPT ─────────────────────────────────────────────
+        // `bar` carries the new progress so the meter in the scene moves without a second request, and
+        // `bar.paid` is every reward this settle crossed, in order. A reward granted and not announced is
+        // the bug that hid the Coliseum's dead gear for months — [[reward-with-no-screen-is-not-shipped]].
+        bar,
         ate,
         rejected,
         zoneKills: Number(z?.kills) || 0,

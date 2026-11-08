@@ -502,6 +502,12 @@ export default function GroveScene({
     // mid-collection is not how you lose what you just earned — see migration 500.
     groundChests = null,
     onOpenChest,
+    // ── ⚠️ THE KILL BAR, AND IT IS A PROP RATHER THAN SCENE STATE ───────────────────────────────
+    // The server owns it: it ticks on settle, off the clamped kill count, because it is the one place
+    // in the Grove where kills convert into chests. The scene cannot be allowed an opinion about how
+    // full it is, or the meter would disagree with the rewards — so this is read-only and arrives from
+    // groveEnter on the way in and from every settle response after that. See grove-bar.js.
+    bar = null,
     zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
@@ -4420,12 +4426,53 @@ export default function GroveScene({
                 the zone can be rebuilt underneath it unseen. */}
             {warp ? <div className={`gv-warp is-${warp}`} aria-hidden="true" /> : null}
 
-            {/* ✂️ THE HAUL LIST RENDERED HERE — newest row at the top, because the row that just
-                changed is the one being read, and aria-hidden because every row had already fired a
-                pop at the collector and was already banked in the pack: a screen reader announcing
-                each arrival twice is noise, not access. The count was keyed on itself so React
-                replaced the node and re-ran the bump animation — mutating the text of a live element
-                does not restart a CSS animation, which was the whole tell that the number went up. */}
+            {/* ── THE KILL BAR ─────────────────────────────────────────────────────────────────────
+                Luke: "You kill enemies in an area. A bar fills. It reaches full. You get a reward."
+
+                Stands where the haul list used to, which is the one part of the frame that is neither
+                the belt and boss bar at the top nor the dock and the note at the bottom.
+
+                ⚠️ IT NAMES THE REWARD. `bar.next` is resolved server-side — the next tool in TOOL_SLOTS
+                order that this map still owes, or the chest ceiling once all twelve are held — so the
+                meter fills toward a named, drawn object rather than toward "a reward".
+
+                ⚠️ NOT aria-hidden, UNLIKE THE HAUL IT REPLACED. The haul was hidden because every row
+                had already been announced twice over; this is the only place the bar exists, so hiding
+                it would make the feature invisible to a screen reader rather than merely quieter.
+                role="progressbar" with the real numbers, because that is exactly what it is. */}
+            {bar?.need ? (
+                <div className={`gv-bar${bar.next?.kind === "chest" ? " is-chest" : ""}`}
+                    role="progressbar" aria-valuemin={0} aria-valuemax={bar.need}
+                    aria-valuenow={Math.min(bar.need, bar.kills || 0)}
+                    aria-label={bar.next?.kind === "chest"
+                        ? `${bar.need - (bar.kills || 0)} kills to a chest`
+                        : `${bar.need - (bar.kills || 0)} kills to ${bar.next?.name || "a tool"}`}>
+                    {bar.next?.art ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={bar.next.art} alt="" width={30} height={30} draggable={false} />
+                    ) : null}
+                    <span className="gv-bar-txt">
+                        <b className="gv-bar-name">
+                            {bar.next?.kind === "chest"
+                                ? "A chest"
+                                : `${bar.next?.name || "A tool"} ${bar.next?.numeral || ""}`.trim()}
+                        </b>
+                        <span className="gv-bar-track">
+                            {/* ⚠️ CLAMPED AT 100%. The remainder carries across a fill, so a settle that
+                                crossed two rewards can hand back a kills value the width maths would
+                                otherwise render as 180% — which paints outside the track. */}
+                            <i className="gv-bar-fill" style={{
+                                width: `${Math.min(100, Math.round((100 * (bar.kills || 0)) / bar.need))}%`,
+                            }} />
+                        </span>
+                    </span>
+                    {/* ⚠️ CLAMPED, LIKE THE WIDTH ABOVE. BAR_MAX_FILLS defers rewards rather than
+                        destroying them, so a single enormous settle can leave MORE than a full bar on the
+                        clock — 2,600 kills pays eight and leaves 600 sitting on a 250 bar. Nothing is lost
+                        (the next kill pays it out), but "600/250" reads as a bug. */}
+                    <span className="gv-bar-n">{Math.min(bar.need, bar.kills || 0)}/{bar.need}</span>
+                </div>
+            ) : null}
 
             {world.herald ? (
                 <div className={`gv-herald is-${world.herald.kind}`} aria-hidden="true">

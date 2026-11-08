@@ -2355,29 +2355,46 @@ export const GROVE_CSS = `
    ⚠️ pointer-events: none ON THE LIST. Every tap in a zone is a move order on the world underneath, and
    a list that grows under the player's thumb while they are walking left would silently eat those taps.
    Nothing in here is pressable and nothing in here may become pressable. */
-.gv-haul { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 42%;
+/* ── ⚠️ THE KILL BAR, IN THE SLOT THE HAUL LIST USED TO OWN ──────────────────────────────────────
+   Luke, 2026-11-08: "You kill enemies in an area. A bar fills. It reaches full. You get a reward."
+
+   The haul list ran down this edge from 42% and was deleted with monster parts, which freed the one
+   piece of the frame that is neither the belt and boss bar (top) nor the dock and the note (bottom).
+   That is lucky rather than clever, but it is the right home for the same reason the haul had it: it
+   is the edge the eye goes to for "what am I getting out of this", and it is out of the play area.
+   See the note on .gv-note.is-zone about why nothing in this feature sits over the floor you fight on.
+
+   ⚠️ IT NAMES AND DRAWS WHAT IS COMING, which is the whole difference between this and a progress bar.
+   A meter filling toward "a reward" teaches nothing; a meter filling toward the Antler Pick, with its
+   sprite on it, is a goal you can decide to go and finish. [[teach-by-showing-not-telling]]
+
+   ⚠️ pointer-events: none. It is a readout, and it sits over ground a thumb reaches into to hit things.
+   The one thing worse than not showing the bar is swallowing a tap meant for a creature. */
+.gv-bar { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 42%;
     transform: translateY(-50%); z-index: 5; pointer-events: none;
-    list-style: none; margin: 0; padding: 0;
-    display: flex; flex-direction: column; gap: 5px; max-width: min(56vw, 230px); }
-.gv-haul li { display: flex; align-items: center; gap: 7px; padding: 4px 9px 4px 4px;
+    display: flex; align-items: center; gap: 8px; padding: 5px 11px 5px 5px;
     border-radius: 999px; background: rgba(8,11,8,0.68); border: 1px solid rgba(255,255,255,0.1);
     box-shadow: 0 3px 10px rgba(0,0,0,0.4); backdrop-filter: blur(3px);
-    animation: gvHaulIn 260ms cubic-bezier(0.2, 1.3, 0.4, 1) both; }
-.gv-haul li img { flex: none; width: 26px; height: 26px; object-fit: contain; display: block;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
-.gv-haul li span { flex: 1; min-width: 0; font-size: 0.74rem; font-weight: 600; color: #e6e0d2;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ⚠️ THE COUNT IS THE POINT OF THE ROW, so it is the only thing in it that moves. The node is keyed on
-   the number in the JSX, so React swaps the element and this animation re-runs -- rewriting the text of
-   a live element does not restart a CSS animation, and a number that changes without moving is a number
-   nobody sees change. */
-.gv-haul li b { flex: none; min-width: 22px; text-align: right; font-size: 0.86rem; font-weight: 900;
-    color: #ffd75e; font-variant-numeric: tabular-nums;
-    animation: gvHaulBump 320ms cubic-bezier(0.2, 1.6, 0.4, 1) both; }
-/* The one uncommon part in a pile gets the same gold the drop itself wore on the floor. */
-.gv-haul li.is-rare { border-color: rgba(255,200,97,0.45); background: rgba(38,26,6,0.74);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.4), 0 0 14px rgba(255,200,97,0.18); }
-.gv-haul li.is-rare span { color: #ffe6a8; }
+    max-width: min(58vw, 240px); }
+/* object-fit: contain, because a tool sprite is not square and must not be stretched to this box.
+   [[sprite-floats-object-fit-contain]] */
+.gv-bar img { flex: none; width: 30px; height: 30px; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+.gv-bar-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.gv-bar-name { font-size: 0.72rem; font-weight: 700; color: #e6e0d2; letter-spacing: 0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ⚠️ A REAL BOX, NOT A PERCENTAGE OF NOTHING. The track needs its own height or the fill inside it
+   collapses — [[percentage-needs-a-real-box]], which this repo has paid for four times. */
+.gv-bar-track { position: relative; height: 5px; border-radius: 999px; overflow: hidden;
+    background: rgba(255,255,255,0.14); }
+.gv-bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+    background: linear-gradient(90deg, #7fd48a, #d8f06a);
+    transition: width 420ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+/* The chest phase, once every tool of the tier is held. A different colour because it is a different
+   kind of reward, and the player should be able to tell which phase they are in at a glance. */
+.gv-bar.is-chest .gv-bar-fill { background: linear-gradient(90deg, #ffc857, #ffe9a8); }
+.gv-bar-n { flex: none; font-size: 0.64rem; font-weight: 800; color: #b9c4ae;
+    font-variant-numeric: tabular-nums; }
 @keyframes gvHaulIn { from { opacity: 0; transform: translateX(-14px) scale(0.92); }
     to { opacity: 1; transform: none; } }
 @keyframes gvHaulBump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #fff6df; }
@@ -2614,6 +2631,13 @@ export const GROVE_CSS = `
 .gv-pop-art { display: block; width: 100%; aspect-ratio: 16/10; border-radius: 14px;
     background-size: cover; background-position: center;
     border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 28px rgba(0,0,0,0.7); }
+/* ── THE TOOL THE KILL BAR PAID ──────────────────────────────────────────────────────────────────
+   ⚠️ A SPRITE, NOT gv-pop-art. That sibling is a 16/10 cover-fitted plate built for a zone BACKDROP;
+   a tool is a drawn object on transparency and cover-fitting it would crop the handle off and stretch
+   what was left. contain, on a square box, with nothing behind it.
+   [[sprite-floats-object-fit-contain]] */
+.gv-pop-tool { display: block; width: 96px; height: 96px; margin: 10px auto 0; object-fit: contain;
+    filter: drop-shadow(0 6px 16px rgba(0,0,0,0.65)); }
 .gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
     text-transform: uppercase; color: #9b9487; }
 @keyframes gvPopIn { from { opacity: 0; } to { opacity: 1; } }
