@@ -113,7 +113,7 @@ def limb(bm, path, n):
 # dummy next to the art this has to stand beside.
 TORSO = [
     ("crotch", 0.86, 0.150, 0.118, 0.000, None),
-    ("hips", 0.96, 0.172, 0.130, 0.000,
+    ("hips", 0.96, 0.166, 0.130, 0.000,
      [(T_LEFT, 0.11, 0.08), (T_RIGHT, 0.11, 0.08)]),             # iliac crest
     # ⚠️ A VERTICAL GROOVE ALONE READS AS A BACK. Rings vary radius with
     # ANGLE, so everything they make is vertically continuous -- and a
@@ -127,7 +127,7 @@ TORSO = [
       (T_FRONT, 0.038, -0.07)]),
     ("ab_gap1", 1.062, 0.134, 0.101, 0.004,
      [(T_FRONT, 0.14, -0.05)]),                                  # tendinous band
-    ("waist", 1.105, 0.142, 0.110, 0.004,
+    ("waist", 1.105, 0.146, 0.110, 0.004,
      [(0.695, 0.055, 0.12), (0.805, 0.055, 0.12),                # ABDOMINALS
       (T_FRONT, 0.040, -0.08)]),                                 # linea alba
     ("ab_gap2", 1.150, 0.152, 0.114, 0.004,
@@ -159,14 +159,20 @@ TORSO = [
     # notch out to the point of the shoulder, so it is a pair of ridges with
     # a PIT between them at the throat. A ring that only widens gives a
     # barrel; the notch is what says collarbone.
-    ("clavicle", 1.432, 0.244, 0.132, -0.006,
+    ("clavicle", 1.432, 0.2255, 0.132, -0.006,
      [(0.640, 0.075, 0.11), (0.860, 0.075, 0.11),                # CLAVICLES
       (T_FRONT, 0.050, -0.13)]),                                 # sternal notch
+    # ⚠️ AND THE SHOULDER WAS 531 mm, WHICH IS 3.45 HEAD-WIDTHS AGAINST A
+    # HEROIC CANON OF 2.85-3.25. It passed the audit for two days because
+    # the audit measured 2*rx and ignored the muscle bumps every ring on
+    # this body is shaped by -- a width taken off a radius is the width of a
+    # cylinder nobody built. From the front he read as a slab with thin arms
+    # hanging off it, and the arms were never the problem.
     # ⚠️ TWO RINGS AT THE SHOULDER, not one. The arm bridges into the band
     # BETWEEN them, so the armpit has a real edge loop above and below it. A
     # joint with a single loop through it has nothing to fold along, which is
     # exactly how a deltoid ends up a flat sheet.
-    ("shoulder", 1.472, 0.248, 0.128, -0.006,
+    ("shoulder", 1.472, 0.229, 0.128, -0.006,
      [(T_LEFT, 0.13, 0.07), (T_RIGHT, 0.13, 0.07)]),
     # ⚠️ THE HOLE MUST SIT ON A SURFACE THAT IS NOT COLLAPSING. The arm
     # bridges the band clavicle -> shoulder -> trapezius, and with the traps
@@ -175,7 +181,7 @@ TORSO = [
     # to twist to reach it and threw a triangular flap at each shoulder.
     # Anatomically the traps are broad anyway -- they slope from the neck out
     # to the point of the shoulder; the pinch belongs at the neck, one ring up.
-    ("trapezius", 1.516, 0.216, 0.118, -0.008,
+    ("trapezius", 1.516, 0.206, 0.118, -0.008,
      [(0.205, 0.090, 0.20), (0.295, 0.090, 0.20),                # TRAPEZIUS
       (T_BACK, 0.050, -0.07)]),
     ("neck_base", 1.530, 0.086, 0.078, -0.004,

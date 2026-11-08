@@ -101,8 +101,22 @@ def measure(ob):
     # that band measured the upper ARMS: it read 0.619 m against a real
     # biacromial 0.496, and reported the shoulders half a head wider than
     # they are. Read the ring that IS the shoulder.
-    ti = [t[0] for t in body_mod.TORSO].index("shoulder")
-    m["shoulder_w"] = 2.0 * body_mod.TORSO[ti][2]
+    #
+    # ⚠️ AND READ IT WITH ITS MUSCLE ON. Taking 2*rx ignores the bumps that
+    # every ring on this body is shaped by, so the shoulders measured 496 mm
+    # when the surface is 531 -- and 3.3 head-widths PASSED while the real
+    # figure was at 3.5 and reading blocky from the front. A width taken off
+    # a radius is the width of a cylinder nobody built.
+    def ring_width(name):
+        ti = [t[0] for t in body_mod.TORSO].index(name)
+        _n, _z, rx, _ry, _cy, b = body_mod.TORSO[ti]
+        mult = cage.shape(body_mod.N, b)
+        return 2.0 * max(abs(rx * mult[i] * math.cos(2 * math.pi * i / body_mod.N))
+                         for i in range(body_mod.N))
+
+    m["shoulder_w"] = ring_width("shoulder")
+    m["waist_w"] = ring_width("waist")
+    m["hip_w"] = ring_width("hips")
     # ⚠️ SPAN IS ALONG THE ARM, NOT ACROSS THE RENDER. He is modelled in an
     # A-pose, so the x extent of the figure is nowhere near his reach -- it
     # read 0.794 of his height and sent me looking for arms that were 20%
@@ -183,6 +197,13 @@ def checks(m):
         # check. Arm length against height does not double-count anything.
         Check("arm length", m["arm_len"] / h, 0.437, 0.018, "of height",
               "shoulder joint to fingertip"),
+        # ⚠️ THE V IS THE WHOLE SILHOUETTE OF A HEROIC FIGURE and nothing was
+        # watching it. Straight-on was the one view never rendered -- the
+        # standard four angles are all three-quarter -- and from the front
+        # he read as a slab. Shoulder against waist and shoulder against hip
+        # are the two numbers that own that read.
+        Check("shoulder : waist", m["shoulder_w"] / m["waist_w"], 1.55, 0.20, ""),
+        Check("shoulder : hip", m["shoulder_w"] / m["hip_w"], 1.45, 0.15, ""),
         Check("wrist at crotch", (m["wrist_z"] - m["crotch_z"]) / h, 0.0, 0.025, "of height"),
         Check("elbow at waist", (m["elbow_z"] - m["waist_z"]) / h, 0.0, 0.030, "of height"),
         Check("knee half hip->floor", m["knee_z"] / m["hip_z"], 0.50, 0.055, ""),
@@ -267,7 +288,17 @@ BREAKS = [
      lambda: _set_eyes(0.902, 0.598)),
     ("arms given an extra hand's length", "arm length",
      lambda: _stretch_arms(1.12)),
+    ("shoulders back to the 531 mm slab", "shoulder : waist",
+     lambda: _widen("shoulder", 1.085)),
+    ("waist thickened to a tube", "shoulder : waist",
+     lambda: _widen("waist", 1.30)),
 ]
+
+
+def _widen(name, f):
+    ti = [t[0] for t in body_mod.TORSO].index(name)
+    n, z, rx, ry, cy, b = body_mod.TORSO[ti]
+    body_mod.TORSO[ti] = (n, z, rx * f, ry, cy, b)
 
 
 def _scale_head(f):
