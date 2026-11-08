@@ -26,8 +26,16 @@ from mathutils import Vector
 # ═══════════════════════════════════════════════════════════════════════════
 
 ROWS = 3        # vertex rows through the palm's thickness -> 2 quad rows
-COLS = 8        # vertex columns across -> 7 quad columns, 4 of them fingers
-NF = 6          # verts per finger ring: matches a 1x2 socket's 6 edges
+# ⚠️ THREE COLUMNS A FINGER, NOT TWO, AND THE KNUCKLES ARE WHY. With a
+# column at each finger's EDGES only there is no vertex at a finger's
+# centre, so a bump raised on the back of the hand is a ridge across all
+# four of them rather than four knuckles -- the feature is simply not
+# expressible, the same wall the face hit at 32 verts. A centre column per
+# finger makes the lid 12 columns, which also widens each finger socket
+# from one quad to two and gives the fingers 8-vert rings instead of 6.
+COLS = 12       # vertex columns across -> 11 quad columns, 8 of them fingers
+NF = 8          # verts per finger ring: matches a 2x2 socket's 8 edges
+NTH = 6         # the thumb still leaves a 1x2 socket, so it keeps 6
 
 # (name, centre across the palm, half-width, length, how far the knuckle sits
 # back from the middle one). Fractions of the palm half-width and of the
@@ -84,11 +92,13 @@ def _frame(wrist, tip, side):
 
 
 def _columns():
-    """The 8 across-the-palm positions, in half-width units, derived from the
-    fingers themselves. Ordered so quad columns 0, 2, 4, 6 are the fingers."""
+    """The 12 across-the-palm positions, in half-width units, derived from
+    the fingers themselves: each finger owns its outer edge, its CENTRE and
+    its inner edge, so quad columns 3i and 3i+1 are finger and 3i+2 is the
+    webbing between it and the next."""
     cols = []
     for _n, c, w, _l, _b in FINGERS:
-        cols += [c + w, c - w]
+        cols += [c + w, c, c - w]
     return cols
 
 
@@ -191,10 +201,19 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
     # Each column is pulled back by its own finger's setback.
     setback = []
     for _n, _c, _w, _l, back in FINGERS:
-        setback += [finger_len * back, finger_len * back]
+        setback += [finger_len * back] * 3        # outer, centre, inner
 
     # Per column (thumb side first) and per station along the palm.
-    PAD = [0.95, 0.78, 0.30, 0.12, 0.12, 0.26, 0.50, 0.58]
+    PAD = [0.95, 0.86, 0.78, 0.30, 0.21, 0.12,
+           0.12, 0.19, 0.26, 0.50, 0.54, 0.58]
+    # ⚠️ THE KNUCKLES GO ON THE BACK FACE ONLY, and they peak at each
+    # finger's CENTRE column -- which is the entire reason for the third
+    # column. Raising the edge columns too would give one ridge, which is
+    # what the old lattice could express and why the back of the hand
+    # photographed as a flat slab.
+    KNUCK = [0.12, 0.62, 0.12, 0.10, 0.56, 0.10,
+             0.08, 0.50, 0.08, 0.07, 0.42, 0.07]
+    KNUCK_ALONG = [0.0, 0.08, 0.45, 1.0]
     PAD_ALONG = [0.18, 0.95, 1.00, 0.45]
 
     def grid(k):
@@ -219,14 +238,16 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
             t = half_t * tm * (r - 1.0)
             if r == 0:
                 t -= half_t * PAD[i] * PAD_ALONG[k] * 0.62
+            elif r == ROWS - 1:
+                t += half_t * KNUCK[i] * KNUCK_ALONG[k] * 0.55
             return t
 
         return [[P(palm_len * f - setback[i] * arc, across(i, r), through(i, r))
                  for r in range(ROWS)] for i, c in enumerate(cols)]
 
     def perimeter(g):
-        """The lattice's outline as one cycle of 18, so it can be a ring in a
-        tube. Order matters only in being consistent between stations."""
+        """The lattice's outline as one cycle, so it can be a ring in a tube.
+        Order matters only in being consistent between stations."""
         cyc = [(c, 0) for c in range(COLS)]
         cyc += [(COLS - 1, r) for r in (1, 2)]
         cyc += [(c, ROWS - 1) for c in range(COLS - 2, -1, -1)]
@@ -254,7 +275,9 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
         for r in range(1, ROWS - 1):
             at[(c, r)] = bm.verts.new(top[c][r])
 
-    finger_cols = {0: 0, 1: 2, 2: 4, 3: 6}      # finger index -> quad column
+    # Finger i owns vertex columns 3i..3i+2, so quad columns 3i and 3i+1;
+    # 3i+2 is the webbing between it and the next.
+    finger_cols = {i: (3 * i, 3 * i + 1) for i in range(len(FINGERS))}
     lid = {}
     for c in range(COLS - 1):
         for r in range(ROWS - 1):
@@ -266,8 +289,8 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
     bm.edges.ensure_lookup_table()
 
     holes = {}
-    for fi, qc in finger_cols.items():
-        faces = [lid[(qc, r)] for r in range(ROWS - 1)]
+    for fi, qcs in finger_cols.items():
+        faces = [lid[(qc, r)] for qc in qcs for r in range(ROWS - 1)]
         edges = set()
         for f in faces:
             edges |= set(f.edges)
@@ -343,12 +366,12 @@ def build(bm, side, wrist, tip, palm_len, half_w, half_t):
         uu = (d - ax * d.dot(ax)).normalized()
         vv = ax.cross(uu).normalized()
         t_rings.append([bm.verts.new(
-            ctr + uu * (ru * math.cos(2 * math.pi * i / NF))
-            + vv * (rv * math.sin(2 * math.pi * i / NF)))
-            for i in range(NF)])
+            ctr + uu * (ru * math.cos(2 * math.pi * i / NTH))
+            + vv * (rv * math.sin(2 * math.pi * i / NTH)))
+            for i in range(NTH)])
     for a, b in zip(t_rings, t_rings[1:]):
-        for i in range(NF):
-            j = (i + 1) % NF
+        for i in range(NTH):
+            j = (i + 1) % NTH
             bm.faces.new((a[i], a[j], b[j], b[i]))
     bm.faces.new(t_rings[-1])
     bm.edges.ensure_lookup_table()

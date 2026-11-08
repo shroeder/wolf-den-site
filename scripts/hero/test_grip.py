@@ -152,6 +152,45 @@ def close(rig, side, deg):
     return report
 
 
+def collisions(rig, side):
+    """Do any two fingers share space once the hand is closed?
+
+    ⚠️ THE GRIP TEST PASSED A FIST WITH THE FINGERS THROUGH EACH OTHER.
+    Everything it measured -- hinge squareness, how far each tip travelled
+    toward the palm, the joint angles -- was green while the render showed a
+    tangle, because not one of those quantities involves two fingers at the
+    same time. Widening the hand lattice made the fingers 7% fatter and they
+    began to overlap; nothing noticed. A pairwise check is the only kind
+    that can see it.
+
+    Sampled along each finger's bones rather than at the tips: fingers cross
+    in the MIDDLE of a curl, where the tips may still be far apart.
+    """
+    names = [n for n in hand_mod.DIGITS if n != "thumb"]
+    tracks = []
+    for name in names:
+        pts = []
+        for k in (1, 2, 3):
+            pb = rig.pose.bones["%s_%02d_%s" % (name, k, side)]
+            h = rig.matrix_world @ pb.head
+            t = rig.matrix_world @ pb.tail
+            for f in (0.0, 0.34, 0.67):
+                pts.append(h.lerp(t, f))
+        tracks.append((name, pts))
+
+    worst, where = 1e9, ""
+    for a in range(len(tracks)):
+        for b in range(a + 1, len(tracks)):
+            na, pa = tracks[a]
+            nb, pb_ = tracks[b]
+            for p in pa:
+                for q in pb_:
+                    d = (p - q).length
+                    if d < worst:
+                        worst, where = d, "%s/%s" % (na, nb)
+    return worst, where
+
+
 def open_hand(rig, side):
     for name in hand_mod.DIGITS:
         for k in (1, 2, 3):
@@ -182,6 +221,14 @@ def main():
     for line in close(rig, SIDE, CURL):
         print(line)
     look.sheet(out, "grip_fist", centre, 0.30, res=(900, 900))
+
+    # Adjacent fingers are about 20 mm centre to centre at the knuckles and
+    # roughly 9 mm thick, so bone tracks closer than 9 mm are inside one
+    # another however good every other number looks.
+    gap, pair = collisions(rig, SIDE)
+    print("   closest two fingers %.1f mm apart (%s)" % (gap * 1000, pair))
+    if gap < 0.009:
+        print("   ** FINGERS INTERPENETRATE")
     print("GRIP_OK %s" % out)
 
 

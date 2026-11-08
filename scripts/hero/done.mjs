@@ -36,7 +36,7 @@ const STEPS = [
   ["audit", "audit.py", [], /AUDIT_CLEAN/, /AUDIT_FAIL/],
   ["discrimination", "audit.py", ["--", "--selftest"], /every check discriminates/, /cannot detect/],
   ["shoulder", "test_raise.py", [], /TEST_OK/, /Traceback/],
-  ["grip", "test_grip.py", [], /GRIP_OK/, /CURLED AWAY|OFF AXIS/],
+  ["grip", "test_grip.py", [], /GRIP_OK/, /CURLED AWAY|OFF AXIS|INTERPENETRATE/],
   ["renders", "body.py", [], /LOOK_OK/, /Traceback/],
 ];
 
