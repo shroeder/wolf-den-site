@@ -152,6 +152,20 @@ def measure(ob):
     m["eye_z"] = hz["eye"]
     m["brow_z"] = hz["brow"]
     m["nose_z"] = hz["nose_base"]
+    # How far a joint's landmark stands proud of the limb either side of it.
+    def proud(path, name, at_map, frac):
+        i = at_map[name]
+        k = int(round(frac * body_mod.NA)) % body_mod.NA
+
+        def front(j):
+            r = path[j][1]
+            ru = r[0] if isinstance(r, (tuple, list)) else r
+            b = path[j][2] if len(path[j]) > 2 else None
+            return ru * cage.shape(body_mod.NA, b)[k]
+        return front(i) - max(front(i - 1), front(i + 1))
+
+    m["patella"] = proud(L, "knee", body_mod.LEG_AT, 0.0)
+    m["olecranon"] = proud(A, "elbow", body_mod.ARM_AT, 0.5)
     m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
     _n, _z, rx, ry, cy, _b = H[ri]
@@ -216,6 +230,14 @@ def checks(m):
         Check("wrist at crotch", (m["wrist_z"] - m["crotch_z"]) / h, 0.0, 0.025, "of height"),
         Check("elbow at waist", (m["elbow_z"] - m["waist_z"]) / h, 0.0, 0.030, "of height"),
         Check("knee half hip->floor", m["knee_z"] / m["hip_z"], 0.50, 0.055, ""),
+        # ⚠️ A JOINT WITH NO LANDMARK IS A DIAMETER, NOT A JOINT, and it is
+        # most of why the limbs read as smooth tubes. These measure the
+        # patella and the olecranon against the limb EITHER SIDE of them,
+        # which is what the eye actually reads -- a bump given as a fraction
+        # of its own ring can be large and still sit behind its neighbours,
+        # which is exactly what the first attempt did.
+        Check("patella proud", m["patella"] * 1000, 9.0, 3.5, "mm"),
+        Check("olecranon proud", m["olecranon"] * 1000, 9.0, 3.5, "mm"),
         Check("hand length", m["hand_len"] / h, 0.108, 0.013, "of height"),
         Check("foot length", (m["foot_len"] or 0) / h, 0.152, 0.018, "of height"),
         # ⚠️ 0.52 WAS A NUMBER I INVENTED AND IT FAILED THE MODEL FOR BEING
@@ -301,7 +323,24 @@ BREAKS = [
      lambda: _widen("shoulder", 1.085)),
     ("waist thickened to a tube", "shoulder : waist",
      lambda: _widen("waist", 1.30)),
+    ("knee flattened back to a tube", "patella proud",
+     lambda: _flatten_joint("leg_path", "knee", 0)),
+    ("elbow flattened back to a tube", "olecranon proud",
+     lambda: _flatten_joint("arm_path", "elbow", 1)),
 ]
+
+
+def _flatten_joint(fn_name, ring, which):
+    """Strip the joint ring's landmark bump, leaving a smooth taper."""
+    orig = getattr(body_mod, fn_name)
+    idx = (body_mod.LEG_AT if which == 0 else body_mod.ARM_AT)[ring]
+
+    def flat(side):
+        p = list(orig(side))
+        e = p[idx]
+        p[idx] = (e[0], e[1])
+        return p
+    setattr(body_mod, fn_name, flat)
 
 
 def _widen(name, f):

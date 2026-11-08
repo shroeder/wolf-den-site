@@ -246,8 +246,20 @@ SHOULDER_X = 0.196
 
 # Landmark RING INDICES, so the rig can find a joint by name. Adding a ring
 # for a bicep must not silently move the elbow.
-ARM_AT = {"elbow": 5, "wrist": 9, "end": 12}
-LEG_AT = {"knee": 4, "ankle": 10, "ball": 12, "toe": 13}
+# ⚠️ THESE WERE HAND-COUNTED INDICES AND THE FILE'S OWN COMMENT WARNED THAT
+# "adding a ring for a bicep must not silently move the elbow". Adding two
+# rings at each joint moved every landmark past it, which would have put the
+# wrist bone in the middle of a forearm with nothing erroring. Name the
+# rings and derive the indices; the assert in build() catches any drift
+# between the names and the path that is supposed to match them.
+ARM_RINGS = ["cuff", "deltoid", "delt_low", "bicep", "bicep_low",
+             "elbow_up", "elbow", "elbow_low", "flexor", "forearm_mid",
+             "forearm_low", "wrist", "palm", "knuckles", "end"]
+LEG_RINGS = ["hip", "thigh", "thigh_low", "quad_low", "knee_up", "knee",
+             "knee_low", "calf_up", "calf", "calf_low", "shin", "shin_low",
+             "ankle", "heel", "ball", "toe"]
+ARM_AT = {n: i for i, n in enumerate(ARM_RINGS)}
+LEG_AT = {n: i for i, n in enumerate(LEG_RINGS)}
 
 
 def arm_path(side):
@@ -283,7 +295,29 @@ def arm_path(side):
         # and sits lower; the biceps peaks higher.
         (at(0.230), 0.050, [(L_ANT, 0.20, 0.26), (L_POST, 0.22, 0.22)]),
         (at(0.288), 0.046, [(L_ANT, 0.19, 0.16), (L_POST, 0.21, 0.20)]),
-        (at(0.335), 0.041, [(L_POST, 0.20, 0.10)]),              # elbow (5)
+        # ── THE ELBOW ─────────────────────────────────────────────────────
+        # ⚠️ ONE LOOP THROUGH A JOINT HAS NOTHING TO FOLD ALONG. This is the
+        # same defect the shoulder had and the same fix: the joint gets a
+        # ring either side of it, close in, so the surface has an edge to
+        # crease on instead of a long smooth span that collapses when the
+        # limb bends. It is also why the arm read as a tube -- a joint with
+        # no structure is not a joint, it is a diameter.
+        #
+        # The olecranon is the POINT of the elbow and it is posterior; the
+        # joint is narrower across than the muscle above and below it, which
+        # is what makes the taper read.
+        #
+        # ⚠️ AND THE BUMP IS MEASURED AGAINST ITS NEIGHBOURS, NOT ITS OWN
+        # RING. The first pass put a 20% bump on a joint ring that is itself
+        # 5 mm narrower than the limb above it, so the "point" of the elbow
+        # came out a millimetre BEHIND the triceps and the knee's patella
+        # sat behind the thigh. Both joints rendered as a faint crease. A
+        # bump is a fraction of its own radius; what the eye reads is how
+        # far it stands out from what is either side of it.
+        (at(0.318), 0.0425, [(L_POST, 0.20, 0.09)]),
+        (at(0.335), 0.0395, [(L_POST, 0.17, 0.42),               # olecranon
+                             (L_LAT, 0.16, -0.05), (L_MED, 0.16, -0.05)]),
+        (at(0.354), 0.0425, [(L_POST, 0.19, 0.10), (L_ANT, 0.18, 0.07)]),
         # FOREARM — the flexor mass sits just below the elbow, then tapers
         # hard to a wrist that is mostly bone.
         (at(0.398), 0.045, [(L_ANT, 0.26, 0.22), (L_MED, 0.20, 0.12)]),
@@ -302,7 +336,7 @@ def arm_path(side):
 
 
 # The arm is meshed to this ring and no further.
-ARM_MESH_TO = 9
+ARM_MESH_TO = ARM_AT["wrist"]
 
 
 def leg_path(side):
@@ -320,7 +354,15 @@ def leg_path(side):
         (at(0.620, 0.095), 0.078, [(L_ANT, 0.22, 0.18), (L_POST, 0.22, 0.12),
                                    (L_LAT, 0.18, 0.09)]),
         (at(0.530), 0.064, [(L_ANT, 0.20, 0.10)]),
-        (at(0.470), 0.056, None),                                 # knee (4)
+        # ── THE KNEE ──────────────────────────────────────────────────────
+        # Same three-ring treatment as the elbow, and the same reason. The
+        # shapes are a patella standing proud at the front, the joint pulled
+        # IN at the sides so the kneecap reads against something, and the
+        # tibial tuberosity just below it -- the bump you kneel on.
+        (at(0.500), 0.0595, [(L_ANT, 0.22, 0.11)]),
+        (at(0.470), 0.0545, [(L_ANT, 0.20, 0.38),                 # patella
+                             (L_LAT, 0.17, -0.07), (L_MED, 0.17, -0.07)]),
+        (at(0.444), 0.0565, [(L_ANT, 0.18, 0.18)]),               # tuberosity
         # CALF — gastrocnemius, high and posterior, tapering to a thin ankle.
         # The two heads give it width as well as depth.
         (at(0.410), 0.062, [(L_POST, 0.26, 0.26)]),
@@ -400,6 +442,9 @@ def build():
     hrings = head_mod.build(bm, rings[-1])
     for t in (bm.verts, bm.edges, bm.faces):
         t.ensure_lookup_table()
+
+    assert len(ARM_RINGS) == len(arm_path("l")), "ARM_RINGS is out of step with arm_path"
+    assert len(LEG_RINGS) == len(leg_path("l")), "LEG_RINGS is out of step with leg_path"
 
     log = []
     hands = {}
@@ -524,6 +569,8 @@ if __name__ == "__main__":
     look.stage(floor_z=0.0)
     out = os.path.join(HERE, "_look")
     HAND_CENTRE = hand_centre("l")
+    KNEE_CENTRE = tuple(leg_path("l")[LEG_AT["knee"]][0])
+    ELBOW_CENTRE = tuple(arm_path("l")[ARM_AT["elbow"]][0])
     look.sheet(out, "body", (0, 0, 0.92), 2.05)
     look.sheet(out, "torso", (0, 0, 1.24), 0.85, res=(900, 900))
     look.sheet(out, "arm", (0.30, 0, 1.25), 0.60, res=(900, 900))
@@ -538,6 +585,12 @@ if __name__ == "__main__":
     look.sheet(out, "head", (0, 0, 1.70), 0.30, angles=(0, 35, 90, 180),
                res=(900, 900))
     look.sheet(out, "calf", (0.10, 0, 0.33), 0.45, res=(900, 900))
+    # ⚠️ THE HARNESS MUST PHOTOGRAPH THE THING BEING WORKED ON. Two rings
+    # went into each of the elbow and the knee before anyone noticed that
+    # neither joint appeared in any sheet -- the knee sat just off the top
+    # of the calf shot. A region with no picture is a region worked on blind.
+    look.sheet(out, "knee", KNEE_CENTRE, 0.24, res=(900, 900))
+    look.sheet(out, "elbow", ELBOW_CENTRE, 0.22, res=(900, 900))
     look.sheet(out, "foot", (0.10, -0.06, 0.06), 0.32, angles=(0, 35, 90, 180),
                res=(900, 900))
     print("LOOK_OK %s" % out)
