@@ -113,6 +113,12 @@ def limb(bm, path, n):
 # dummy next to the art this has to stand beside.
 TORSO = [
     ("crotch", 0.86, 0.150, 0.118, 0.000, None),
+    # ⚠️ HE HAD NO BUTTOCKS. The pelvis ran straight from the crotch ring to
+    # the hips with nothing on the back of it, so from behind and in
+    # profile the hips fell directly into the thighs. A glute is the
+    # largest muscle on a body and it was the one form with no ring to
+    # carry it at all.
+    ("glute", 0.905, 0.158, 0.128, 0.002, None),
     ("hips", 0.96, 0.166, 0.130, 0.000,
      [(T_LEFT, 0.11, 0.08), (T_RIGHT, 0.11, 0.08)]),             # iliac crest
     # ⚠️ A VERTICAL GROOVE ALONE READS AS A BACK. Rings vary radius with
@@ -237,29 +243,36 @@ F_ERECTOR_L, F_ERECTOR_R = 0.293, 0.207
 # at the rear (FRONT, BACK = 24, 8) and hip_sockets() indexes a vertex list
 # with it -- shadowing it swapped an integer for a dict and the figure
 # failed to build at the crotch, which is nowhere near where the edit was.
+# (ring -> paired mass either side of the midline, midline groove, width).
+# Low down the pair is the GLUTE and the groove is the cleft; higher up the
+# same two numbers are the erector and the spinal furrow. It is the same
+# arrangement at both ends of a back, which is why one table does both.
 BACK_FORMS = {
-    "hips": (0.06, -0.05), "ab_low": (0.07, -0.06),
-    "ab1_top": (0.07, -0.06), "ab_gap1": (0.07, -0.06),
-    "ab2_bot": (0.08, -0.07), "waist": (0.09, -0.08),
-    "ab2_top": (0.09, -0.08), "ab_gap2": (0.09, -0.08),
-    "ab3_bot": (0.09, -0.08), "ribs": (0.10, -0.08),
-    "pec_under": (0.10, -0.08), "pec_rim": (0.10, -0.08),
-    "chest": (0.11, -0.08), "chest_up": (0.11, -0.07),
-    "clavicle": (0.09, -0.06), "shoulder": (0.07, -0.05),
-    "trapezius": (0.18, -0.07),
+    "crotch": (0.20, -0.07, 0.072),
+    "glute": (0.285, -0.12, 0.078),
+    "hips": (0.24, -0.10, 0.074),
+    "ab_low": (0.10, -0.07, 0.060),
+    "ab1_top": (0.08, -0.06, 0.056), "ab_gap1": (0.08, -0.06, 0.056),
+    "ab2_bot": (0.08, -0.07, 0.054), "waist": (0.09, -0.08, 0.052),
+    "ab2_top": (0.09, -0.08, 0.052), "ab_gap2": (0.09, -0.08, 0.052),
+    "ab3_bot": (0.09, -0.08, 0.052), "ribs": (0.10, -0.08, 0.052),
+    "pec_under": (0.10, -0.08, 0.052), "pec_rim": (0.10, -0.08, 0.052),
+    "chest": (0.11, -0.08, 0.052), "chest_up": (0.11, -0.07, 0.052),
+    "clavicle": (0.09, -0.06, 0.052), "shoulder": (0.07, -0.05, 0.052),
+    "trapezius": (0.18, -0.07, 0.052),
 }
 
 
 def _apply_back():
     """Replace whatever erector and furrow bumps a ring already had."""
     names = [t[0] for t in TORSO]
-    for name, (ere, fur) in BACK_FORMS.items():
+    for name, (mass, fur, w) in BACK_FORMS.items():
         i = names.index(name)
         n, z, rx, ry, cy, b = TORSO[i]
-        keep = [t for t in (b or ()) if not (0.185 <= t[0] <= 0.315)]
+        keep = [t for t in (b or ()) if not (0.175 <= t[0] <= 0.325)]
         TORSO[i] = (n, z, rx, ry, cy,
-                    keep + [(F_ERECTOR_L, 0.052, ere),
-                            (F_ERECTOR_R, 0.052, ere),
+                    keep + [(F_ERECTOR_L, w, mass),
+                            (F_ERECTOR_R, w, mass),
                             (T_BACK, 0.028, fur)])
 
 

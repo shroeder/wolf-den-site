@@ -163,6 +163,16 @@ def measure(ob):
     f = [furrow_at(n) for n in ("ribs", "waist", "chest")]
     f = [x for x in f if x is not None]
     m["furrow"] = min(f) if f else None
+    # ⚠️ HOW FAR THE BUTTOCK STANDS BEHIND THE SMALL OF THE BACK. A glute is
+    # the largest muscle on a body and this figure had no ring carrying it
+    # at all -- the pelvis ran straight from the crotch to the hips, so from
+    # behind and in profile the hips fell directly into the thighs.
+    # Measured against the lumbar above it, which is the datum a buttock is
+    # actually read against.
+    tzz = {t[0]: t[1] for t in body_mod.TORSO}
+    gl = [v.y for v in V if abs(v.z - tzz["glute"]) < 0.006 and abs(v.x) < 0.075]
+    lu = [v.y for v in V if abs(v.z - tzz["ab_low"]) < 0.006 and abs(v.x) < 0.075]
+    m["glute"] = (max(gl) - max(lu)) if (gl and lu) else None
     m["shoulder_w"] = ring_width("shoulder")
     m["waist_w"] = ring_width("waist")
     m["hip_w"] = ring_width("hips")
@@ -388,6 +398,8 @@ def checks(m):
         # tolerance answers is not "what counts as fine" but "how small a
         # change must I still be able to see". A visible band on a lean
         # figure is 4 to 8 mm, so the window is 4.4 to 7.6.
+        Check("glute projection", (m["glute"] or 0) * 1000, 26.0, 9.0, "mm",
+              "the buttock against the small of the back"),
         Check("spinal furrow", (m["furrow"] or 0) * 1000, 5.0, 2.0, "mm",
               "the midline against the erector beside it"),
         Check("ab definition", (m["ab_groove"] or 0) * 1000, 6.0, 1.6, "mm",
@@ -533,7 +545,18 @@ BREAKS = [
      lambda: _smooth_abs()),
     ("back smoothed to a slab", "spinal furrow",
      lambda: _smooth_back()),
+    ("buttocks flattened off the pelvis", "glute projection",
+     lambda: _flat_glutes()),
 ]
+
+
+def _flat_glutes():
+    for name in ("crotch", "glute", "hips"):
+        i = [t[0] for t in body_mod.TORSO].index(name)
+        n, z, rx, ry, cy, b = body_mod.TORSO[i]
+        keep = [(c, w, a) for c, w, a in (b or ())
+                if not (0.175 <= c <= 0.325)]
+        body_mod.TORSO[i] = (n, z, rx, ry, cy, keep or None)
 
 
 def _smooth_back():
