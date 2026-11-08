@@ -123,18 +123,38 @@ TORSO = [
     # horizontal, so they are extra RINGS that pull in and push out in
     # alternation, not extra bumps.
     ("ab_low", 1.010, 0.136, 0.106, 0.004,
-     [(0.700, 0.050, 0.09), (0.800, 0.050, 0.09),
+     [(0.700, 0.050, 0.12), (0.800, 0.050, 0.12),
+      (T_FRONT, 0.038, -0.07)]),
+    # ⚠️ THE DIVISIONS WERE 45 mm FROM THEIR NEIGHBOURS AND SUBDIVISION ATE
+    # THEM. The same arithmetic as the lips, which needed 8 mm to read at
+    # all and were mush at 12: on a subdivided cage the sharpness of a
+    # crease is set by how CLOSE the loops either side of it are, not by
+    # how deep it is. The structure here was right all along -- muscle,
+    # band, muscle -- and spread over 45 mm it rendered as a smooth belly
+    # with a suggestion of shading. Each band now has a muscle ring 10 mm
+    # above and below it.
+    ("ab1_top", 1.052, 0.1344, 0.1020, 0.004,
+     [(0.700, 0.050, 0.13), (0.800, 0.050, 0.13),
       (T_FRONT, 0.038, -0.07)]),
     ("ab_gap1", 1.062, 0.134, 0.101, 0.004,
-     [(T_FRONT, 0.14, -0.05)]),                                  # tendinous band
+     [(T_FRONT, 0.12, -0.075)]),                                 # tendinous band
+    ("ab2_bot", 1.072, 0.1368, 0.1031, 0.004,
+     [(0.695, 0.055, 0.14), (0.805, 0.055, 0.14),
+      (T_FRONT, 0.040, -0.08)]),
     ("waist", 1.105, 0.146, 0.110, 0.004,
-     [(0.695, 0.055, 0.12), (0.805, 0.055, 0.12),                # ABDOMINALS
+     [(0.695, 0.055, 0.16), (0.805, 0.055, 0.16),                # ABDOMINALS
       (T_FRONT, 0.040, -0.08)]),                                 # linea alba
+    ("ab2_top", 1.140, 0.1507, 0.1131, 0.004,
+     [(0.695, 0.055, 0.15), (0.805, 0.055, 0.15),
+      (T_FRONT, 0.040, -0.08)]),
     ("ab_gap2", 1.150, 0.152, 0.114, 0.004,
-     [(T_FRONT, 0.14, -0.05)]),
+     [(T_FRONT, 0.12, -0.075)]),
+    ("ab3_bot", 1.160, 0.1572, 0.1176, 0.004,
+     [(0.690, 0.060, 0.13), (0.810, 0.060, 0.13),
+      (T_FRONT, 0.042, -0.07)]),
     ("ribs", 1.20, 0.178, 0.132, 0.004,
      [(T_LEFT, 0.12, 0.17), (T_RIGHT, 0.12, 0.17),               # LATISSIMUS
-      (0.690, 0.060, 0.09), (0.810, 0.060, 0.09),                # upper abs
+      (0.690, 0.060, 0.13), (0.810, 0.060, 0.13),                # upper abs
       (T_FRONT, 0.042, -0.06),
       (0.205, 0.060, 0.06), (0.295, 0.060, 0.06),                # erectors
       (T_BACK, 0.045, -0.05)]),                                  # spinal groove
@@ -144,6 +164,12 @@ TORSO = [
     ("pec_under", 1.258, 0.186, 0.126, 0.002,
      [(0.676, 0.085, -0.06), (0.824, 0.085, -0.06),
       (T_FRONT, 0.050, -0.05)]),
+    # The pectoral's lower edge is the same problem as an ab band: it was a
+    # 47 mm fall from the chest ring to the one under it and read as a soft
+    # swelling. A rim ring 17 mm below the chest gives it somewhere to stop.
+    ("pec_rim", 1.288, 0.2010, 0.1400, 0.0008,
+     [(0.676, 0.082, -0.09), (0.824, 0.082, -0.09),
+      (T_FRONT, 0.048, -0.06)]),
     ("chest", 1.305, 0.206, 0.144, 0.000,
      [(0.676, 0.078, 0.20), (0.824, 0.078, 0.20),                # PECTORALS
       (T_FRONT, 0.046, -0.11),                                   # sternum
@@ -635,7 +661,10 @@ if __name__ == "__main__":
     _m = head_mod.HEAD[head_mod.at("mouth")]
     MOUTH_CENTRE = (0.0, _m[4] - _m[3] * 0.6, _m[1])
     look.sheet(out, "body", (0, 0, 0.92), 2.05)
-    look.sheet(out, "torso", (0, 0, 1.24), 0.85, res=(900, 900))
+    # Straight on and in profile, for the same reason the head sheet is:
+    # three-quarter views hide what a form gets wrong.
+    look.sheet(out, "torso", (0, 0, 1.22), 0.62, angles=(0, 35, 90, 180),
+               res=(900, 900))
     look.sheet(out, "arm", (0.30, 0, 1.25), 0.60, res=(900, 900))
     # A hand is a hand-sized picture or it is four pink pixels.
     look.sheet(out, "hand", HAND_CENTRE, 0.30, res=(900, 900))

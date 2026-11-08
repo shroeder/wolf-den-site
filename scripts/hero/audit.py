@@ -114,6 +114,35 @@ def measure(ob):
         return 2.0 * max(abs(rx * mult[i] * math.cos(2 * math.pi * i / body_mod.N))
                          for i in range(body_mod.N))
 
+    # ⚠️ HOW DEEP A TENDINOUS BAND SITS BEHIND THE MUSCLE EITHER SIDE OF IT,
+    # MEASURED WHERE THE MUSCLE IS. The first version read it at the
+    # midline, which is where BOTH the band and the muscle rings carry the
+    # linea alba groove -- so it was comparing a groove with a groove and
+    # reported 1.4 mm for bands that plainly read in the render.
+    #
+    # And on the evaluated surface, not the cage: the cage says 18 mm at
+    # the muscle's own column and subdivision takes most of that back. The
+    # only number worth having is the one that ships.
+    def front_near(z, xw, tol=0.004):
+        ys = [v.y for v in V
+              if abs(v.z - z) < tol and abs(abs(v.x) - xw) < 0.006]
+        return min(ys) if ys else None
+
+    def band_depth(gap, lo, hi):
+        tz = {t[0]: t[1] for t in body_mod.TORSO}
+        ti = [t[0] for t in body_mod.TORSO].index(gap)
+        xw = abs(body_mod.TORSO[ti][2] * math.cos(2 * math.pi * 0.70))
+        g = front_near(tz[gap], xw)
+        a = front_near(tz[lo], xw)
+        b = front_near(tz[hi], xw)
+        if None in (g, a, b):
+            return None
+        return g - min(a, b)
+
+    depths = [band_depth(*t) for t in (("ab_gap1", "ab1_top", "ab2_bot"),
+                                       ("ab_gap2", "ab2_top", "ab3_bot"))]
+    depths = [d for d in depths if d is not None]
+    m["ab_groove"] = min(depths) if depths else None
     m["shoulder_w"] = ring_width("shoulder")
     m["waist_w"] = ring_width("waist")
     m["hip_w"] = ring_width("hips")
@@ -331,6 +360,16 @@ def checks(m):
         # standard four angles are all three-quarter -- and from the front
         # he read as a slab. Shoulder against waist and shoulder against hip
         # are the two numbers that own that read.
+        # ⚠️ A TOLERANCE WIDER THAN THE DEFECT IS A TOLERANCE THAT
+        # CERTIFIES. At 4.5 +/- 2.5 this passed a flattened abdomen: the
+        # break took the bands from 6.75 mm to 3.59 and both ends sat
+        # inside the band, so the discrimination run called the check blind
+        # when the check and the break were both working. The question a
+        # tolerance answers is not "what counts as fine" but "how small a
+        # change must I still be able to see". A visible band on a lean
+        # figure is 4 to 8 mm, so the window is 4.4 to 7.6.
+        Check("ab definition", (m["ab_groove"] or 0) * 1000, 6.0, 1.6, "mm",
+              "how far a tendinous band sits behind the muscle beside it"),
         Check("shoulder : waist", m["shoulder_w"] / m["waist_w"], 1.55, 0.20, ""),
         Check("shoulder : hip", m["shoulder_w"] / m["hip_w"], 1.45, 0.15, ""),
         Check("wrist at crotch", (m["wrist_z"] - m["crotch_z"]) / h, 0.0, 0.025, "of height"),
@@ -468,7 +507,26 @@ BREAKS = [
      lambda: _jowl()),
     ("nose wings spread wide", "nose width",
      lambda: _spread_nose()),
+    ("abdomen smoothed to a belly", "ab definition",
+     lambda: _smooth_abs()),
 ]
+
+
+def _smooth_abs():
+    """⚠️ THE FIRST VERSION OF THIS STRIPPED THE BANDS' OWN BUMPS AND THE
+    CHECK DID NOT MOVE -- correctly, and for the third time in this file a
+    break has attacked the wrong quantity. The depth of a tendinous band is
+    made almost entirely by the MUSCLE standing proud either side of it,
+    not by the band pulling in; removing the band's own negative changes
+    about a millimetre. Flattening the rectus is what 'smoothed to a belly'
+    actually means."""
+    names = [t[0] for t in body_mod.TORSO]
+    for i, (n, z, rx, ry, cy, b) in enumerate(body_mod.TORSO):
+        if not b:
+            continue
+        keep = [(c, w, a) for c, w, a in b
+                if not (0.68 <= c <= 0.72 or 0.79 <= c <= 0.82)]
+        body_mod.TORSO[i] = (n, z, rx, ry, cy, keep or None)
 
 
 def _spread_nose():
