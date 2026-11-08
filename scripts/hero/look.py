@@ -85,8 +85,21 @@ def shot(path, center, width, azim, res=(900, 1100), elev=7.0, dist=12.0):
                     center.z + dist * math.sin(e))
     cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
     sc.render.resolution_x, sc.render.resolution_y = res
-    sc.render.filepath = path
+    # ⚠️ KEEP THE PREVIOUS FRAME. Judging a change by looking at the new
+    # render alone means comparing it against my memory of the old one,
+    # which is exactly where I drift: several passes on this figure "fixed"
+    # something and I could not actually tell afterwards whether it was
+    # better. The last version of every shot is one directory away, so
+    # before and after can be looked at side by side.
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        prev = os.path.join(os.path.dirname(path), "_prev")
+        os.makedirs(prev, exist_ok=True)
+        try:
+            os.replace(path, os.path.join(prev, os.path.basename(path)))
+        except OSError:
+            pass
+    sc.render.filepath = path
     bpy.ops.render.render(write_still=True)
     return path
 

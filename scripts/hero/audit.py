@@ -159,8 +159,17 @@ def measure(ob):
 
     # mesh hygiene, on the CAGE -- the thing that is authored and edited
     cm = ob.data
-    m["boundary"] = sum(1 for e in cm.edges
-                        if sum(1 for p in cm.polygons if e.key in p.edge_keys) == 1)
+    # ⚠️ THIS WAS QUADRATIC AND IT COST FIVE MINUTES A RUN. Counting an
+    # edge's faces by scanning every polygon for every edge is 3300 x 3300
+    # = 11 million membership tests, which made the audit take 34 seconds
+    # and the self-test -- which builds the figure eight times -- take 4m57.
+    # Nothing was slow about Blender; Blender starts in 0.38s. Tally the
+    # edges once instead.
+    seen = {}
+    for p in cm.polygons:
+        for k in p.edge_keys:
+            seen[k] = seen.get(k, 0) + 1
+    m["boundary"] = sum(1 for v in seen.values() if v == 1)
     counts = {}
     for p in cm.polygons:
         counts[len(p.vertices)] = counts.get(len(p.vertices), 0) + 1
