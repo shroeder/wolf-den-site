@@ -166,6 +166,22 @@ def measure(ob):
 
     m["patella"] = proud(L, "knee", body_mod.LEG_AT, 0.0)
     m["olecranon"] = proud(A, "elbow", body_mod.ARM_AT, 0.5)
+    # ⚠️ EAR PROJECTION, MEASURED THE SAME WAY HEAD BREADTH IS. The ear is
+    # the only thing sticking out at its own height, so the skull's width
+    # on the FRONT half of that z band is an ear-free reference and the
+    # difference is how far the ear stands off. Guessing it from the
+    # construction number is wrong twice over: the direction is angled
+    # back, and subdivision pulls a ridge with ten verts inward.
+    ez0, ez1 = hz["nose_base"] - 0.012, hz["lid_low"] + 0.012
+    band = [v for v in V if ez0 < v.z < ez1]
+    _ecy = H[head_mod.at("cheek")][4]
+    if band:
+        m["ear_proj"] = (max(abs(v.x) for v in band)
+                         - max(abs(v.x) for v in band if v.y < _ecy))
+        ear = [v for v in band if abs(v.x) > max(abs(w.x) for w in band) - 0.012]
+        m["ear_h"] = max(v.z for v in ear) - min(v.z for v in ear)
+    else:
+        m["ear_proj"] = m["ear_h"] = None
     m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
     _n, _z, rx, ry, cy, _b = H[ri]
@@ -256,6 +272,10 @@ def checks(m):
         # was to open it wider, and this says by how much it may not.
         Check("eye width", m["eye_w"] / hw, 0.200, 0.035, "head-widths",
               "a head is five eyes across"),
+        # An ear is about as tall as the nose is long -- one third of the
+        # face -- and stands roughly 17 mm off the skull.
+        Check("ear height", (m["ear_h"] or 0) / hh, 0.265, 0.055, "of head height"),
+        Check("ear projection", (m["ear_proj"] or 0) * 1000, 17.0, 5.0, "mm"),
         Check("face thirds", (m["brow_z"] - m["nose_z"]) / max(m["nose_z"] - m["chin_z"], 1e-9),
               1.00, 0.22, "", "brow->nose against nose->chin"),
         # ── MESH HYGIENE ──────────────────────────────────────────────────
@@ -327,7 +347,17 @@ BREAKS = [
      lambda: _flatten_joint("leg_path", "knee", 0)),
     ("elbow flattened back to a tube", "olecranon proud",
      lambda: _flatten_joint("arm_path", "elbow", 1)),
+    ("ears flattened against the skull", "ear projection",
+     lambda: _flat_ears()),
 ]
+
+
+def _flat_ears():
+    orig = face_mod.ear
+
+    def flat(bm, rings, ri0, cols, n, side, **kw):
+        return orig(bm, rings, ri0, cols, n, side, out=0.006, bowl=0.002)
+    face_mod.ear = flat
 
 
 def _flatten_joint(fn_name, ring, which):

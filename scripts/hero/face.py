@@ -1,6 +1,8 @@
 import bmesh, math
 from mathutils import Vector
 
+import cage
+
 # ═══════════════════════════════════════════════════════════════════════════
 # THE FACE'S SEPARATE PIECES — the nose, and the ears.
 #
@@ -24,7 +26,7 @@ from mathutils import Vector
 # underside and a bridge -- all three of which a ring cannot have.
 # ═══════════════════════════════════════════════════════════════════════════
 
-NE = 8          # verts per ear ring
+NE = 10         # verts per ear ring: matches a 3x2 patch's 10 edges
 NEY = 12        # verts per eye-socket ring: matches a 4x2 patch's 12 edges
 
 
@@ -197,22 +199,62 @@ def eye_socket(bm, rings, ri0, cols, n, w=0.0166, h=0.0082, depth=0.0135):
     return centre, outward
 
 
-def ear(bm, rings, ri0, cols, n, side, out=0.018):
-    """An ear, as a flattened tube off the side of the skull.
+def ear(bm, rings, ri0, cols, n, side, out=0.030,
+        rw=0.0125, rh=0.0310, bowl=0.0120):
+    """An ear, as a DISH: out to a raised helix, then folded back to a bowl.
 
-    ⚠️ AN EAR STICKS OUT SIDEWAYS AND BACK, AND IT IS A DISC, NOT A LUMP.
-    Its cross-section is tall and thin -- that is the whole silhouette, and
-    a round tube there reads as a handle. The taper is also the wrong way
-    round from a finger's: an ear is WIDEST at its outer rim, not at the
-    root, which is why one modelled like a thumb looks like a wart.
+    ⚠️ AN EAR IS NOT A BLOB ON THE SIDE OF A HEAD, AND THE OLD ONE WAS. It
+    was a flattened tube capped at its outer end -- a smooth almond stuck
+    to the skull, which has no helix, no concha and no lobe, and reads as a
+    wart from every angle. The silhouette is only half of what makes an ear;
+    the other half is that it is CONCAVE. The rim stands proud and the
+    middle falls away behind it, and that one shadow is most of the read.
+
+    So it is built the way the eye socket is: a ring standing out from the
+    skull, then folded BACK toward it into a smaller ring, capped behind.
+    The surface between the two is the helix curling over; the hollow it
+    leaves is the concha. Same closed pocket, laid on its side.
+
+    ⚠️ THE CONSTRUCTION NUMBER IS NOT THE PROJECTION. Built to stand 17 mm
+    off the skull it measured 9.7 on the rendered surface -- the outward
+    direction is angled back so only 92% of it is lateral, and Catmull-Clark
+    pulls a ridge carried by ten vertices well inside its cage. 43% lost
+    between what was authored and what ships, which is exactly why the
+    audit measures the evaluated mesh and not the numbers in this file.
+
+    ⚠️ AND IT IS FATTER AT THE BOTTOM. An ear tapers upward and hangs into a
+    lobe; an even oval is the thing that makes it read as a leaf stuck on.
+    The helix ring takes a bump low and a pinch high, which is a number
+    rather than a shape I have to sculpt.
     """
     rim, centre = patch(bm, rings, ri0, 2, cols, n)
-    s = 1.0 if side == "l" else -1.0
-    d = Vector((s * 1.0, 0.42, 0.0)).normalized()
-    base = centre + d * -0.004
-    # The same cuff-bigger-than-its-socket mistake the nose made: 52 mm of
-    # ring into a 44 mm hole pierced the skull behind the ear.
-    path = [(base, (0.008, 0.019)),
-            (base + d * (out * 0.55), (0.009, 0.024)),
-            (base + d * out, (0.006, 0.021))]
-    return _bridge(bm, rim, _tube(bm, path, NE, Vector((0, 0, 1))), NE)
+    s_ = 1.0 if side == "l" else -1.0
+    outward = Vector((s_ * 1.0, 0.42, 0.0)).normalized()
+    up = Vector((0.0, 0.0, 1.0))
+    fore = up.cross(outward).normalized()
+
+    # ⚠️ THE PROJECTION HAS TO VARY ROUND THE RIM OR IT IS A FUNNEL. A ring
+    # standing uniformly proud of the skull is a napkin ring stuck to his
+    # head -- which is precisely what the first corrected version rendered
+    # as, and it was worse than the blob it replaced. An ear is ATTACHED at
+    # the front, where it meets the face, and flares at the back and top.
+    # The offset is therefore per-vertex: full at the back, a third of it
+    # at the front.
+    #
+    # `fore` points backward here (up x outward), so fraction 0 is the back
+    # of the ear and 0.5 the front.
+    def oval(off, w, h, bumps=None, hug=0.32):
+        mult = cage.shape(NE, bumps)
+        out_v = []
+        for i in range(NE):
+            t = 2.0 * math.pi * i / NE
+            lean = hug + (1.0 - hug) * (0.5 + 0.5 * math.cos(t))
+            c = centre + outward * (off * lean)
+            out_v.append(bm.verts.new(c + fore * (w * mult[i] * math.cos(t))
+                                      + up * (h * mult[i] * math.sin(t))))
+        return out_v
+
+    # 0.25 of the way round is the top of the ear, 0.75 the lobe.
+    helix = oval(out, rw, rh, [(0.75, 0.24, 0.22), (0.25, 0.20, -0.08)])
+    concha = oval(bowl, rw * 0.50, rh * 0.46)
+    return _bridge(bm, rim, [helix, concha], NE)
