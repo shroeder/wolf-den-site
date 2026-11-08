@@ -24,8 +24,8 @@ from mathutils import Vector
 # underside and a bridge -- all three of which a ring cannot have.
 # ═══════════════════════════════════════════════════════════════════════════
 
-NN = 6          # verts per nose ring: matches a 2x1 socket's 6 edges
-NE = 8          # and per ear ring
+NE = 8          # verts per ear ring
+NEY = 12        # verts per eye-socket ring: matches a 4x2 patch's 12 edges
 
 
 def patch(bm, rings, ri0, n_rings, cols, n):
@@ -94,40 +94,7 @@ def _bridge(bm, rim, tube_rings, n):
     return len(rim), len(cuff), len(r.get("faces", []))
 
 
-def nose(bm, rings, ri0, cols, n, width=0.016, out=0.026, down=0.040):
-    """The protruding part of the nose, as a short tube off a SMALL socket.
-
-    ⚠️ THE BRIDGE IS SKULL AND MUST NOT TRAVEL WITH THE TIP. The first
-    version cut a socket from the nose base all the way up to eye level and
-    bridged one tube into the whole thing -- so the root between the eyes
-    moved forward exactly as far as the tip did, and that is the definition
-    of a beak. Angling the tube down helps and does not fix it: a tube is
-    uniform, and anything the tip does the root does too.
-    #
-    What actually divides here is not top-from-bottom, it is SKULL from
-    CARTILAGE. The bridge is a form on the skull's own surface and the head
-    rings already make it, with a bump at the midline between the sockets.
-    Only the lower nose leaves the surface, so only the lower nose is a
-    separate piece -- one ring gap of socket, six edges, and the face above
-    it is left alone.
-
-    ⚠️ AND THE PATH IS AUTHORED, NOT A STRAIGHT AXIS. Along one direction
-    the second ring is already a third of the way out, so the nose is proud
-    the moment it leaves the face. Forward and down are separate numbers per
-    ring, which is what lets the dorsum ease out and the tip drop.
-    """
-    rim, centre = patch(bm, rings, ri0, 1, cols, n)
-    #            forward, down,  half-width, half-height
-    PROFILE = [(-0.003, 0.000, 0.80, 0.013),
-               (0.009, 0.014, 0.95, 0.012),
-               (0.020, 0.029, 1.00, 0.011),
-               (out, down, 0.78, 0.008)]
-    path = [(centre + Vector((0.0, -f, -dz)), (width * w, h))
-            for f, dz, w, h in PROFILE]
-    return _bridge(bm, rim, _tube(bm, path, NN, Vector((0, 0, 1))), NN)
-
-
-def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, n=3):
+def eyeball(bm, at, outward, r=0.0118, stand=0.0040, n=3):
     """A sphere set into the socket, as its own closed shell.
 
     ⚠️ THE SOCKET CANNOT BE THE EYE. A hollow in the skull is a hollow; it
@@ -150,9 +117,10 @@ def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, n=3):
     subdivision cage is supposed to hit. A cube projected onto a sphere is
     all quads and rounds identically once subdivided.
     """
-    into = Vector((-at.x, cy - at.y, 0.0))
-    into = into.normalized() if into.length > 1e-6 else Vector((0, 1, 0))
-    c = at + into * sink
+    # Centred so the cornea stands `stand` proud of the lid margin. An eye
+    # is not flush with the lids -- the bulge is most of why one reads as
+    # wet rather than painted on.
+    c = at - outward * (r - stand)
 
     made = {}
 
@@ -184,7 +152,52 @@ def eyeball(bm, at, cy, r=0.0118, sink=-0.0030, n=3):
     return c
 
 
-def ear(bm, rings, ri0, cols, n, side, out=0.022):
+def eye_socket(bm, rings, ri0, cols, n, w=0.0166, h=0.0082, depth=0.0135):
+    """The eye OPENING -- a lid margin, folded back into a closed pocket.
+
+    ⚠️ A RING CANNOT MAKE AN EYELID AND NO RESOLUTION FIXES IT. This is the
+    one defect that survived everything: the head went to 64 verts, lid
+    rings went in above and below, amounts were tuned over and over, and the
+    eyes still read as two beads pressed into a face. The reason is
+    structural. A ring varies its radius with ANGLE, so every form it can
+    make is a vertical stripe; stack three and you get a soft dimple. A lid
+    is the opposite shape -- it WRAPS the eyeball, a surface at roughly
+    constant distance from the eye's centre, curving in two axes at once and
+    ending in a hard margin. No stripe approximates that.
+
+    So the eye gets loops of its own, which is what every hand-modelled head
+    has and what a ring stack structurally cannot: cut the face open and
+    bridge in a lattice whose rings go AROUND the opening rather than around
+    the head. The same socket-and-bridge move as the arm, the thumb, the
+    fingers, the ear and the foot -- and the first one where the direction
+    the loops run is the entire point.
+
+    ⚠️ AND IT FOLDS INWARD INSTEAD OF STOPPING. An opening with a free rim
+    is a HOLE: the surface stops being closed and the audit's boundary-edge
+    check fails it, correctly. A real lid does not stop at its margin
+    either, it turns and runs back behind the eyeball. So the margin
+    continues into a smaller ring inside the skull and caps there, which
+    makes a pocket for the eyeball to sit in and keeps him watertight.
+    """
+    rim, centre = patch(bm, rings, ri0, 2, cols, n)
+    outward = Vector((centre.x, centre.y, 0.0))
+    outward = outward.normalized() if outward.length > 1e-6 else Vector((0, -1, 0))
+    up = Vector((0.0, 0.0, 1.0))
+    right = up.cross(outward).normalized()
+
+    def oval(off, rw, rh):
+        c = centre + outward * off
+        return [bm.verts.new(c + right * (rw * math.cos(2 * math.pi * i / NEY))
+                             + up * (rh * math.sin(2 * math.pi * i / NEY)))
+                for i in range(NEY)]
+
+    margin = oval(0.0016, w, h)                     # the lid edge
+    inner = oval(-depth, w * 0.54, h * 0.60)        # behind the eyeball
+    _bridge(bm, rim, [margin, inner], NEY)
+    return centre, outward
+
+
+def ear(bm, rings, ri0, cols, n, side, out=0.018):
     """An ear, as a flattened tube off the side of the skull.
 
     ⚠️ AN EAR STICKS OUT SIDEWAYS AND BACK, AND IT IS A DISC, NOT A LUMP.

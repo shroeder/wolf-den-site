@@ -447,13 +447,21 @@ def build():
                    % ((side,) + face_mod.ear(bm, hrings, head_mod.at("nose_base"),
                                              (c0, c0 + 1, c0 + 2), NH, side)))
 
-    # The eyes go in the sockets the "eye" ring already hollowed out -- taken
-    # from the ring's own vertices, so a socket cannot move without the eye
-    # in it moving too.
-    eye_ri = head_mod.at("eye")
-    for f in (head_mod.F_EYE_L, head_mod.F_EYE_R):
-        v = hrings[eye_ri][int(round(f * NH)) % NH]
-        face_mod.eyeball(bm, v.co.copy(), head_mod.HEAD[eye_ri][4])
+    # ── THE EYES ──────────────────────────────────────────────────────────
+    # Four columns centred on the eye's own fraction, two ring gaps tall:
+    # a 12-edge rim for a 12-vert socket. The right eye's columns are the
+    # left's mirrored, and the mirror of a ring index is (N/2 - i).
+    eye_ri = head_mod.at("lid_low")
+    c0 = int(round(head_mod.F_EYE_L * NH)) - 2
+    cl = (c0, c0 + 1, c0 + 2, c0 + 3)
+    cr = tuple(sorted((NH // 2 - (c + 1)) % NH for c in cl))
+    eyes = []
+    for cols in (cl, cr):
+        bm.edges.ensure_lookup_table()
+        eyes.append(face_mod.eye_socket(bm, hrings, eye_ri, cols, NH))
+    log.append("eyes   cols %s and %s" % (cl, cr))
+    for centre, outward in eyes:
+        face_mod.eyeball(bm, centre, outward)
     bm.verts.ensure_lookup_table()
     bm.edges.ensure_lookup_table()
 

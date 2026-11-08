@@ -34,8 +34,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import importlib
 import cage, body as body_mod, head as head_mod, hand as hand_mod
-import foot as foot_mod, rig as rig_mod
-for m in (cage, head_mod, hand_mod, foot_mod, body_mod, rig_mod):
+import foot as foot_mod, rig as rig_mod, face as face_mod
+for m in (cage, head_mod, hand_mod, foot_mod, face_mod, body_mod, rig_mod):
     importlib.reload(m)
 
 
@@ -138,6 +138,7 @@ def measure(ob):
     m["eye_z"] = hz["eye"]
     m["brow_z"] = hz["brow"]
     m["nose_z"] = hz["nose_base"]
+    m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
     _n, _z, rx, ry, cy, _b = H[ri]
     m["eye_x"] = abs(rx * math.cos(2 * math.pi * head_mod.F_EYE_L))
@@ -197,6 +198,12 @@ def checks(m):
               "a head is taller than it is wide; this was 1.15 once"),
         Check("eyes on midline", (m["crown_z"] - m["eye_z"]) / hh, 0.50, 0.06, "down from crown"),
         Check("eye separation", 2.0 * m["eye_x"] / hw, 0.45, 0.06, "head-widths"),
+        # ⚠️ A FACE IS FIVE EYES WIDE. The oldest rule in portrait drawing
+        # and the one that catches an eye drawn at whatever size looked
+        # right: when the socket got loops of its own the obvious next move
+        # was to open it wider, and this says by how much it may not.
+        Check("eye width", m["eye_w"] / hw, 0.200, 0.035, "head-widths",
+              "a head is five eyes across"),
         Check("face thirds", (m["brow_z"] - m["nose_z"]) / max(m["nose_z"] - m["chin_z"], 1e-9),
               1.00, 0.22, "", "brow->nose against nose->chin"),
         # ── MESH HYGIENE ──────────────────────────────────────────────────

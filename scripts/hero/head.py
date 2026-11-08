@@ -107,12 +107,16 @@ HEAD = [
     # of it are, not by how deep it is -- pulling it deeper just makes a
     # wider dent. 8 mm apart, it is a mouth.
     ("mouth_low", 1.622, 0.071, 0.089, -0.011,
-     [(T_FRONT, 0.062, 0.095)]),                                 # lower lip
+     [(T_FRONT, 0.054, 0.085)]),                                 # lower lip
     ("mouth", 1.628, 0.072, 0.090, -0.010,
-     [(T_FRONT, 0.070, -0.10),                                    # the lip line
-      (F_LIP_L, 0.030, -0.05), (F_LIP_R, 0.030, -0.05)]),     # the corners
+     # ⚠️ CORNER BUMPS ON THE LIP RING MADE CHEEK GROOVES, NOT CORNERS. A
+    # negative at a fraction is a VERTICAL stripe -- put one at each end of
+    # the mouth and you get two furrows running down the face, crossing the
+    # lip line into a mess of creases. What ends a mouth is the lip line
+    # simply stopping, which is the bump's WIDTH.
+    [(T_FRONT, 0.058, -0.095)]),                                 # the lip line
     ("mouth_up", 1.634, 0.073, 0.091, -0.010,
-     [(T_FRONT, 0.056, 0.085)]),                                 # upper lip
+     [(T_FRONT, 0.050, 0.080)]),                                 # upper lip
     # ⚠️ THE NOSE IS RINGS, AND THE RING UNDER IT IS WHAT MAKES IT A NOSE.
     # Built as a bridged tube it came out a beak, then a straw -- see
     # face.py. What a ring stack cannot do on its own is STOP: push the
@@ -128,7 +132,7 @@ HEAD = [
      [(T_FRONT, 0.044, -0.05)]),                                 # philtrum
     ("nose_base", 1.645, 0.075, 0.090, -0.010,
      [(T_FRONT, 0.052, 0.34),                                    # the nostril base
-      (F_NOSE_L, 0.030, 0.13), (F_NOSE_R, 0.030, 0.13),          # the wings
+      (F_NOSE_L, 0.030, 0.09), (F_NOSE_R, 0.030, 0.09),          # the wings
       (F_NOSTRIL_L, 0.013, -0.09), (F_NOSTRIL_R, 0.013, -0.09)]),  # nostrils
     # ⚠️ NO TEMPLE DIP ON THE CHEEK RING. A hollow here is not a temple --
     # the temple is above the cheekbone, not beside it -- and at 64 verts
