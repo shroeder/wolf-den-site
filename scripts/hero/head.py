@@ -51,7 +51,7 @@ F_LIP_L, F_LIP_R = 0.818, 0.682
 # invisible to me across a dozen renders, and both fell out of audit.py in
 # one pass. Chin to crown is 212 mm, which puts him at 8.5 heads.
 HEAD = [
-    ("neck_top", 1.568, 0.0615, 0.0655, -0.004,
+    ("neck_top", 1.568, 0.0590, 0.0640, -0.0060,
      [(0.700, 0.070, 0.07), (0.800, 0.070, 0.07)]),             # sternomastoid
     # ── THE HEAD ──────────────────────────────────────────────────────────
     # ⚠️ MEASURE THE PROFILE, DO NOT JUDGE IT. The first head read as having
@@ -89,9 +89,26 @@ HEAD = [
     # enormous hooked one. Nothing was wrong with the nose. A profile is the
     # RELATIONSHIP between brow, nose base and chin, and the eye reads the
     # one that is out of line as the one that is wrong.
-    ("chin", 1.590, 0.048, 0.066, -0.034,
+    # ── THE JAW ───────────────────────────────────────────────────────────
+    # ⚠️ HE HAD NO JAW AND NO CHIN, ONLY A JOWL. Measured down the midline,
+    # the surface below the chin did recede -- but the WIDTH grew the whole
+    # way, 106 mm at the chin to 125 mm eight millimetres lower, so the
+    # lower face was a wedge running straight into the neck with no
+    # mandible anywhere in it.
+    #
+    # What makes a jaw is an EDGE and then an undercut: a ring at the
+    # mandible's lower border that is wide and forward, and the ring below
+    # it sharply back and no wider. Same trick as the nose's undercut --
+    # the step between two close rings is the feature, not the rings.
+    ("sub_chin", 1.574, 0.0540, 0.0585, -0.0105, None),
+    ("under_jaw", 1.582, 0.0480, 0.0540, -0.0160,
+     [(T_FRONT, 0.070, 0.06)]),
+    ("chin", 1.590, 0.0465, 0.0645, -0.0345,
      [(F_EYE_L, 0.120, -0.08), (F_EYE_R, 0.120, -0.08),
-      (T_FRONT, 0.055, 0.20)]),                                  # the chin point
+      (T_FRONT, 0.055, 0.22)]),                                  # the chin point
+    ("jaw_line", 1.598, 0.0570, 0.0720, -0.0265,
+     [(T_FRONT, 0.075, 0.12),
+      (F_JAW_L, 0.085, 0.10), (F_JAW_R, 0.085, 0.10)]),       # mandible edge
     ("jaw", 1.606, 0.064, 0.080, -0.016,
      [(F_JAW_L, 0.090, 0.09), (F_JAW_R, 0.090, 0.09),            # gonial angles
       (T_FRONT, 0.060, 0.08)]),

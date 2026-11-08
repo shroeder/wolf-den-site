@@ -182,6 +182,15 @@ def measure(ob):
         m["ear_h"] = max(v.z for v in ear) - min(v.z for v in ear)
     else:
         m["ear_proj"] = m["ear_h"] = None
+    # ⚠️ HOW FAR THE FACE FALLS AWAY UNDER THE CHIN. Without it the lower
+    # face is a wedge into the neck -- which is what a jowl is, and what he
+    # had. Measured on the evaluated surface at the midline, chin against
+    # 12 mm below it.
+    def front_at(z, tol=0.004):
+        ys = [v.y for v in V if abs(v.z - z) < tol and abs(v.x) < 0.007]
+        return min(ys) if ys else None
+    _c, _u = front_at(hz["chin"]), front_at(hz["chin"] - 0.012)
+    m["chin_undercut"] = (_u - _c) if (_c is not None and _u is not None) else None
     m["mouth_w"] = 2.0 * face_mod.mouth.__defaults__[0]
     m["eye_w"] = 2.0 * face_mod.eye_socket.__defaults__[0]
     ri = head_mod.at("eye")
@@ -280,6 +289,8 @@ def checks(m):
         # The corners of a mouth sit under the pupils -- about a third of
         # the head's breadth. The first lattice came out 58 mm, a letterbox.
         Check("mouth width", m["mouth_w"] / hw, 0.335, 0.045, "head-widths"),
+        Check("chin undercut", (m["chin_undercut"] or 0) * 1000, 30.0, 10.0, "mm",
+              "how far the face falls back 12 mm under the chin"),
         Check("face thirds", (m["brow_z"] - m["nose_z"]) / max(m["nose_z"] - m["chin_z"], 1e-9),
               1.00, 0.22, "", "brow->nose against nose->chin"),
         # ── MESH HYGIENE ──────────────────────────────────────────────────
@@ -355,7 +366,16 @@ BREAKS = [
      lambda: _flat_ears()),
     ("mouth widened to a letterbox", "mouth width",
      lambda: _wide_mouth()),
+    ("chin merged back into the neck", "chin undercut",
+     lambda: _jowl()),
 ]
+
+
+def _jowl():
+    """Pull the under-jaw ring forward until the jaw is a wedge again."""
+    i = head_mod.at("under_jaw")
+    n, z, rx, ry, cy, b = head_mod.HEAD[i]
+    head_mod.HEAD[i] = (n, z, rx * 1.18, ry * 1.30, cy - 0.016, b)
 
 
 def _wide_mouth():
