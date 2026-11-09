@@ -24,7 +24,7 @@ export default async function EnterPage({ searchParams }) {
 
     if (!buyerId) {
         return (
-            <div className="stack">
+            <div style={{ padding: "48px 20px", maxWidth: 560, margin: "0 auto" }}>
                 <h1 style={{ marginBottom: 2 }}>That link has expired</h1>
                 <p className="muted" style={{ marginTop: 0, maxWidth: "58ch" }}>
                     Sign-in links are good for twenty seconds and can only be used once. Start again from the

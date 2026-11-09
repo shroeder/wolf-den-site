@@ -22,7 +22,7 @@ export default async function DenQuestHome() {
 
     if (!buyer || !denQuestOpen(buyer.id)) {
         return (
-            <div className="stack">
+            <div style={{ padding: "48px 20px", maxWidth: 640, margin: "0 auto" }}>
                 <h1 style={{ marginBottom: 2 }}>Den Quest</h1>
                 <p className="muted" style={{ marginTop: 0, maxWidth: "58ch" }}>
                     A small online world. Play it with your Wolf Den account — the same one you use for the
@@ -33,14 +33,5 @@ export default async function DenQuestHome() {
         );
     }
 
-    return (
-        <div className="stack">
-            <h1 style={{ marginBottom: 2 }}>Den Quest</h1>
-            <p className="muted" style={{ marginTop: 0, maxWidth: "62ch" }}>
-                An early prototype, and a live one — everyone here is in the same world on the same server.
-                Bring a friend and you will see each other move and fight in real time.
-            </p>
-            <DenQuest serverUrl={process.env.RT_PUBLIC_URL || "wss://den-quest-rt.fly.dev/ws"} />
-        </div>
-    );
+    return <DenQuest fill serverUrl={process.env.RT_PUBLIC_URL || "wss://den-quest-rt.fly.dev/ws"} />;
 }

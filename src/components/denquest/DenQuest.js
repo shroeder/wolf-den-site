@@ -21,9 +21,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const EYE_HEIGHT = 1.62;
 const CAM_ELEV = 30 * Math.PI / 180;      // the house angle, same as the walk lab
 const CAM_DIST = 11.0;
-const CAM_AIM_RAISE = 2.4;
+const CAM_AIM_RAISE = 1.5;
+// ⚠️ THE CAMERA PULLS IN WHEN SOMETHING IS BETWEEN IT AND YOU. Without this
+//    the first render put a 5.5 m tree squarely between the camera and the
+//    player and the game was a photograph of bark. Every third-person camera
+//    needs it; the only question is whether you find out before or after
+//    someone tries to play.
+const CAM_MIN_DIST = 2.6;
 
-export default function DenQuest({ serverUrl }) {
+export default function DenQuest({ serverUrl, fill = false }) {
     const hostRef = useRef(null);
     const apiRef = useRef(null);
     const [status, setStatus] = useState("connecting");
@@ -31,6 +37,8 @@ export default function DenQuest({ serverUrl }) {
     const [hud, setHud] = useState({ hp: 100, players: 1, ping: 0, name: "" });
     const [log, setLog] = useState([]);
     const [touch, setTouch] = useState(false);
+    const fillRef = useRef(fill);
+    useEffect(() => { fillRef.current = fill; }, [fill]);
 
     useEffect(() => {
         if (typeof window !== "undefined" && window.matchMedia) {
@@ -75,7 +83,12 @@ export default function DenQuest({ serverUrl }) {
             const SKY = 0x7d9099;
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(SKY);
-            scene.fog = new THREE.Fog(SKY, 26, 90);
+            // ⚠️ FOG STARTS BEYOND THE FIGHT, NOT INSIDE IT. At 26 m the murk began
+            //    about where the goblins stand, so the thing you are walking
+            //    toward was already half dissolved and the whole scene read as
+            //    overcast rather than distant. It exists to hide the edge of a
+            //    finite ground disc, and that edge is 170 m away.
+            scene.fog = new THREE.Fog(SKY, 55, 155);
 
             const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 260);
             const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -99,11 +112,24 @@ export default function DenQuest({ serverUrl }) {
             fill.position.set(-16, 10, 8);
             const rim = new THREE.DirectionalLight(0xffffff, 0.75);
             rim.position.set(-6, 14, -18);
+            // ⚠️ AND SO DOES THE SHADOW CAMERA. A directional light's shadow
+            //    only covers the box around its TARGET, which defaults to the
+            //    origin -- so with the action at (512, 560) nothing cast a
+            //    shadow at all and the scene looked flat and unlit without any
+            //    single thing being obviously wrong.
+            scene.add(key.target);
             scene.add(key, fill, rim, new THREE.AmbientLight(0xffffff, 0.46));
 
+            // ⚠️ THE GROUND FOLLOWS THE PLAYER, AND IT HAS TO. A disc at the
+            //    scene origin is 760 m from the spawn point -- the world's
+            //    coordinates start at (512, 560), not (0, 0) -- so the first
+            //    build had everyone standing on nothing, with the sky showing
+            //    through where the floor should be. Re-centring it every frame
+            //    is also what makes the world feel endless: you never reach an
+            //    edge, and the fog hides the one that exists.
             const ground = new THREE.Mesh(
-                new THREE.CircleGeometry(160, 64).rotateX(-Math.PI / 2),
-                new THREE.MeshStandardMaterial({ color: 0x36442a, roughness: 0.95 })
+                new THREE.CircleGeometry(170, 64).rotateX(-Math.PI / 2),
+                new THREE.MeshStandardMaterial({ color: 0x3f5131, roughness: 0.95 })
             );
             ground.receiveShadow = true;
             scene.add(ground);
@@ -128,10 +154,16 @@ export default function DenQuest({ serverUrl }) {
                 h = (h ^ (h >>> 15)) >>> 0;
                 return h / 4294967296;
             };
+            // ⚠️ NOTHING IS PLACED IN THE ARRIVAL CLEARING. Players spawn on a
+            //    26 m ring, and scenery starting at 18 m put trees inside it --
+            //    so the first thing a new player saw was the inside of a trunk.
+            //    34 m leaves a clear space to arrive into and to find each other
+            //    in, which is what a spawn point is for.
+            const CLEARING = 34;
             const dressing = new THREE.Group();
-            for (let i = 0; i < 90; i += 1) {
+            for (let i = 0; i < 110; i += 1) {
                 const a = hash(i) * Math.PI * 2;
-                const r = 18 + hash(i + 977) * 70;
+                const r = CLEARING + hash(i + 977) * 62;
                 const isTree = hash(i + 55) > 0.42;
                 const proto = isTree ? treeProto : rockProto;
                 if (!proto) continue;
@@ -261,7 +293,13 @@ export default function DenQuest({ serverUrl }) {
 
             const resize = () => {
                 const w = host.clientWidth || 640;
-                const h = Math.round(Math.min(Math.max(w * 0.58, 320), window.innerHeight * 0.76));
+                // ⚠️ ON ITS OWN DOMAIN THE GAME IS THE PAGE, so the viewport is
+                //    measured from the element the layout gave it rather than
+                //    from a ratio of its width. Inside the shop it is a panel
+                //    on a page and the ratio is right.
+                const h = fillRef.current
+                    ? Math.max(260, host.clientHeight)
+                    : Math.round(Math.min(Math.max(w * 0.58, 320), window.innerHeight * 0.76));
                 renderer.setSize(w, h);
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();
@@ -274,6 +312,7 @@ export default function DenQuest({ serverUrl }) {
             let last = performance.now();
             let hudAt = 0;
             const tmp = new THREE.Vector3();
+            const ray = new THREE.Raycaster();
 
             const frame = (nowMs) => {
                 raf = requestAnimationFrame(frame);
@@ -364,13 +403,30 @@ export default function DenQuest({ serverUrl }) {
 
                 // ── CAMERA ───────────────────────────────────────────────────────────────
                 const me = client.state.predicted;
-                camera.position.set(
-                    me.x + Math.sin(camYaw) * Math.cos(CAM_ELEV) * CAM_DIST,
-                    EYE_HEIGHT + Math.sin(CAM_ELEV) * CAM_DIST,
-                    me.y + Math.cos(camYaw) * Math.cos(CAM_ELEV) * CAM_DIST
+                const focus = tmp.set(me.x, EYE_HEIGHT, me.y);
+                const want = new THREE.Vector3(
+                    Math.sin(camYaw) * Math.cos(CAM_ELEV),
+                    Math.sin(CAM_ELEV),
+                    Math.cos(camYaw) * Math.cos(CAM_ELEV)
                 );
-                tmp.set(me.x, EYE_HEIGHT + CAM_AIM_RAISE, me.y);
-                camera.lookAt(tmp);
+
+                // Cast from the player out along the camera arm; if the ray
+                // meets scenery, sit just in front of whatever it hit.
+                // Everything that is anchored to the world origin by default
+                // gets moved to where the player actually is, every frame.
+                ground.position.set(me.x, 0, me.y);
+                key.position.set(me.x + 14, 26, me.y + 10);
+                key.target.position.set(me.x, 0, me.y);
+                key.target.updateMatrixWorld();
+
+                ray.set(focus, want);
+                ray.far = CAM_DIST;
+                const blocked = ray.intersectObject(dressing, true);
+                const dist = blocked.length
+                    ? Math.max(CAM_MIN_DIST, blocked[0].distance - 0.5)
+                    : CAM_DIST;
+                camera.position.copy(focus).addScaledVector(want, dist);
+                camera.lookAt(me.x, EYE_HEIGHT + CAM_AIM_RAISE, me.y);
 
                 if (nowMs - hudAt > 250) {
                     hudAt = nowMs;
@@ -409,36 +465,52 @@ export default function DenQuest({ serverUrl }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serverUrl]);
 
+    const viewport = (
+        <div ref={hostRef} style={{
+            width: "100%",
+            flex: fill ? 1 : undefined,
+            minHeight: fill ? 0 : 320,
+            borderRadius: fill ? 0 : 10,
+            overflow: "hidden",
+            background: "#7d9099",
+            position: "relative",
+        }} />
+    );
+
+    const status_line = (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 14 }}>
+            <span style={{
+                padding: "3px 10px", borderRadius: 999,
+                background: hud.hp > 40 ? "rgba(127,211,196,.18)" : "rgba(232,160,160,.2)",
+            }}>
+                HP <strong>{hud.hp}</strong>
+            </span>
+            <span className="muted">· {hud.players} in the zone</span>
+            {hud.name && <span className="muted">· you are <strong>{hud.name}</strong></span>}
+            {status !== "playing" && <span className="muted">· {status}</span>}
+            {error && <span style={{ color: "#e8a0a0" }}>· {error}</span>}
+            <span style={{ flex: 1 }} />
+            <span className="muted" style={{ fontSize: 13 }}>
+                {touch ? "drag left to move · drag right to turn · tap right to swing"
+                    : "WASD · drag to turn · space to swing"}
+            </span>
+        </div>
+    );
+
+    if (fill) {
+        return (
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                {viewport}
+                <div style={{ padding: "8px 16px", borderTop: "1px solid #1b2a2e" }}>{status_line}</div>
+            </div>
+        );
+    }
+
     return (
         <div className="stack" style={{ gap: 10 }}>
-            <div ref={hostRef} style={{
-                width: "100%", borderRadius: 10, overflow: "hidden",
-                background: "#7d9099", minHeight: 320, position: "relative",
-            }} />
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 14 }}>
-                <span style={{
-                    padding: "3px 10px", borderRadius: 999,
-                    background: hud.hp > 40 ? "rgba(127,211,196,.18)" : "rgba(232,160,160,.2)",
-                }}>
-                    HP <strong>{hud.hp}</strong>
-                </span>
-                <span className="muted">· {hud.players} in the zone</span>
-                {hud.name && <span className="muted">· you are <strong>{hud.name}</strong></span>}
-                {status !== "playing" && <span className="muted">· {status}</span>}
-            </div>
-
-            {error && <p style={{ color: "#e8a0a0", margin: 0 }}>{error}</p>}
-            {log.length > 0 && (
-                <p className="muted" style={{ margin: 0, fontSize: 13 }}>{log.join(" · ")}</p>
-            )}
-
-            <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
-                {touch
-                    ? "Drag the left of the screen to move, the right to turn the camera, tap the right to swing."
-                    : "WASD to move, drag to turn the camera, space to swing."}
-                {" "}Goblins hit back — at 0 HP you respawn where you came in.
-            </p>
+            {viewport}
+            {status_line}
+            {log.length > 0 && <p className="muted" style={{ margin: 0, fontSize: 13 }}>{log.join(" · ")}</p>}
         </div>
     );
 }
