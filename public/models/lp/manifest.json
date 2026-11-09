@@ -288,9 +288,9 @@
    "label": "Tree",
    "kind": "scenery",
    "scale": "tree",
-   "note": "Six parts: a flared six-sided trunk and three twisted canopy cones in three greens. 5.5 m -- three times the player, with 3.5 m of bare trunk so you walk UNDER it rather than past it.",
+   "note": "A short forked trunk under four overlapping leaf blobs. 5.4 m, just under three times the player, and the canopy is a little over half of it. You walk under the branches at 2.1 m.",
    "url": "/models/lp/tree.glb",
-   "tris": 70,
+   "tris": 128,
    "budget": 250,
    "materials": [
     "bark_dark",
@@ -299,10 +299,10 @@
     "leaf",
     "leaf_light"
    ],
-   "height": 5.5,
-   "width": 2.68,
-   "depth": 2.3209,
-   "bytes": 8456
+   "height": 5.565,
+   "width": 3.5938,
+   "depth": 2.6938,
+   "bytes": 12860
   }
  ]
 }

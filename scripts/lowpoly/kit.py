@@ -6,7 +6,7 @@ from mathutils import Euler, Vector
 import style
 
 # ═══════════════════════════════════════════════════════════════════════════
-# THE KIT — EVERY MODEL IS BUILT FROM THESE FIVE SHAPES
+# THE KIT — EVERY MODEL IS BUILT FROM THESE SIX SHAPES
 #
 # No modifiers. No booleans. No subdivision. No bevels. Nothing that makes
 # geometry you did not count.
@@ -137,6 +137,35 @@ def cone(name, center, radius, height, colour, sides=6, rot=(0, 0, 0),
     f = [tuple(range(n - 1, -1, -1))]
     for i in range(n):
         f.append((i, (i + 1) % n, n))
+    return _mesh(name, v, f, colour, loc=center, rot=rot)
+
+
+# ── BIPYRAMID — 2n triangles (6 sides = 12) ──────────────────────────────
+# Two pyramids base to base: a faceted blob with no flat cap anywhere. The
+# cheapest shape in the kit that reads as ROUND, which is what foliage and
+# boulders need and what a cone cannot do -- a cone has a point at one end
+# and a disc at the other, so three of them stacked read as a fir and
+# nothing else.
+def bipyramid(name, center, radius, height, colour, sides=6, rot=(0, 0, 0),
+              twist=0.0, waist=0.42):
+    """`waist` is where the equator sits, 0 = bottom tip, 1 = top tip. Below
+    0.5 the blob is tall-topped and heavy underneath, which is what a leaf
+    cluster looks like with the light coming from above."""
+    n = sides
+    lo = -height * waist
+    hi = height * (1.0 - waist)
+    v = []
+    for i in range(n):
+        a = 2 * math.pi * i / n + math.radians(twist)
+        v.append((radius * math.cos(a), radius * math.sin(a), 0.0))
+    v.append((0.0, 0.0, lo))
+    v.append((0.0, 0.0, hi))
+    bot, top = n, n + 1
+    f = []
+    for i in range(n):
+        j = (i + 1) % n
+        f.append((i, bot, j))
+        f.append((i, j, top))
     return _mesh(name, v, f, colour, loc=center, rot=rot)
 
 
