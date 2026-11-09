@@ -42,6 +42,20 @@ primary_region = "iad"
     auto_start_machines = true
     min_machines_running = 1
 
+    # ⚠️ ONE MACHINE. `fly deploy` creates TWO by default "for high
+    # availability and zero downtime deployments", and for this app that is
+    # not availability, it is a SECOND WORLD. Each machine holds its own
+    # entity store in RAM, the proxy spreads connections across them, and
+    # two players can land on different ones -- so they fight different
+    # copies of enemy 47 and see different hp. That is precisely the thing
+    # the milestone asserts cannot happen, and it would have shipped
+    # looking healthy: both machines pass their health checks.
+    #
+    # Enforced with `fly scale count 1`, not by this file. Re-check after
+    # any deploy that mentions creating a second machine. The real fix is
+    # zone sharding with addressable machines (fly-replay), which is the
+    # decision record's own open item -- until then, one zone, one process.
+
     # Connections, not requests: one player is one long-lived socket, and
     # counting requests would read a hundred players as almost no load.
     [http_service.concurrency]

@@ -52,6 +52,7 @@ export function createClient({ send, now }) {
         connected: false,
         bytesIn: 0,
         snapshots: 0,
+        clockOffset: null,
         corrections: 0,
         maxCorrection: 0,
     };
@@ -82,13 +83,36 @@ export function createClient({ send, now }) {
         state.snapshots += 1;
         state.authoritative = snap.entities;
 
+        // ── THE SERVER'S CLOCK, ESTIMATED ────────────────────────────
+        // ⚠️ SAMPLES ARE STAMPED WITH SERVER TIME, NOT ARRIVAL TIME. This
+        //    is the difference between interpolation that absorbs network
+        //    jitter and interpolation that IMPORTS it. On loopback the two
+        //    are indistinguishable -- arrivals are evenly spaced, so
+        //    arrival time is a fine proxy for tick time and the first
+        //    version of this file passed every assertion. Over the real
+        //    internet a burst of two snapshots arriving 8 ms apart after a
+        //    120 ms gap carries two ticks of travel, and interpolating
+        //    across that tiny arrival window drew the remote player moving
+        //    at 471 units/second against a top speed of 220. Deployed, it
+        //    failed within one run.
+        //
+        //    A tick number IS a timestamp -- tick * TICK_MS is exactly when
+        //    the server computed that state, evenly spaced by construction.
+        //    All the client needs is the offset between that clock and its
+        //    own, which is one subtraction smoothed over time.
         const t = now();
+        const serverMs = snap.tick * TICK_MS;
+        const observed = t - serverMs;
+        state.clockOffset = state.clockOffset === null
+            ? observed
+            : state.clockOffset + (observed - state.clockOffset) * 0.08;
+
         for (const [id, ent] of snap.entities) {
             state.hp.set(id, ent.hp);
             if (id === state.playerId) continue;
             let track = state.tracks.get(id);
             if (!track) { track = []; state.tracks.set(id, track); }
-            track.push({ t, x: ent.x, y: ent.y, flags: ent.flags });
+            track.push({ sm: serverMs, x: ent.x, y: ent.y, flags: ent.flags });
             while (track.length > 32) track.shift();
         }
 
@@ -163,16 +187,19 @@ export function createClient({ send, now }) {
             const ent = state.authoritative.get(id);
             return ent ? { x: ent.x, y: ent.y } : null;
         }
-        const target = now() - INTERP_DELAY_MS;
+        // Where the server's clock reads now, minus the render delay.
+        const target = (now() - (state.clockOffset ?? 0)) - INTERP_DELAY_MS;
         let a = null;
         let b = null;
         for (let i = track.length - 1; i >= 0; i -= 1) {
-            if (track[i].t <= target) { a = track[i]; b = track[i + 1] || null; break; }
+            if (track[i].sm <= target) { a = track[i]; b = track[i + 1] || null; break; }
         }
         if (!a) return { x: track[0].x, y: track[0].y, flags: track[0].flags };
         if (!b) return { x: a.x, y: a.y, flags: a.flags };
-        const span = b.t - a.t;
-        const f = span > 0 ? Math.min(1, Math.max(0, (target - a.t) / span)) : 0;
+        // span is a whole number of ticks by construction, so f advances at
+        // the rate real time advances and the drawn speed is the real speed.
+        const span = b.sm - a.sm;
+        const f = span > 0 ? Math.min(1, Math.max(0, (target - a.sm) / span)) : 0;
         return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, flags: a.flags };
     }
 
