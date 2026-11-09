@@ -266,57 +266,14 @@ export function playKill(step = 0) {
     } catch { /* ignore */ }
 }
 
-/**
- * A blow that killed something several times over.
- *
- * ⚠️ IT COUNTS, RATHER THAN BEING LOUDER. The kill chime already plays and already climbs with the streak,
- * so a multi-kill announced as "the same sound with more gain" would be a difference in degree — and the
- * arena's own note explains why those stop reading once they happen all the time. This plays ONE NOTE PER
- * KILL CREDITED, climbing, so an x2 is two notes and an x8 is a run of eight: you hear the number without
- * reading it, and the sound is physically longer the better the blow was.
- *
- * Over the top of playKill rather than instead of it — the creature still died, and that chime is the thing
- * that says so.
- */
-export function playMulti(credit = 2) {
-    // ── ⚠️ ONE PER MOMENT, NOT ONE PER CORPSE ───────────────────────────────────────────────────────────
-    // This is the expensive one — up to nine notes and a vibrate, and the caller runs it inside the kill
-    // loop. A screen-wide one-shot is ONE multikill moment by this function's own definition, so twenty
-    // overlapping pentatonic runs are not twenty rewards, they are a single unreadable smear that costs
-    // three hundred and sixty nodes to produce.
-    //
-    // 200ms rather than a frame: kills land across several frames as bodies resolve, and the ear hears that
-    // whole span as one event. It also covers the vibrate, which Luke has already complained about once —
-    // "the vibrations are too much when im multikilling" — for the same reason, one level lower down.
-    if (!spend("multi", 200, 1)) return;
-    const a = audio();
-    if (!a) return;
-    const n = Math.max(2, Math.min(8, Math.round(Number(credit) || 2)));
-    try {
-        for (let i = 0; i < n; i += 1) {
-            // A major pentatonic run — no semitone in it, so any length of it lands as one happy thing
-            // rather than as a scale being practised. Same argument as the plaza's candy cascade.
-            const step = [0, 2, 4, 7, 9, 12, 14, 16][i];
-            note(a, 523.25 * Math.pow(2, step / 12), 0.03 + i * 0.045, 0.22, 0.085 - i * 0.004, "triangle");
-        }
-        // And a floor under the run, so a big one has weight rather than just sparkle.
-        note(a, 130.81, 0.00, 0.34, 0.10 + n * 0.012, "sine");
-    } catch { /* a missing flourish must never break the kill */ }
-    try {
-        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-            // ── ⚠️ ONE PULSE, NOT ONE PER KILL ───────────────────────────────────────────────────────
-            // This was `[14, 36]` repeated once per credit, so an eight-kill chain buzzed for 400ms —
-            // and multikills come in runs, so the pulses ran together into a phone that would not stop
-            // shaking. Luke: "the vibrations are too much when im multikilling."
-            //
-            // Countable-in-the-hand was the idea and it was the wrong one: the screen already shows the
-            // count, and a pattern long enough to count is long enough to be annoying. A multikill is ONE
-            // event with weight, so it gets one pulse that grows a little with size and stops well short
-            // of a buzz you notice as a buzz.
-            navigator.vibrate(Math.min(70, 16 + n * 7));
-        }
-    } catch { /* ignore */ }
-}
+// ── ✂️ playMulti IS GONE, 2026-11-08 ────────────────────────────────────────────────────────────────────────
+// Luke: "Remove the particles entirely, and the ground circle effect, the boing noises, and the multiplier
+// text." The boing was this: a major-pentatonic run, one note per credit, plus a bass floor under it — up to
+// nineteen WebAudio nodes and a vibrate, fired once per corpse until it was budgeted this afternoon.
+//
+// It went with the "x8" plate it was scoring, because they were one piece of feedback and he asked for both.
+// The ordinary kill chime (playKill) stays: every kill still sounds, a multikill simply no longer sings.
+
 
 /** Taking a hit. Low, dull and a little ugly — it is not meant to be enjoyed. */
 export function playHurt() {

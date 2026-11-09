@@ -792,22 +792,6 @@ export const GROVE_CSS = `
    It wears the proc word, in the colour nothing else uses. */
 .gv-proc.is-hyper { color: #ffd0ff; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 20px rgba(255,120,255,0.95),
     0 0 38px rgba(210,70,255,0.7); }
-.gv-boom.is-hyper { border-color: rgba(255,150,255,0.95); }
-
-/* ── THE PET'S CLAW MARK ──────────────────────────────────────────────────────────────────────
-   The pet's answer to .gv-swipe, and deliberately a different SHAPE rather than a smaller crescent.
-
-   Luke: "it has to be differentiated from the character that's attacking, because otherwise it might just
-   get too noisy and confusing."
-
-   The hero cuts one long arc with a hard leading edge. This is three short parallel rakes, slanted across
-   the direction of travel, in the pet's cool green rather than the hero's hot cream -- so the two marks
-   differ in count, in angle and in colour, and any one of those three is enough to tell them apart at a
-   glance in the middle of a fight. Visible for the 85ms of the leap and nothing else.
-
-   The lines are children rather than a repeating-linear-gradient because they are different LENGTHS: a
-   rake where the middle claw reaches furthest reads as a paw, and three identical bars read as a UI
-   element. */
 .gv-claw { position: absolute; left: 52%; top: 24%; width: 52%; height: 54%; opacity: 0;
     pointer-events: none; transform: rotate(-16deg); }
 .gv-claw i { position: absolute; left: 0; width: 100%; height: 9%; border-radius: 50%;
@@ -1610,15 +1594,6 @@ export const GROVE_CSS = `
    attack-speed buff. */
 .gv-proc.is-ice { translate: -50% 0; color: #cdeaff; letter-spacing: 0.22em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(140,210,255,0.95), 0 0 34px rgba(60,150,255,0.6); }
-.gv-boom.is-ice { border-color: rgba(190,230,255,0.95); }
-.gv-boom.is-surge { border-color: rgba(255,210,110,0.95); }
-.gv-boom.is-guard { border-color: rgba(175,215,255,0.95); }
-.gv-boom.is-riposte { border-color: rgba(255,225,160,0.95); }
-.gv-boom.is-grudge { border-color: rgba(255,120,100,0.95); }
-/* The call-outs each wear their own particle's colour, so the word and the burst are one event. */
-/* ── REND ─────────────────────────────────────────────────────────────────────────────────────
-   The Reaver's word, and the only proc in the zone that had none. Arterial red, hotter than the
-   bleed ticks it starts so the CAUSE reads louder than its instalments. */
 .gv-proc.is-bleed { translate: -50% 0; color: #ff6b6b; letter-spacing: 0.2em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(255,70,70,0.9), 0 0 30px rgba(190,20,20,0.6); }
 
@@ -1642,19 +1617,8 @@ export const GROVE_CSS = `
 /* Hot white, the stun's own. Warm because a blow landed; not gold, because a crit already owns gold. */
 .gv-proc.is-stun { translate: -50% 0; color: #fffdf2; letter-spacing: 0.22em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,235,170,0.95), 0 0 32px rgba(255,200,80,0.6); }
-.gv-boom.is-stun { border-color: rgba(255,240,190,0.95); }
-/* Both halves at once, so it wears both colours and is the only thing on screen that does. */
 .gv-proc.is-cata { translate: -50% 0; color: #ffd9a0; letter-spacing: 0.26em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 18px rgba(255,150,60,0.95), 0 0 38px rgba(120,190,255,0.8); }
-.gv-boom.is-cata { border-color: rgba(255,200,140,0.95); }
-/* Soulfire is a second blow of pure magic off the first, so it is neither a hit colour nor a crit one. */
-/* ⚠️ A BLOCKED BLOW HAS TO LOOK BLOCKED. Cream is what an ordinary blow landing on you looks like; a
-   blow your shield turned aside is a different event and printing it in the same colour at a smaller
-   size says only "that one hurt less", which a weak creature also says. */
-/* ⚠️ THORNS ARE NOT YOUR SWORD. They land on the creature in the same place a hit does, so in cream
-   they read as the blow the player just struck -- and the whole appeal of the node is that being
-   ATTACKED hurts them. Steel, because it is the shield doing it, and it is the same steel the blocked
-   number wears: one colour for "your defence did this", wherever it lands. */
 .gv-num.is-thorn { color: #a9c8ef; --gv-nb: 0.84;
     text-shadow: 0 2px 5px rgba(0,0,0,0.9), 0 0 12px rgba(150,200,255,0.8); }
 .gv-num.is-warded { color: #bcd8ff;
@@ -1680,24 +1644,12 @@ export const GROVE_CSS = `
    a different kind of good news and should not share a palette with damage. */
 .gv-proc.is-block { translate: -50% 0; color: #bcd8ff; letter-spacing: 0.2em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(150,200,255,0.9), 0 0 30px rgba(70,130,220,0.55); }
-.gv-boom.is-block { border-color: rgba(170,210,255,0.9); }
 .gv-proc.is-heal { translate: -50% 0; color: #8dffb8; letter-spacing: 0.16em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,255,160,0.9), 0 0 36px rgba(30,200,110,0.6); }
 /* Sized off the type like the loot pop's, so the object scales with the number beside it rather than
    being a fixed pixel count that is huge on a phone and lost on a desktop. */
 .gv-proc.is-heal img { width: 1.5em; height: 1.5em; margin-right: 0.34em; vertical-align: -0.4em;
     object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.85)); }
-.gv-boom.is-heal { border-color: rgba(125,255,175,0.95); }
-/* Motes rising off him rather than sparks flying off a blow: no gravity to fight, softer light, and the
-   green the rest of the beat is in. */
-.gv-spark.is-heal { background: #c8ffd8; box-shadow: 0 0 8px 3px rgba(110,255,165,0.8); }
-
-/* The ring a crit throws, and the one a proc throws. ⚠️ A CRIT'S IS THE ONLY THING AN ORDINARY HIT
-   NEVER DOES -- everything else between them is a difference of degree, and degrees stop reading once
-   they are happening sixty times a minute. */
-.gv-boom.is-crit { border-color: rgba(255,186,80,0.95); }
-.gv-boom.is-haste { border-color: rgba(120,215,255,0.95); }
-
 .gv-num.is-hit { color: #ffe9a8; }
 /* ⚠️ A CRIT IS A DIFFERENT EVENT, NOT A BIGGER NUMBER. Bigger alone reads as more damage; what says CRIT
    is that it is a different colour, it is lit from inside, and it arrives at an angle nothing else does. */
@@ -1714,7 +1666,6 @@ export const GROVE_CSS = `
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,140,40,0.95), 0 0 32px rgba(255,90,10,0.6); }
 /* The motes thrown when fire catches the body beside it. Warmer and sparser than a blow's sparks --
    this is something igniting, not something being struck. */
-.gv-spark.is-burn { background: #ffd9a0; box-shadow: 0 0 8px 3px rgba(255,150,50,0.85); }
 .gv-num.is-big { color: #fff3c4; text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(255,205,110,0.7); }
 /* ── ⚠️ THE PET'S NUMBER IS COOL AND SMALL, AND BOTH ARE LOAD-BEARING ─────────────────────────
    Warm is what the player's own damage looks like in this game -- cream for a hit, gold for a crit, pale
@@ -1805,144 +1756,6 @@ export const GROVE_CSS = `
 /* ⚠️ SIZED PAST WHAT THE FEEL WANTS, ON PURPOSE — see the note on SPARK in grove-juice.js. 1.15 of a world
    unit is ~20px on a phone, which is unmissable rather than tasteful. It comes back down once the question
    "can he see them at all" has an answer. */
-.gv-spark { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(1.15 * var(--gv-unit, 1%)); height: calc(1.15 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.575 * var(--gv-unit, 1%)) calc(-0.575 * var(--gv-unit, 1%));
-    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
-    /* ⚠️ NO WHITE CORE. The first pass started at #fffdf5, and shot beside the numbers that still read
-       as cream at this size — the hue has to leave the text's family entirely, not sit next to it.
-       Gold into deep orange is the furthest a warm spark can get from cream while still reading hot. */
-    background: radial-gradient(circle at 50% 50%, #ffd45e 0%, #ff8c1e 55%, #f2560c 100%);
-    box-shadow: 0 0 16px 6px rgba(255,110,20,0.95); }
-/* A crit is hotter and whiter — the core grows rather than the dot changing colour, so it reads as
-   more energy in the same object instead of as a different kind of particle. */
-.gv-spark.is-crit { background: radial-gradient(circle at 50% 50%, #fff3c4 0%, #ffa32a 50%, #ff4d07 100%);
-    box-shadow: 0 0 12px 3px rgba(255,120,20,0.95); }
-/* The pet's bite throws its own colour, and fewer of them (PET_SPARKS). Smaller too: the spark is the
-   thing that says a blow CONNECTED, and the pet's connects for less. */
-.gv-spark.is-pet { width: calc(0.34 * var(--gv-unit, 1%)); height: calc(0.34 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.17 * var(--gv-unit, 1%)) calc(-0.17 * var(--gv-unit, 1%));
-    background: #ddffcc; box-shadow: 0 0 5px 2px rgba(150,240,120,0.75); }
-/* ── ⚠️ A PARTICLE PER KIND, BECAUSE A COLOURED WORD IS NOT AN EFFECT ─────────────────────────
-   Luke: "the effects should be cool, not words, or not just words." Every proc in here used to be a
-   caption with a ring behind it; these are the things the caption is a label FOR.
-
-   Ice is the one that is not round. A shard reads as ice the moment it is not a dot, and it is the
-   cheapest possible way to say "this is a different element" -- no new art, one border-radius. */
-/* ⚠️ BIGGER AND BLUER THAN THE FIRST CUT. At spark size in near-white they read as the ordinary hit
-   sparks they sit next to -- against a lit forest everything pale looks the same. A shard has to be
-   large enough to show it is not round and saturated enough to be a colour rather than a highlight. */
-.gv-spark.is-ice { width: calc(0.95 * var(--gv-unit, 1%)); height: calc(0.95 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.47 * var(--gv-unit, 1%)) calc(-0.47 * var(--gv-unit, 1%));
-    border-radius: 2px 70% 2px 70%; background: #7fd4ff;
-    box-shadow: 0 0 14px 5px rgba(60,170,255,0.95); }
-/* A stun is a blow that rang their head -- hot white, hard, and gone quickly. */
-.gv-spark.is-stun { background: #fffdf2; box-shadow: 0 0 9px 3px rgba(255,225,150,0.95); }
-/* Soulfire is magic: cooler light, softer edge, and it drifts rather than flying. */
-.gv-spark.is-soul { width: calc(0.72 * var(--gv-unit, 1%)); height: calc(0.72 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.36 * var(--gv-unit, 1%)) calc(-0.36 * var(--gv-unit, 1%));
-    background: #d59bff; box-shadow: 0 0 14px 5px rgba(170,70,255,0.9); }
-/* Steel off a shield arm. Pale and hard, the same family as the blocked number and the thorns. */
-.gv-spark.is-block { background: #e8f1ff; box-shadow: 0 0 8px 3px rgba(150,200,255,0.9); }
-/* ── ⚠️ ONE LOOK PER ABILITY, BECAUSE SHARING ONE MAKES TWO NODES THE SAME NODE ───────────────
-   Luke: "every ability should have effects that are unique." Surge was wearing haste's particle, so
-   the one proc a player can SEE COMING looked identical to the one they cannot. Guard, block, riposte
-   and grudge were all one steel. Chill was wearing the freeze's, which made the cheap one look like
-   the rare one landing weakly. */
-/* Chill: the same family as ice and deliberately smaller and softer -- slowed, not stopped. */
-.gv-spark.is-chill { width: calc(0.5 * var(--gv-unit, 1%)); height: calc(0.5 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.25 * var(--gv-unit, 1%)) calc(-0.25 * var(--gv-unit, 1%));
-    background: #bfe8ff; box-shadow: 0 0 8px 3px rgba(120,190,255,0.6); }
-/* Surge: gold and square-edged, because it is charge rather than light. */
-.gv-spark.is-surge { width: calc(0.8 * var(--gv-unit, 1%)); height: calc(0.8 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.4 * var(--gv-unit, 1%)) calc(-0.4 * var(--gv-unit, 1%));
-    border-radius: 2px; background: #ffe9a8; box-shadow: 0 0 14px 5px rgba(255,190,60,0.95); }
-/* Guard: the shield seating. Wide, pale, and short-lived. */
-.gv-spark.is-guard { width: calc(0.85 * var(--gv-unit, 1%)); height: calc(0.85 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.42 * var(--gv-unit, 1%)) calc(-0.42 * var(--gv-unit, 1%));
-    background: #dcebff; box-shadow: 0 0 12px 5px rgba(130,185,255,0.9); }
-/* Riposte: the answer. Hot and narrow, because it is a point rather than a plate. */
-.gv-spark.is-riposte { width: calc(0.42 * var(--gv-unit, 1%)); height: calc(0.9 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.45 * var(--gv-unit, 1%)) calc(-0.21 * var(--gv-unit, 1%));
-    border-radius: 2px; background: #fff2cf; box-shadow: 0 0 12px 4px rgba(255,210,120,0.95); }
-/* Grudge: everything they did to you coming back at once. The only deep red in the kit. */
-.gv-spark.is-grudge { width: calc(0.9 * var(--gv-unit, 1%)); height: calc(0.9 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.45 * var(--gv-unit, 1%)) calc(-0.45 * var(--gv-unit, 1%));
-    background: #ff8a7a; box-shadow: 0 0 14px 5px rgba(220,50,40,0.9); }
-/* Wild: it picks one of three at random, so it is the one that is not a single colour. */
-.gv-spark.is-wild { width: calc(0.7 * var(--gv-unit, 1%)); height: calc(0.7 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.35 * var(--gv-unit, 1%)) calc(-0.35 * var(--gv-unit, 1%));
-    background: #c6ffb0; box-shadow: 0 0 12px 4px rgba(120,255,160,0.85); }
-/* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
-/* ── ⚠️ DUST SAYS WEIGHT AND MUST NEVER COMPETE WITH THE SPARK ───────────────────────────────────
-   This was a 1.1-unit disc of flat rgba(170,152,120,0.55) thrown at the BODY's centre — the grey blob
-   sitting on the corpse in the before shot. It is softer, fainter and smaller now, with the opacity in
-   the gradient so it has no hard edge: dust with a crisp rim is a pebble. It is also thrown at the
-   FLOOR by the caller, which is where a falling body actually disturbs anything. */
-.gv-spark.is-dust { width: calc(0.85 * var(--gv-unit, 1%)); height: calc(0.85 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.42 * var(--gv-unit, 1%)) calc(-0.42 * var(--gv-unit, 1%));
-    background: radial-gradient(circle at 50% 50%, rgba(196,180,150,0.34) 0%, rgba(170,152,120,0.14) 70%, rgba(170,152,120,0) 100%);
-    box-shadow: none; }
-
-/* The ring an attack leaves when it resolves. It is the difference between damage arriving and damage
-   LANDING somewhere — the player needs to see the place the thing they dodged went off. */
-/* ── THE AoE RING ─────────────────────────────────────────────────────────────────────────────
-   Luke: "the most important thing for me is that the AoE and the being able to see the AoE happen.
-   Up until now, we really haven't been able to show skill effects in a way that I'm satisfied with."
-
-   ⚠️ SIZED FROM THE REAL RADIUS, PASSED IN AS --r IN WORLD UNITS. Every other ring in this scene is a
-   fixed 9-unit ellipse, which is fine for "something happened here" and useless for an area: an AoE
-   whose edge you cannot see is just numbers appearing on things you did not aim at. This one is drawn
-   at exactly the radius the damage used, so the picture IS the hitbox.
-
-   It expands from nothing to full over 520ms and fades — a ring that appears at full size reads as a
-   decal, a ring that GROWS reads as a shockwave leaving the body. Flat ellipse rather than a circle
-   because the stage is side-on: a true circle reads as a sphere hanging in the air. */
-/* The ground ring is the FALLBACK now, not the effect. See .gv-sfx below: a skill gets a shape that
-   says what it is, and this is what draws when one has not been given one yet. Luke: "everything is
-   the same. A ring on the ground... Its all just noise. And a bunch of rings." */
-.gv-nova { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(var(--r, 4) * 2 * var(--gv-unit, 1%));
-    height: calc(var(--r, 4) * 0.8 * var(--gv-unit, 1%));
-    margin-left: calc(var(--r, 4) * -1 * var(--gv-unit, 1%));
-    margin-bottom: calc(var(--r, 4) * -0.4 * var(--gv-unit, 1%));
-    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
-    border: 3px solid rgba(255,120,90,0.95);
-    box-shadow: 0 0 26px 6px rgba(255,90,60,0.45), inset 0 0 34px 10px rgba(255,120,70,0.3);
-    animation: gv-nova-grow 520ms cubic-bezier(.12,.75,.3,1) both; }
-.gv-nova.is-corpse { border-color: rgba(255,70,70,0.95);
-    box-shadow: 0 0 30px 8px rgba(220,30,30,0.5), inset 0 0 40px 12px rgba(200,20,20,0.34); }
-.gv-nova.is-frost { border-color: rgba(150,225,255,0.95);
-    box-shadow: 0 0 30px 8px rgba(90,190,255,0.5), inset 0 0 40px 12px rgba(120,200,255,0.3); }
-.gv-nova.is-burn { border-color: rgba(255,190,80,0.95);
-    box-shadow: 0 0 30px 8px rgba(255,150,40,0.5), inset 0 0 40px 12px rgba(255,170,60,0.32); }
-/* ── ⚠️ A SKILL IS A SHAPE, NOT A RECOLOURED RING ─────────────────────────────────────────────
-   Luke: "The issue is everything is the same. A ring on the ground. An honestly its to the point
-   where me and everyone testing honestly has no clue what is going on. Its all just noise. And a
-   bunch of rings. Friend or foe ring all the same. I was picturing like legit skill effects. Like
-   in maple story a literal lightning bolt strikes down for lightning skills."
-
-   Twenty-nine skills across three classes all drew .gv-nova — the same ground ellipse in one of
-   four colours. Colour is the weakest signal there is in a scene this busy, so every skill in the
-   game read as the same event. Making that ring BRIGHTER, which is what I tried first, makes the
-   noise louder; the fix is that the effects must have different SILHOUETTES.
-
-   Six shapes, chosen so each is identifiable from its outline alone at a glance:
-
-     bolt     a column of light SNAPS DOWN from above onto the target.    arcane / runic
-     column   fire erupts UPWARD out of the ground under the target.      fire
-     shards   ice spikes stab up around the target in a spread.           frost
-     slash    a diagonal arc cuts ACROSS the target.                      blood, on hit
-     spray    a radial burst out of a body.                               blood, on kill
-     dome     a shell swells OUT OF THE HERO.                             warden / self
-
-   ⚠️ AND THE LAST ONE IS THE FRIEND-OR-FOE ANSWER. "Friend or foe ring all the same" — the dome is
-   the only shape centred on YOU and the only one that grows outward from its centre rather than
-   striking into it, so a defensive proc never again looks like something landing on an enemy.
-
-   ⚠️ ALL SIX ARE ONE ELEMENT AND PURE CSS. A skill fires at the busiest moment on screen; anything
-   that allocates a dozen nodes per cast would land straight in the stutter Luke already reported.
-   Each is a single <i> with gradients, clip-path and one transform animation. */
 .gv-sfx { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     pointer-events: none; will-change: transform, opacity; transform-origin: 50% 100%; }
 
@@ -2185,46 +1998,9 @@ export const GROVE_CSS = `
 
 @media (prefers-reduced-motion: reduce) { .gv-sfx { animation-duration: 120ms; } }
 
-@keyframes gv-nova-grow {
-    0%   { transform: scale(0.12); opacity: 0; }
-    18%  { opacity: 1; }
-    70%  { opacity: 0.85; }
-    100% { transform: scale(1); opacity: 0; }
-}
-
-/* The numbers an area deals. Distinct from a sword's cream and a wound's red: an AoE tick is neither
-   of those, and several of them land on the same frame. */
 .gv-num.is-nova { color: #ffbf7a; --gv-nb: 1.04; font-weight: 900;
     text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 16px rgba(255,140,60,0.85); }
 
-.gv-boom { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(9 * var(--gv-unit, 1%)); height: calc(3 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-1.5 * var(--gv-unit, 1%)) calc(-4.5 * var(--gv-unit, 1%));
-    border-radius: 50%; pointer-events: none; will-change: transform, opacity;
-    border: 2px solid rgba(255,150,100,0.9); }
-.gv-boom.is-sweep { border-color: rgba(255,215,120,0.9); }
-.gv-boom.is-volley { border-color: rgba(190,160,255,0.9); }
-
-/* ── ⚠️ THE TELEGRAPHS ────────────────────────────────────────────────────────────────────────
-   Luke asked for attacks that "telecast where they will damage". A band on the ground where the attack
-   will land, filling left to right over the attack's own wind-up, so what is on screen IS the window you
-   have to leave. The duration comes from the attack, set inline, not guessed at here.
-
-   ⚠️ AN ELLIPSE ON THE FLOOR, NOT A BAR. A rectangle at the ground line reads as a progress meter, which
-   is the one thing a danger zone must not read as; a flattened ellipse reads as a patch of ground. And the
-   loop now places it at the y of the creature that made it, so an attack from a ledge is announced on that
-   ledge rather than painted on the floor underneath while hitting you through it.
-
-   ⚠️ WIDTH IS SET IN PIXELS BY THE LOOP, NOT scaleX. Scaling a 2r-wide box would stretch its border with
-   it, so a wide sweep would have a four-pixel edge and a slam a one-pixel one. */
-/* ⚠️ LOUD, BECAUSE THE FIRST VERSION WAS INVISIBLE. A two-pixel 40%-white rim on a painted forest floor
-   is nothing: filmed at 25ms intervals the band under the hero's feet could barely be found in the frame,
-   and a tell the player does not SEE is the same as no tell at all — which is the whole defect this feature
-   was supposed to have fixed. A danger zone has to win against the busiest art in the game, so: a dark
-   ground wash to separate it from the grass, a thick saturated rim, and a glow that spills past the edge.
-
-   The brightness is deliberately uncomfortable. It is on screen for well under a second and it is the only
-   warning the player gets. */
 .gv-tel { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
     height: calc(3.6 * var(--gv-unit, 1%)); margin-bottom: calc(-1.8 * var(--gv-unit, 1%));
     border-radius: 50%; pointer-events: none; overflow: hidden; will-change: transform;

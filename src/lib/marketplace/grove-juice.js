@@ -610,72 +610,19 @@ export function shadowFor(heightAboveFloor, bodyH) {
     return { scale: 1 - k * 0.55, opacity: 0.42 * (1 - k * 0.72) };
 }
 
-// ── SPARKS AND DUST ─────────────────────────────────────────────────────────────────────────────────────────
-// Particles are the cheapest thing on this list and they do a specific job: they put the moment of contact in
-// a PLACE. A damage number tells you how much; a burst of sparks at the point of impact tells you where, and
-// the eye needs the where first. Dust does the same for weight — a body that lands without disturbing
-// anything has no mass.
+// ── ✂️ SPARKS AND DUST ARE GONE, 2026-11-08 ─────────────────────────────────────────────────────────────────
+// Luke: "Remove the particles entirely". SPARK, DUST and makeSpark lived here; burst() in GroveScene was
+// their only caller and it went with them.
 //
-// ⚠️ THEY ARE DELIBERATELY FEW. Eight sparks a hit at thirty bodies is still nothing, but two hundred is a
-// phone dropping frames in the middle of a fight, which costs more feel than the sparks add.
+// ⚠️ WORTH KEEPING, BECAUSE IT COST A DAY TO LEARN. They were not broken and they were not invisible —
+// measured on the live page they rendered at 101 per peak, 6.7px across, opacity 0.8, on screen. What they
+// were was INDISTINGUISHABLE: the damage number's own cream, spawned at the damage number's own point, at a
+// tenth of its size. A held frame shot with and without them had the number reading "100" against "1300" —
+// the particles had eaten the 3. Recolouring, resizing, adding drag and stretch, and fixing a real budget
+// starvation (rings shared their array and never checked the cap) did not make them land.
 //
-// ── ⚠️ RETUNED 2026-11-08: THEY RENDERED AND THEY DID NOT READ ──────────────────────────────────────────────
-// Luke: "The particles never were visible." Measured on the live page they were emphatically present — 101
-// of them at peak, 6.7px across, opacity 0.8, visibility visible, on screen. Shot as a held frame with and
-// without them, the damage number read "100" with the particles on and "1300" with them off: they had eaten
-// the 3. That is the whole bug. They were not invisible, they were INDISTINGUISHABLE — eight small slow dots
-// in the damage number's own cream, spawned at the damage number's own point, under a glyph ten times their
-// size. The eye filed them as texture on the text.
-//
-// So this is the standard impact-particle treatment, and every line of it is a legibility decision:
-//
-//   FEWER AND FASTER. Count reads as fuzz; speed reads as force. Six that leave hard beat eight that drift.
-//   DRAG, NOT JUST GRAVITY. Constant horizontal velocity reads as floating. Real debris is thrown and then
-//     stopped by the air, so the speed has to fall off sharply — this is the single biggest win of the lot.
-//   SHORTER LIVES. An impact is over before you can look at it. A particle still on screen 400ms later is
-//     not an impact, it is litter.
-//
-// The colour and the stretch are the other half and they live where they belong: the hue in grove-css
-// (sparks are amber now, a hue neither the cream numbers nor the green forest use), the stretch-along-
-// velocity in the scene's update, because only the loop knows which way a particle is travelling.
-// ⚠️ DELIBERATELY OVERSHOT, 2026-11-08. Luke still could not see these after the retune, and the gap between
-// "101 measured in the lab" and "I see none in the game" was not closing by reasoning about it. So these are
-// turned up past what the feel wants ON PURPOSE: if they are visible now, they were only ever too subtle and
-// the numbers come back down. If they are STILL not visible, the cause is structural and no amount of tuning
-// was ever going to find it. Turn them down once that question is answered — this is a probe, not a target.
-export const SPARK = {
-    n: 12, nCrit: 18,
-    speed: 0.95, speedCrit: 1.4,
-    life: 430, lifeCrit: 560,
-    gravity: 0.05,
-    // ── ⚠️ DRAG IS WHAT BOUNDS THE TRAVEL, AND THE FIRST TUNE GOT IT WRONG ──────────────────────────────
-    // Filmed at 0.12 against a doubled launch speed, the burst crossed a third of the screen and was still
-    // strewn about 500ms later: a comet trail, not an impact. Total travel is roughly v0/drag, so at 0.12
-    // with a crit's 2.2 peak that is ~18 world units — two and a half hero heights from a sword blow.
-    //
-    // 0.32 puts it near 5 units, about two thirds of a hero. The burst now stops where the blow stopped,
-    // which is the entire job: a particle that outruns the body it came off reads as a firework.
-    drag: 0.26,
-};
-// ⚠️ DUST IS A FLOOR EFFECT AND IT IS THROWN AT THE FLOOR. Slower, wider, shorter-lived and far fainter
-// than a spark — it says WEIGHT, not contact, so it must never compete with the spark for the eye. Its old
-// 1.1-unit beige circle at the body's CENTRE was the grey blob sitting on the corpse in the shot.
-export const DUST = { n: 6, speed: 0.34, life: 420, gravity: 0.004, drag: 0.16 };
-
-/** One particle, thrown from a point. Angles are fanned deterministically so a burst reads as a burst. */
-export function makeSpark(i, n, x, y, { speed, life, dir = 0, rand }) {
-    // Biased into the half-plane the blow came from, so a burst leans away from the hit rather than being a
-    // symmetrical firework. A symmetrical burst reads as an explosion; a leaning one reads as an impact.
-    const spread = (i / Math.max(1, n - 1)) * Math.PI - Math.PI / 2;
-    const a = spread + (dir ? dir * 0.5 : 0) + (rand() - 0.5) * 0.4;
-    const v = speed * (0.55 + rand() * 0.75);
-    return {
-        x, y, vx: Math.cos(a) * v, vy: Math.abs(Math.sin(a)) * v * 0.9 + 0.1, born: 0, life, node: null,
-        // ⚠️ SIZE VARIES PER PARTICLE. Identical dots read as a UI element — a ring of pips. Debris is
-        // never uniform, and the variance is what stops six circles looking like a loading spinner.
-        size: 0.7 + rand() * 0.8,
-    };
-}
+// The lesson is about the MEASUREMENT, not the pixels: "it is in the DOM, sized, opaque and on screen" is
+// not the same claim as "a player can see it", and only one of those two is worth anything.
 
 // ── THE SCREEN ITSELF REACTS ────────────────────────────────────────────────────────────────────────────────
 // A red wash at the edges when you are hit, and a slow pulse while you are nearly dead. This is the one piece

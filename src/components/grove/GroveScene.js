@@ -43,7 +43,7 @@ import {
 // these things that game developers do to make it really sell the feeling of hitting an enemy."
 import {
     makeClock, makeShaker, makeChase, stepChase, swingPose, breathe, landSquash, shadowFor,
-    makePop, stepPop, makeSpark, spillVelocity, comboRung,
+    makePop, stepPop, spillVelocity, comboRung,
     popScale, popWeight, barHit, barColor, FOE_BAR_LINGER_MS,
     HITSTOP_MS, TRAUMA, SWING, SWING_TOTAL_MS, KNOCK, RECOIL, FLASH_MS, SPAWN_FADE_MS,
     deathKit, DEATH_SINK, DEATH_OPAQUE_UNTIL, DEATH_IMPACT, HERO_DEATH, DEATH_VEIL_DELAY_MS,
@@ -53,7 +53,7 @@ import {
 } from "@/lib/marketplace/grove-juice.js";
 import { footOf } from "@/components/grove/grove-foot.js";
 import {
-    playHit, playKill, playMulti, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
+    playHit, playKill, playHurt, playDrop, playPickup, playWhiff, playTell, celebrateUnlock, playEmblemDrop, playBossNotice, playDeath,
     playPetHit, playQuaff,
     playFreeze, playStun, playChill, playCataclysm, playSoulfire, playSurge,
     playGuard, playBlock, playRiposte, playGrudge, playIgnite, playWild,
@@ -818,7 +818,6 @@ export default function GroveScene({
     const maxHp = stats?.maxHp || 100;
 
 
-
     // ── THE WORLD ───────────────────────────────────────────────────────────────────────────────────
     const world = useMemo(() => {
         const rand = rngFrom(seed);
@@ -1497,7 +1496,7 @@ export default function GroveScene({
                     best.burn = { dmg: Math.max(1, Math.round(dot.dmg * BURN_SPREAD_SHARE)),
                         leech: dot.leech, spread: false,
                         left: BURN_TICKS, nextAt: now + everyMs };
-                    burst(best.x, best.y + best.h * 0.4, { kind: "burn", scale: 0.9 });
+
                 }
             }
             dot.left -= 1;
@@ -1509,53 +1508,18 @@ export default function GroveScene({
             return false;
         };
 
-        // ── ⚠️ THE SPARKS HAVE A BUDGET NOW ─────────────────────────────────────────────────────
-        // Luke: "when I kill like more than one thing, the game freaking like lags out and freaking
-        // like stutters big time."
+        // ── ✂️ THE PARTICLES ARE GONE, 2026-11-08 ──────────────────────────────────────────────
+        // Luke: "Remove the particles entirely, and the ground circle effect, the boing noises, and the
+        // multiplier text."
         //
-        // There was no ceiling on live particles at all. A crit burst is 14 nodes; a nova that catches
-        // nine bodies calls burst once per body AND twice more in each death kit, so a single frame
-        // created three to four HUNDRED elements — and then wrote a transform and an opacity to every
-        // one of them, every frame, for the next 400ms. One kill is free; nine is a DOM thrash.
+        // `burst` spawned sparks and dust into the fx layer, with SPARK_BUDGET scaling the count down as
+        // the array filled. Thirty-one call sites: every hit, kill, proc, ignite, block, land and skill.
         //
-        // ⚠️ IT SCALES DOWN, IT DOES NOT CUT OFF. A hard "stop at N" would give the first two bodies a
-        // full spray and the other seven nothing, which reads as the effect being broken rather than
-        // busy. Past half the budget each burst gets proportionally fewer particles, so a nine-body
-        // nova still throws sparks off all nine — just thinner ones, at the moment when there is far
-        // too much on screen to count them anyway.
-        // ⚠️ RAISED FROM 150 WITH THE SAME OVERSHOOT LOGIC AS SPARK ABOVE. 150 was chosen when a crit
-        // burst was 14 nodes and nothing else competed for it; rings now count against it honestly, and a
-        // screen-wide multikill has to be able to show SOMETHING on the twentieth body as well as the first.
-        const SPARK_BUDGET = 420;
-        const burst = (x, y, { crit = false, dir = 0, kind = "spark", scale = 1 } = {}) => {
-            const layer = fxRef.current;
-            if (!layer) return;
-            const dust = kind === "dust";
-            const base = dust ? DUST.n : crit ? SPARK.nCrit : SPARK.n;
-            let n = Math.max(1, Math.round(base * scale));
-            const live = w.sparks.length;
-            if (live >= SPARK_BUDGET) return;
-            if (live > SPARK_BUDGET * 0.5) {
-                const room = (SPARK_BUDGET - live) / (SPARK_BUDGET * 0.5);
-                n = Math.max(1, Math.round(n * room));
-            }
-            n = Math.min(n, SPARK_BUDGET - live);
-            for (let i = 0; i < n; i += 1) {
-                const s = makeSpark(i, n, x, y, {
-                    speed: (dust ? DUST.speed : crit ? SPARK.speedCrit : SPARK.speed) * scale,
-                    life: dust ? DUST.life : crit ? SPARK.lifeCrit : SPARK.life,
-                    dir, rand: w.rand,
-                });
-                s.born = w.sceneNow ? w.sceneNow() : performance.now();
-                s.g = dust ? DUST.gravity : SPARK.gravity;
-                s.drag = dust ? DUST.drag : SPARK.drag;
-                const el = document.createElement("i");
-                el.className = `gv-spark is-${kind}${crit ? " is-crit" : ""}`;
-                layer.appendChild(el);
-                s.node = el;
-                w.sparks.push(s);
-            }
-        };
+        // ⚠️ WHY IT CAME OUT RATHER THAN GETTING A THIRD TUNE: measured on the live page they DID render —
+        // 101 at peak, 6.7px, on screen, opacity 0.8 — and still could not be seen in a real fight. Colour,
+        // drag, stretch, size and a budget-starvation fix did not change that. Every node they built was
+        // cost for a picture nobody was going to notice.
+
         // ── ⚠️ A PROC IS AN EVENT, AND IT WAS WEARING A DAMAGE NUMBER'S CLOTHES ──────────────────
         // Luke: "if something procs like haste it should be dopamine inducing."
         //
@@ -1619,26 +1583,14 @@ export default function GroveScene({
             pr.node = el;
             w.pops.push(pr);
             // The ring is what makes it read as coming OUT of the hero rather than appearing above him.
-            shockwave(src.x, src.y + src.h * 0.45, kind);
+
             w.shake.add(TRAUMA.hit * 0.8);
         };
 
-        const shockwave = (x, y, kind) => {
-            const layer = fxRef.current;
-            if (!layer) return;
-            // ── ⚠️ RINGS SHARE w.sparks AND USED TO IGNORE ITS BUDGET ───────────────────────────────
-            // burst() refuses once w.sparks hits SPARK_BUDGET; this pushed into the same array without
-            // checking, so every ring ate budget that burst() then could not have. A zone holds 15-30
-            // creatures and every telegraph, crit, proc and skill makes one — which is a standing reason
-            // for sparks to be starved to nothing in a real fight while the lab, with a quiet fixture,
-            // shows them perfectly. Rings keep priority over sparks (a skill's AoE edge is load-bearing
-            // and a spark is decoration) but they can no longer spend an unbounded amount.
-            if (w.sparks.length >= SPARK_BUDGET) return;
-            const el = document.createElement("i");
-            el.className = `gv-boom is-${kind}`;
-            layer.appendChild(el);
-            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0, born: w.sceneNow ? w.sceneNow() : performance.now(), life: 380, node: el, ring: true });
-        };
+        // ✂️ THE GROUND RING IS GONE with the particles — the expanding circle an attack left where it
+        // resolved, fourteen call sites. The TELEGRAPH is untouched: that is `.gv-tel`, a separately
+        // rendered band, so attacks are still dodgeable. This was only the flash afterwards.
+
 
         // ── ⚠️ THE SKILL ENGINE: SIX PRIMITIVES, THIRTY-SIX SKILLS ──────────────────────────────────
         // Luke: "what's going to be the most fun for people is having skills that do AoE ... the most
@@ -1766,16 +1718,12 @@ export default function GroveScene({
                 life: shape === "slash" ? 320 : shape === "bolt" ? 420 : 520, node: el, ring: true, flat: true });
         };
 
-        const novaRing = (x, y, r, kind) => {
-            const layer = fxRef.current;
-            if (!layer) return;
-            const el = document.createElement("i");
-            el.className = `gv-nova is-${kind}`;
-            el.style.setProperty("--r", String(Math.max(0.5, r)));
-            layer.appendChild(el);
-            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0,
-                born: w.sceneNow ? w.sceneNow() : performance.now(), life: 520, node: el, ring: true });
-        };
+        // ✂️ THE NOVA RING IS GONE with the other ground circle. It drew the AoE's edge at its REAL radius,
+        // which its own note called the whole point — "an AoE you cannot see the edge of is a number
+        // appearing on things you did not hit". That readability is the price of removing it, and it is
+        // worth saying out loud rather than discovering later: the skill still hits exactly what it hit.
+        // The skill SHAPES (slash, bolt and the rest, via skillFx) are untouched.
+
 
         // ⚠️ A NOVA MAY NOT CHAIN OFF ITS OWN KILLS FOR EVER. Bloodletting at rank five detonates every
         // corpse for 60% of its health, and in a thirty-body zone the first tap would otherwise cascade to
@@ -1806,7 +1754,6 @@ export default function GroveScene({
         const skillNova = (now, x, y, r, dmg, o = {}) => {
             if (!(r > 0)) return 0;
             const kind = o.kind || "nova";
-            novaRing(x, y, r, kind);
             w.shake.add(TRAUMA.kill * Math.min(1.5, 0.45 + r / 9));
             // ⚠️ A SNAPSHOT, NOT THE LIVE ARRAY. killFoe can set `dying` and the respawn pass can splice,
             // and mutating what you are iterating is how one body in a crowd silently gets skipped.
@@ -1908,7 +1855,7 @@ export default function GroveScene({
                         const tick = Math.max(1, Math.round(base * sk.share * n));
                         t.hp -= tick; t.hurtAt = now; lightUp(t, now);
                         addPop("nova", `${tick}`, t.x, t.y + t.h * 0.62, popWeight(tick, t.maxHp));
-                        burst(t.x, t.y + t.h * 0.5, { kind: "spark", crit: true });
+
                         if (t.hp <= 0) {
                             t.hp = 0;
                             if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, t, now, tick); novaDepth -= 1; }
@@ -1921,7 +1868,6 @@ export default function GroveScene({
                     const src = sk.dot === "burn" ? foe.burn : sk.dot === "chill" ? { dmg: 1, leech: 0 } : foe.bleed;
                     if (!src) continue;
                     const r = sk.radius * n;
-                    novaRing(foe.x, foe.y + foe.h * 0.45, r, sk.dot === "burn" ? "burn" : "corpse");
                     for (const t of w.foes.slice()) {
                         if (!t || t === foe || t.dying || t.hp <= 0) continue;
                         const dx = t.x - foe.x;
@@ -1932,7 +1878,7 @@ export default function GroveScene({
                         t[sk.dot] = { dmg: per, leech: src.leech || 0, spread: false,
                             left: sk.dot === "burn" ? BURN_TICKS : BLEED_TICKS,
                             nextAt: now + (sk.dot === "burn" ? BURN_TICK_MS : BLEED_TICK_MS) };
-                        burst(t.x, t.y + t.h * 0.4, { kind: sk.dot === "burn" ? "burn" : "spark", scale: 0.8 });
+
                     }
                     skillFx(sfxFor(sk), foe.x, foe.y + foe.h * 0.1);
                     sayOnce(sk.name.toUpperCase(), sk.dot === "burn" ? "ignite" : "bleed", null, 1.2, foe, now);
@@ -1976,10 +1922,10 @@ export default function GroveScene({
             // travel away from the number rather than through it. Two separate events in two places,
             // which is what lets the eye read both.
             const hitX = foe.x + (foe.face || 1) * foe.halfW * 0.5;
-            burst(hitX, foe.y + foe.h * 0.38, { crit: true, dir: -(foe.face || 1), kind: "spark" });
+
             // ⚠️ DUST AT THE FLOOR, NOT AT THE BODY. A corpse disturbs the ground it falls on; thrown
             // from the body's centre it was a grey disc floating over the sprite.
-            burst(foe.x, 0, { kind: "dust" });
+
 
             if (foe.big || foe.rare) { wd.bossBar = null; wd.barName = null; }
 
@@ -2008,9 +1954,8 @@ export default function GroveScene({
                 if (open && !open.openedAt) {
                     open.openedAt = now;
                     const y = 6;
-                    burst(open.x, y, { crit: true });
-                    burst(open.x, y, { kind: "dust" });
-                    shockwave(open.x, y, "kill");
+
+
                     wd.shake.add(TRAUMA.boss);
                     celebrateUnlock();
                     const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
@@ -2068,11 +2013,9 @@ export default function GroveScene({
             // up the same way the combo pitches it — a louder version of the thing that already means
             // "that one counted".
             if (credit > 1) {
-                addPop("multi", `x${credit}`, foe.x, foe.y + foe.h * 0.95);
                 // ⚠️ NOT A SECOND playKill. The ordinary kill chime fires below for every kill and already
                 // climbs with the streak; another one on the same frame is two chimes, not a bigger one.
                 // playMulti plays one note per credit OVER it — see the note on it in grove-sfx.js.
-                playMulti(credit);
             }
             // The counter is drawn from wd.killIndex, which the line above has just moved; this is what
             // tells React to look at it again. It is the same re-render the foe list needs anyway.
@@ -2236,15 +2179,15 @@ export default function GroveScene({
             if (got.gear && (got.gearTier === "sup" || got.gearTier === "set")) {
                 const art = gearArtRef.current?.[got.gear] || null;
                 wd.shake.add(TRAUMA.crit);
-                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
+
                 playEmblemDrop();
                 procCall(String(art?.name || "A PIECE OF GEAR").toUpperCase(), "gear", art?.url || null);
             }
             if (got.hyper) {
                 wd.clock.stop(now, EMBLEM_STOP_MS);
                 wd.shake.add(TRAUMA.boss);
-                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
-                burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
+
+
                 playEmblemDrop();
                 procCall(String(got.hyper.name || "A RARE FIND").toUpperCase(), "hyper");
             }
@@ -2262,8 +2205,8 @@ export default function GroveScene({
                 const em = groveEmblem(got.emblem);
                 wd.clock.stop(now, EMBLEM_STOP_MS);
                 wd.shake.add(TRAUMA.boss);
-                shockwave(foe.x, foe.y + foe.h * 0.4, "crit");
-                burst(foe.x, foe.y + foe.h * 0.4, { crit: true });
+
+
                 playEmblemDrop();
                 spill(`e${i}`, got.emblem, em?.name || "Emblem", // name/qty default below
                     {
@@ -2512,8 +2455,8 @@ export default function GroveScene({
                         // charge thrown off the blade.
                         // ⚠️ SURGE IS NOT HASTE. They were sharing a particle and a colour, so the one
                         // proc a player can SEE COMING looked identical to the one they cannot.
-                        shockwave(w.hero.x, w.hero.y + w.hero.h * 0.5, "surge");
-                        burst(w.hero.x, w.hero.y + w.hero.h * 0.5, { kind: "surge", scale: 1.7 });
+
+
                         w.shake.add(TRAUMA.crit);
                         procCall(procWord("surge", "Surge"), "surge");
                         playSurge();
@@ -2534,7 +2477,7 @@ export default function GroveScene({
                     // where the extra came from.
                     if (avenged > 0) {
                         hit.dealt += avenged;
-                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "grudge", scale: 1.5 });
+
                         procCall(`GRUDGE +${avenged}`, "grudge", null, 1.5, foe);
                         playGrudge();
                     }
@@ -2580,7 +2523,7 @@ export default function GroveScene({
                         const better = !foe.burn || hit.burn.dmg >= foe.burn.dmg;
                         // Only when it CATCHES, not on every refresh -- a hiss on every swing of a
                         // high-burn build is a kettle.
-                        if (better && !foe.burn) { playIgnite(); burst(foe.x, foe.y + foe.h * 0.45, { kind: "burn", scale: 1.2 }); }
+                        if (better && !foe.burn) { playIgnite();  }
                         if (better) {
                             foe.burn = { dmg: hit.burn.dmg, leech: hit.burn.leech, spread: true,
                                 left: BURN_TICKS, nextAt: now + BURN_TICK_MS };
@@ -2615,8 +2558,8 @@ export default function GroveScene({
                         // shards off the body with a ring going out through it; a stun arrives as a hot
                         // white crack. The word rides on top for the half-second it takes to read, and
                         // what sells the moment is everything underneath it.
-                        burst(foe.x, foe.y + foe.h * 0.5, { kind, scale: kind === "ice" ? 1.9 : 1.5 });
-                        shockwave(foe.x, foe.y + foe.h * 0.45, kind);
+
+
                         w.shake.add(kind === "ice" ? TRAUMA.crit : TRAUMA.hit);
                         // ⚠️ ITS OWN SOUND, AND NOT IN THE BLOW'S REGISTER. A landed hit is a mid thud;
                         // cold is glass above it and a stun is a knock underneath, so neither competes
@@ -2652,7 +2595,7 @@ export default function GroveScene({
                         // first one -- so the whole of it deepening was invisible and a player could not
                         // see the stat working past the opening hit. A word per stack would be seven
                         // CHILLED in a row, which is noise; frost per stack is the thing itself.
-                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "chill", scale: 0.6 + foe.chill });
+
                         if (was === 0) {
                             procCall(procWord("chill", "Chilled"), "chill", null, 1.15, foe);
                             playChill();
@@ -2666,7 +2609,7 @@ export default function GroveScene({
                     if ((stats?.soulfire || 0) > 0 && hit.dealt > 0 && foe.hp > 0) {
                         const soul = Math.max(1, Math.round(hit.dealt * stats.soulfire));
                         foe.hp -= soul;
-                        burst(foe.x, foe.y + foe.h * 0.55, { kind: "soul", scale: 0.9 });
+
                         playSoulfire();
                         addPop("soul", `${soul}`, foe.x, foe.y + foe.h * 0.8);
                     }
@@ -2689,9 +2632,8 @@ export default function GroveScene({
                         // it is both halves at once. It gets its own word and its own colour.
                         // One swing in twenty at a full tree, and both halves at once -- it gets fire
                         // AND ice off the same body, two rings, and the heaviest shake in the kit.
-                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "burn", scale: 2.2 });
-                        burst(foe.x, foe.y + foe.h * 0.5, { kind: "ice", scale: 2.2 });
-                        shockwave(foe.x, foe.y + foe.h * 0.45, "cata");
+
+
                         w.shake.add(TRAUMA.kill);
                         procCall(procWord("cataclysm", "Cataclysm"), "cata", null, 1.3, foe);
                         playCataclysm();
@@ -2735,7 +2677,7 @@ export default function GroveScene({
                             foe.hp -= extra.dealt;
                             addPop("hit", `${extra.dealt}`, foe.x, foe.y + foe.h * 0.7,
                                 popWeight(extra.dealt, foe.maxHp));
-                            burst(foe.x, foe.y + foe.h * 0.5, { kind: "wild", scale: 1.2 });
+
                             procCall(procWord("wildProc", "Wild"), "wild", null, 1.2, foe);
                         }
                     }
@@ -2755,8 +2697,8 @@ export default function GroveScene({
                             w.shield = one;
                             // The shield itself: a ring snapping out from the hero and steel coming off
                             // him. The word is the receipt; this is the thing that happened.
-                            shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "guard");
-                            burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "guard", scale: 1.3 });
+
+
                             procCall(procWord("guardChance", "Guard"), "guard", null, 1.1);
                             playGuard();
                         }
@@ -2779,13 +2721,13 @@ export default function GroveScene({
                     w.shake.add(hit.crit ? TRAUMA.crit : TRAUMA.hit);
                     const px = foe.x - dir * foe.halfW * 0.6;
                     const py = foe.y + foe.h * 0.5;
-                    burst(px, py, { crit: hit.crit, dir: -dir });
+
                     // ⚠️ A CRIT GETS A RING AND AN ORDINARY HIT DOES NOT. Everything else separating the
                     // two -- a longer flash, a harder stop, more trauma, a brighter number -- is a
                     // DIFFERENCE IN DEGREE, and degrees stop reading once they are happening sixty times
                     // a minute. The ring is the only thing on screen that an ordinary hit never does, so
                     // it is the only part a player can catch without counting.
-                    if (hit.crit) shockwave(px, py, "crit");
+                    if (hit.crit) 
                     // ⚠️ SIZED BY THE SHARE IT TOOK OFF, NOT BY THE RAW NUMBER. 400 is a huge hit on a
                     // rootrat and a scratch on the Heartwood Elder, so a flat threshold would call the
                     // scratch the big one. See popWeight.
@@ -2964,7 +2906,7 @@ export default function GroveScene({
                     //
                     // It is also simply where a companion bites: at the legs.
                     const py = foe.y + foe.h * 0.12;
-                    burst(px, py, { dir: -dir, kind: "pet", scale: PET_SPARKS });
+
                     // ⚠️ AND NO CRIT RING, even on a crit. The ring is the only thing on screen an
                     // ordinary hit never does, which is exactly what makes it readable; handing it to a
                     // second body is how that signal stops being one.
@@ -2989,7 +2931,7 @@ export default function GroveScene({
                 w.pet.x = w.hero.x - w.hero.face * pf.trail;
                 w.pet.y = w.hero.y;
                 w.pet.vx = 0; w.pet.vy = 0;
-                burst(w.pet.x, w.pet.y, { kind: "dust" });
+
             }
 
             // ── FOES ────────────────────────────────────────────────────────────────────────────
@@ -3011,7 +2953,7 @@ export default function GroveScene({
                     // reading `grounded` every frame would squash a creature that died standing still.
                     if (!f.deathHit && f.grounded && now - f.dying > 60) {
                         f.deathHit = now;
-                        burst(f.x, f.floorY == null ? f.y : f.floorY, { kind: "dust", scale: kit.dust });
+
                     }
                     continue;
                 }
@@ -3144,7 +3086,7 @@ export default function GroveScene({
                 if (wasAir && b.grounded) {
                     b.landedAt = now;
                     if (Math.abs(b.vyPrev || 0) > 1.1) {
-                        burst(b.x, b.y, { kind: "dust" });
+
                         if (b === w.hero) w.shake.add(TRAUMA.land);
                     }
                 }
@@ -3159,7 +3101,7 @@ export default function GroveScene({
                 if (now < tel.fires) continue;
                 w.tels.splice(i, 1);
                 rerender();
-                shockwave(tel.x, tel.y, tel.kind);
+
                 // ⚠️ MATCHED ON uid. This read tel.foeId against f.uid, which never matched, so every attack
                 // in the Grove fell through to a hardcoded 5 damage and the whole difficulty curve was dead.
                 const foe = w.foes.find((f) => f.uid === tel.foeUid) || null;
@@ -3235,9 +3177,8 @@ export default function GroveScene({
                     foe.hurtAt = now;
                     addPop("hit", `${riposte.dealt}`, foe.x, foe.y + foe.h * 0.7,
                         popWeight(riposte.dealt, foe.maxHp));
-                    burst(foe.x, foe.y + foe.h * 0.5,
-                        { kind: "riposte", scale: 1.4, crit: true, dir: Math.sign(foe.x - w.hero.x || 1) });
-                    shockwave(foe.x, foe.y + foe.h * 0.45, "riposte");
+
+
                     procCall(procWord("counterBonus", "Riposte"), "riposte", null, 1.32, foe);
                     playRiposte();
                     if (foe.hp <= 0) { foe.hp = 0; killFoe(w, foe, now, riposte.dealt); }
@@ -3266,8 +3207,7 @@ export default function GroveScene({
                 if (guard.blocked || soaked > 0) {
                     // Steel off the shield arm, thrown back toward whatever swung. A block that only
                     // prints a smaller number is a block nobody feels.
-                    burst(w.hero.x, w.hero.y + w.hero.h * 0.45,
-                        { kind: "block", scale: 1.1, dir: Math.sign(w.hero.x - tel.x || 1) });
+
                     playBlock();
                     procCall(guard.blocked && soaked > 0 ? "GUARDED" : guard.blocked ? "BLOCK" : "GUARDED",
                         "block", null, 1.1);
@@ -3294,7 +3234,7 @@ export default function GroveScene({
                     addPop(guard.blocked || soaked > 0 ? "warded" : "took",
                         `-${dealt}`, w.hero.x, w.hero.y + HERO_UNITS * 0.9);
                 }
-                burst(w.hero.x, w.hero.y + HERO_UNITS * 0.4, { crit: true, dir: Math.sign(w.hero.x - tel.x || 1) });
+
                 playHurt();
 
                 // ── ⚠️ EATING IS DECIDED AGAINST THE HP THAT IS ACTUALLY COMMITTED ──────────────
@@ -3333,8 +3273,8 @@ export default function GroveScene({
                     // drank, the health it gave back. Three separate facts about one moment, each in
                     // its own band of the frame so none of them has to be read through another.
                     procCall(belt.name, "heal", groveArt(belt.id), 1.32);
-                    shockwave(w.hero.x, w.hero.y + w.hero.h * 0.45, "heal");
-                    burst(w.hero.x, w.hero.y + w.hero.h * 0.4, { kind: "heal", scale: 1.3 });
+
+
                     // ⚠️ ABOVE THE CALL-OUT, NOT ON IT. Both ride at the hero and the proc sits at
                     // 0.9 of his height, so at 1.1 the number landed across the middle of the word --
                     // two things fighting for the same 40 pixels, which is the exact failure the proc
@@ -3363,8 +3303,8 @@ export default function GroveScene({
                     w.hp = 0;
                     w.clock.stop(now, DEATH_STOP_MS);
                     w.shake.add(1);
-                    burst(w.hero.x, w.hero.y + HERO_UNITS * 0.5, { crit: true });
-                    shockwave(w.hero.x, w.hero.y + HERO_UNITS * 0.4, "hurt");
+
+
                     playDeath();
                     // ── ⚠️ HE NOW ACTUALLY FALLS ────────────────────────────────────────────
                     // Everything above was already here and all of it happened to a hero who stayed
@@ -3604,8 +3544,7 @@ export default function GroveScene({
                 }
                 if (!w.heroDeathHit && w.hero.grounded && now - w.heroDeath > 80) {
                     w.heroDeathHit = now;
-                    burst(w.hero.x, w.hero.floorY == null ? w.hero.y : w.hero.floorY,
-                        { kind: "dust", scale: 1.5 });
+
                 }
             }
 
@@ -3662,7 +3601,7 @@ export default function GroveScene({
                 // of nodes a second, and the look does not need them.
                 if (f.burn && now >= (f.emberAt || 0)) {
                     f.emberAt = now + EMBER_EVERY_MS;
-                    burst(f.x, f.y + f.h * 0.45, { kind: "burn", scale: 0.4 });
+
                 }
                 if (f.statusNode) {
                     // ⚠️ A STUN IS NOT A FREEZE AND MUST NOT LOOK LIKE ONE. Both hold a creature still
