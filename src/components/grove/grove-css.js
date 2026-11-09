@@ -1802,15 +1802,18 @@ export const GROVE_CSS = `
    ⚠️ THE ELLIPSE IS THE POINT, SO DO NOT TOUCH border-radius. The loop stretches these along their own
    velocity with scaleX; on a 50% radius that turns the circle into a streak of light, which is what
    says "thrown" rather than "floating". A square or a fixed-px radius would stretch into a lozenge. */
+/* ⚠️ SIZED PAST WHAT THE FEEL WANTS, ON PURPOSE — see the note on SPARK in grove-juice.js. 1.15 of a world
+   unit is ~20px on a phone, which is unmissable rather than tasteful. It comes back down once the question
+   "can he see them at all" has an answer. */
 .gv-spark { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(0.62 * var(--gv-unit, 1%)); height: calc(0.62 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.31 * var(--gv-unit, 1%)) calc(-0.31 * var(--gv-unit, 1%));
+    width: calc(1.15 * var(--gv-unit, 1%)); height: calc(1.15 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.575 * var(--gv-unit, 1%)) calc(-0.575 * var(--gv-unit, 1%));
     border-radius: 50%; pointer-events: none; will-change: transform, opacity;
     /* ⚠️ NO WHITE CORE. The first pass started at #fffdf5, and shot beside the numbers that still read
        as cream at this size — the hue has to leave the text's family entirely, not sit next to it.
        Gold into deep orange is the furthest a warm spark can get from cream while still reading hot. */
     background: radial-gradient(circle at 50% 50%, #ffd45e 0%, #ff8c1e 55%, #f2560c 100%);
-    box-shadow: 0 0 8px 2px rgba(255,110,20,0.8); }
+    box-shadow: 0 0 16px 6px rgba(255,110,20,0.95); }
 /* A crit is hotter and whiter — the core grows rather than the dot changing colour, so it reads as
    more energy in the same object instead of as a different kind of particle. */
 .gv-spark.is-crit { background: radial-gradient(circle at 50% 50%, #fff3c4 0%, #ffa32a 50%, #ff4d07 100%);

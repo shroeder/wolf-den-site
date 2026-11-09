@@ -1523,7 +1523,10 @@ export default function GroveScene({
         // busy. Past half the budget each burst gets proportionally fewer particles, so a nine-body
         // nova still throws sparks off all nine — just thinner ones, at the moment when there is far
         // too much on screen to count them anyway.
-        const SPARK_BUDGET = 150;
+        // ⚠️ RAISED FROM 150 WITH THE SAME OVERSHOOT LOGIC AS SPARK ABOVE. 150 was chosen when a crit
+        // burst was 14 nodes and nothing else competed for it; rings now count against it honestly, and a
+        // screen-wide multikill has to be able to show SOMETHING on the twentieth body as well as the first.
+        const SPARK_BUDGET = 420;
         const burst = (x, y, { crit = false, dir = 0, kind = "spark", scale = 1 } = {}) => {
             const layer = fxRef.current;
             if (!layer) return;
@@ -1623,6 +1626,14 @@ export default function GroveScene({
         const shockwave = (x, y, kind) => {
             const layer = fxRef.current;
             if (!layer) return;
+            // ── ⚠️ RINGS SHARE w.sparks AND USED TO IGNORE ITS BUDGET ───────────────────────────────
+            // burst() refuses once w.sparks hits SPARK_BUDGET; this pushed into the same array without
+            // checking, so every ring ate budget that burst() then could not have. A zone holds 15-30
+            // creatures and every telegraph, crit, proc and skill makes one — which is a standing reason
+            // for sparks to be starved to nothing in a real fight while the lab, with a quiet fixture,
+            // shows them perfectly. Rings keep priority over sparks (a skill's AoE edge is load-bearing
+            // and a spark is decoration) but they can no longer spend an unbounded amount.
+            if (w.sparks.length >= SPARK_BUDGET) return;
             const el = document.createElement("i");
             el.className = `gv-boom is-${kind}`;
             layer.appendChild(el);

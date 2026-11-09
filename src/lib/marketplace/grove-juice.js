@@ -638,11 +638,16 @@ export function shadowFor(heightAboveFloor, bodyH) {
 // The colour and the stretch are the other half and they live where they belong: the hue in grove-css
 // (sparks are amber now, a hue neither the cream numbers nor the green forest use), the stretch-along-
 // velocity in the scene's update, because only the loop knows which way a particle is travelling.
+// ⚠️ DELIBERATELY OVERSHOT, 2026-11-08. Luke still could not see these after the retune, and the gap between
+// "101 measured in the lab" and "I see none in the game" was not closing by reasoning about it. So these are
+// turned up past what the feel wants ON PURPOSE: if they are visible now, they were only ever too subtle and
+// the numbers come back down. If they are STILL not visible, the cause is structural and no amount of tuning
+// was ever going to find it. Turn them down once that question is answered — this is a probe, not a target.
 export const SPARK = {
-    n: 6, nCrit: 9,
-    speed: 0.85, speedCrit: 1.25,
-    life: 220, lifeCrit: 300,
-    gravity: 0.06,
+    n: 12, nCrit: 18,
+    speed: 0.95, speedCrit: 1.4,
+    life: 430, lifeCrit: 560,
+    gravity: 0.05,
     // ── ⚠️ DRAG IS WHAT BOUNDS THE TRAVEL, AND THE FIRST TUNE GOT IT WRONG ──────────────────────────────
     // Filmed at 0.12 against a doubled launch speed, the burst crossed a third of the screen and was still
     // strewn about 500ms later: a comet trail, not an impact. Total travel is roughly v0/drag, so at 0.12
@@ -650,12 +655,12 @@ export const SPARK = {
     //
     // 0.32 puts it near 5 units, about two thirds of a hero. The burst now stops where the blow stopped,
     // which is the entire job: a particle that outruns the body it came off reads as a firework.
-    drag: 0.32,
+    drag: 0.26,
 };
 // ⚠️ DUST IS A FLOOR EFFECT AND IT IS THROWN AT THE FLOOR. Slower, wider, shorter-lived and far fainter
 // than a spark — it says WEIGHT, not contact, so it must never compete with the spark for the eye. Its old
 // 1.1-unit beige circle at the body's CENTRE was the grey blob sitting on the corpse in the shot.
-export const DUST = { n: 4, speed: 0.3, life: 300, gravity: 0.004, drag: 0.16 };
+export const DUST = { n: 6, speed: 0.34, life: 420, gravity: 0.004, drag: 0.16 };
 
 /** One particle, thrown from a point. Angles are fanned deterministically so a burst reads as a burst. */
 export function makeSpark(i, n, x, y, { speed, life, dir = 0, rand }) {
