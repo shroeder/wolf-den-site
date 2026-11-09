@@ -521,6 +521,99 @@ export const GROVE_SIZE = {
     goblin:       { h: 6.2, foot: 0.02 },
     elderling:    { h: 9.6, foot: 0 },      // the deepest wanderer, and it should tower.
     crystal_stag: { h: 9.0, foot: 0 },      // the rare spawn reads as rare partly by being the biggest thing that is not a boss.
+
+    // -- MAPS TWO TO TWELVE: 72 CREATURES THAT HAD NO ENTRY AT ALL --------------------------------------
+    // Luke, with a screenshot of the Undercave: "Floating enemies".
+    //
+    // Everything above is map one, and it was the only map ever measured. groveSize() falls back to
+    // { h: 5, foot: 0 } for anything missing - and foot: 0 means the scene nudges the drawing down by
+    // NOTHING, so every creature from map two on stood on whatever transparent air its plate carried under
+    // its feet. 41 of the 72 carry at least half a percent of their own height; sinew_spider carries 6.7%.
+    //
+    // That is why this read as a map-two-onward bug with no obvious cause: the code was right, the art was
+    // right, and the table simply stopped at the twelve creatures somebody had measured once.
+    //
+    // MEASURED BY scripts/grove-sprite-bounds.mjs, NOT GUESSED, same as the twelve above and same as
+    // SLAB_SURFACE. The alpha threshold is 8 rather than 0 on purpose -- "transparent" in these plates is
+    // routinely alpha 1-2, so testing for any non-zero alpha finds the edge of the FILE and measures every
+    // foot as zero. [[sprite-alpha-floor-drop-shadow-box]]
+    //
+    // h IS LEFT AT THE 5 THEY ALREADY HAD, DELIBERATELY. That is the value groveSize has been handing out
+    // for these all along, so writing it explicitly changes nothing about how big anything is. Giving 72
+    // creatures a measured HEIGHT would resize most of the bestiary in one commit off a float report -- a
+    // different change, wanting a different look, and one Luke should see before it ships.
+    sinew_spider:     { h: 5, foot: 0.067 },
+    rock_seal:        { h: 5, foot: 0.061 },
+    roostbat:         { h: 5, foot: 0.055 },
+    rayglider:        { h: 5, foot: 0.052 },
+    coalback:         { h: 5, foot: 0.051 },
+    rope_hauler:      { h: 5, foot: 0.050 },
+    urchin_roller:    { h: 5, foot: 0.048 },
+    sootback:         { h: 5, foot: 0.046 },
+    sinew_hound:      { h: 5, foot: 0.043 },
+    scale_basker:     { h: 5, foot: 0.041 },
+    marsh_toad:       { h: 5, foot: 0.039 },
+    tile_scuttler:    { h: 5, foot: 0.036 },
+    mirage_walker:    { h: 5, foot: 0.033 },
+    shimmer:          { h: 5, foot: 0.033 },
+    wirewood:         { h: 5, foot: 0.033 },
+    glass_crawler:    { h: 5, foot: 0.032 },
+    cinder_boar:      { h: 5, foot: 0.030 },
+    sigil_bearer:     { h: 5, foot: 0.027 },
+    storm_gull:       { h: 5, foot: 0.026 },
+    dune_hulk:        { h: 5, foot: 0.026 },
+    scarab_swarm:     { h: 5, foot: 0.025 },
+    shellback:        { h: 5, foot: 0.024 },
+    driftlurk:        { h: 5, foot: 0.024 },
+    basalt_golem:     { h: 5, foot: 0.024 },
+    ashglass_shrike:  { h: 5, foot: 0.024 },
+    glass_skitter:    { h: 5, foot: 0.023 },
+    bog_walker:       { h: 5, foot: 0.022 },
+    salamander:       { h: 5, foot: 0.021 },
+    dripstone_lurker: { h: 5, foot: 0.019 },
+    kelp_hauler:      { h: 5, foot: 0.019 },
+    mosaic_swarm:     { h: 5, foot: 0.018 },
+    cord_slinger:     { h: 5, foot: 0.018 },
+    jackal:           { h: 5, foot: 0.018 },
+    salt_wraith:      { h: 5, foot: 0.017 },
+    chert_thrower:    { h: 5, foot: 0.013 },
+    tendril_creeper:  { h: 5, foot: 0.011 },
+    bone_kiln:        { h: 5, foot: 0.011 },
+    stalk_hopper:     { h: 5, foot: 0.009 },
+    foamborn:         { h: 5, foot: 0.009 },
+    gasbloom:         { h: 5, foot: 0.007 },
+    tidewarden:       { h: 5, foot: 0.006 },
+    shellpicker:      { h: 5, foot: 0.005 },
+    reed_slicer:      { h: 5, foot: 0.004 },
+    opal_moth:        { h: 5, foot: 0.004 },
+    ember_wisp:       { h: 5, foot: 0.002 },
+    blockfist:        { h: 5, foot: 0.001 },
+    cave_crawler:     { h: 5, foot: 0.000 },
+    sporemoth:        { h: 5, foot: 0.000 },
+    blind_warden:     { h: 5, foot: 0.000 },
+    shale_biter:      { h: 5, foot: 0.000 },
+    molewarden:       { h: 5, foot: 0.000 },
+    lumen_drifter:    { h: 5, foot: 0.000 },
+    weedcoil:         { h: 5, foot: 0.000 },
+    willow_wisp:      { h: 5, foot: 0.000 },
+    peat_hulk:        { h: 5, foot: 0.000 },
+    drowned_thing:    { h: 5, foot: 0.000 },
+    vine_lasher:      { h: 5, foot: 0.000 },
+    fen_heron:        { h: 5, foot: 0.000 },
+    wisp_mother:      { h: 5, foot: 0.000 },
+    pearl_diver:      { h: 5, foot: 0.000 },
+    wreck_hand:       { h: 5, foot: 0.000 },
+    net_caster:       { h: 5, foot: 0.000 },
+    pillar_lurk:      { h: 5, foot: 0.000 },
+    moray:            { h: 5, foot: 0.000 },
+    ember_acolyte:    { h: 5, foot: 0.000 },
+    pearl_warden:     { h: 5, foot: 0.000 },
+    wirecoil:         { h: 5, foot: 0.000 },
+    deeplight:        { h: 5, foot: 0.000 },
+    ribwalker:        { h: 5, foot: 0.000 },
+    ember_asp:        { h: 5, foot: 0.000 },
+    slag_crawler:     { h: 5, foot: 0.000 },
+    forge_wraith:     { h: 5, foot: 0.000 },
 };
 
 // A boss is the biggest body in its zone and gets bigger as the map goes down. ⚠️ A LADDER, AND IT FAILS
