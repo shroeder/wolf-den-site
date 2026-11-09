@@ -1,15 +1,19 @@
 # Working on the Wolf Den site
 
-## 🛑 If you are touching `scripts/lowpoly/` — READ `scripts/lowpoly/CLAUDE.md` FIRST
+## 🛑 Den Quest lives in a DIFFERENT REPOSITORY
 
-That pipeline hands Luke **art**, not problems, and the definition of done is a command
-(`npm run lp:done`), not a judgement. The rule is there because it was written as prose,
-read, and then violated the same morning.
+The 3D game, the game server, the low-poly art pipeline and the 3D labs moved to
+`Projects/den-quest` (github.com/shroeder/den-quest) on 2026-11-09, deployed to
+denquestonline.com from its own Vercel project. Luke: *"I dont want the 3d game or any 3d
+labs in the existing website."*
 
-It replaced `scripts/anim/` on 2026-11-09 — Luke: *"I want to go to ground. Reset it all."*
-The MPFB hero, the dragon and the clip mixer are gone and recoverable at `d43ab304`; the rules
-were carried over unchanged, because the rules were the part that worked.
+**One thing stayed here, and only one:** `/api/denquest/handoff`, which mints a single-use
+sign-in code. It has to live on this domain because this is the only origin that can see the
+session cookie — browsers do not send cookies across registrable domains.
 
+⚠️ **`mkt_denquest_handoff` (migration 511) IS SHARED WITH THAT REPOSITORY.** It is written
+here and read there. If its columns change, Den Quest's sign-in breaks and no build in either
+repo will say so.
 
 ## Before you cut anything for cost
 
