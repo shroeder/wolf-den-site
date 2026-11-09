@@ -55,6 +55,12 @@ const WAIT = process.argv[8] || null;   // what the click should have produced; 
 
 const chrome = spawn(CHROME, [
     `--remote-debugging-port=${PORT}`, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+    // ⚠️ --disable-gpu KILLS WebGL, AND A 3D PAGE THEN PHOTOGRAPHS AS AN EMPTY BOX.
+    // The walk lab came back as a flat rectangle of sky with nothing in it, which reads exactly
+    // like a broken scene -- the component was fine, the rig simply had no context to render
+    // into. SwiftShader is the software fallback; it is slower and it is correct, and without it
+    // this rig cannot be used to judge anything that draws with a GPU.
+    "--enable-unsafe-swiftshader",
     "--no-first-run", "--no-default-browser-check", `--user-data-dir=${process.env.TEMP}/cdp-${PORT}`,
     "about:blank",
 ], { stdio: "ignore" });

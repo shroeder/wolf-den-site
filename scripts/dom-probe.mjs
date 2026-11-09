@@ -16,6 +16,12 @@ const PORT = 9610;
 if (!url || !expression) throw new Error('usage: dom-probe.mjs <url> "<expression>" [w] [h]');
 
 const chrome = spawn(CHROME, [`--remote-debugging-port=${PORT}`, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+    // ⚠️ --disable-gpu KILLS WebGL, AND A 3D PAGE THEN PHOTOGRAPHS AS AN EMPTY BOX.
+    // The walk lab came back as a flat rectangle of sky with nothing in it, which reads exactly
+    // like a broken scene -- the component was fine, the rig simply had no context to render
+    // into. SwiftShader is the software fallback; it is slower and it is correct, and without it
+    // this rig cannot be used to judge anything that draws with a GPU.
+    "--enable-unsafe-swiftshader",
     "--no-first-run", `--user-data-dir=${process.env.TEMP}/cdp-probe-${PORT}`, "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ws = null;

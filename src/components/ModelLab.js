@@ -69,13 +69,16 @@ export default function ModelLab() {
             const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            // ⚠️ NOT PCFSoftShadowMap. three.js 0.187 removed it and silently substitutes
+            // PCFShadowMap with a console warning, so the named setting was a lie.
+            renderer.shadowMap.type = THREE.PCFShadowMap;
             // ⚠️ THE SAME EXPOSURE THE FILMER USES. Blender's harness renders these at a key of 2.15 suns with
             // a Standard view transform precisely so a 0.36 brown reads as a 0.36 brown; a lab that then tone
             // maps the same glb differently is a lab whose verdict does not transfer. NoToneMapping is the
             // three.js spelling of "Standard".
             renderer.toneMapping = THREE.NoToneMapping;
             renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.domElement.style.display = "block";
             host.appendChild(renderer.domElement);
 
             // Key / fill / rim, in the same places and the same ratios as scripts/lowpoly/harness/shot.py.
@@ -173,7 +176,12 @@ export default function ModelLab() {
             const resize = () => {
                 const w = host.clientWidth || 600;
                 const h = Math.round(Math.min(Math.max(w * 0.72, 320), 620));
-                renderer.setSize(w, h, false);
+                // ⚠️ setSize WITHOUT the third argument. Passing updateStyle=false leaves the canvas
+                // with no CSS size, so it displays at its ATTRIBUTE size -- which setPixelRatio has
+                // already multiplied by the device ratio. On a 2x screen the viewport came out twice
+                // as tall as the box that was meant to hold it, with the whole scene shoved off the
+                // bottom of the frame and a camera aspect that no longer matched what was on screen.
+                renderer.setSize(w, h);
                 camera.aspect = w / h;
                 camera.updateProjectionMatrix();
             };

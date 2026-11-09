@@ -62,8 +62,7 @@
         "lp:make": "\"C:/Program Files/Blender Foundation/Blender 4.4/blender.exe\" -b --online-mode -P scripts/lowpoly/make.py",
         "lp:film": "\"C:/Program Files/Blender Foundation/Blender 4.4/blender.exe\" -b --online-mode -P scripts/lowpoly/harness/film.py",
         "lp:gate": "\"C:/Program Files/Blender Foundation/Blender 4.4/blender.exe\" -b --online-mode -P scripts/lowpoly/harness/gate.py",
-        "lp:done": "node scripts/lowpoly/harness/done.mjs",
-        "hero:done": "node scripts/hero/done.mjs"
+        "lp:done": "node scripts/lowpoly/harness/done.mjs"
     },
     "keywords": [],
     "author": "",

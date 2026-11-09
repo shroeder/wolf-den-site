@@ -70,11 +70,8 @@ _quests*.html
 .promo/
 startrek-promo*.png
 
-# QA renders are build output, not source.
-scripts/anim/_qa/
-scripts/anim/_film/
+# Renders are build output, not source.
 __pycache__/
-scripts/hero/_look/
 
 # Low-poly renders are build output, not source.
 scripts/lowpoly/_film/
