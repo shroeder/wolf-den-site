@@ -33,6 +33,48 @@ function audio() {
     }
 }
 
+// ── ⚠️ A BUDGET ON THE KILL SOUNDS, FOR EXACTLY THE REASON THE SPARKS HAVE ONE ──────────────────────────────
+// Luke, 2026-11-08: "Attacking enemies in the grove causes lag... I one shot, so its always a hit and kill
+// across the whole screen."
+//
+// He reported this shape once before — "when I kill like more than one thing, the game freaking like lags out
+// and freaking like stutters big time" — and the answer was SPARK_BUDGET in GroveScene, which capped the
+// PARTICLES. It never touched the sound, and the sound is bigger:
+//
+//   playKill   thud (bufferSource + biquad + gain) + two notes  =  ~7 WebAudio nodes
+//   playMulti  up to eight notes plus a bass floor              =  ~18 nodes, and a navigator.vibrate
+//
+// Both fire once PER CORPSE. One-shotting twenty creatures in a frame therefore builds something like five
+// hundred audio nodes synchronously on the main thread, each with scheduled envelope automation, plus twenty
+// vibrate calls. Creating a BiquadFilterNode is not free and doing it five hundred times inside one
+// requestAnimationFrame is a stall you can feel.
+//
+// ⚠️ THE LESSON WAS ALREADY WRITTEN IN playMulti AND APPLIED ONE LEVEL TOO LOW. Its own comment says "A
+// multikill is ONE event with weight, so it gets one pulse" — and that made each CALL one pulse while the
+// CALL still happened per corpse. The fix belongs here, where the nodes are made.
+//
+// ⚠️ IT SCALES DOWN, IT DOES NOT CUT OFF — the same rule SPARK_BUDGET chose, for the same reason. Three kill
+// chimes landing inside 60ms is already past what the ear separates; the fourth through twentieth are not a
+// quieter chord, they are mush and clipping. So the first few play in full and the rest are dropped, which
+// sounds like a big messy kill rather than like the sound being broken.
+const windows = new Map();
+
+/**
+ * May this sound play? `ms` is the window, `max` how many are allowed inside it.
+ *
+ * ⚠️ performance.now(), NOT the audio clock. This has to answer before audio() is called — the whole point is
+ * to avoid building the context's nodes — and a suspended context's currentTime does not advance.
+ */
+function spend(key, ms, max) {
+    if (typeof performance === "undefined") return true;
+    const t = performance.now();
+    const w = windows.get(key);
+    if (!w || t - w.at > ms) { windows.set(key, { at: t, n: 1 }); return true; }
+    if (w.n >= max) return false;
+    w.n += 1;
+    return true;
+}
+
 /** One note. `at` is an offset in seconds so a caller can lay out a phrase. */
 function note(a, freq, at, dur, peak = 0.16, type = "triangle") {
     const osc = a.createOscillator();
@@ -211,6 +253,9 @@ export function playHit(step = 0, crit = false) {
 
 /** A kill. The one beat in the loop that is allowed to be a tiny bit satisfying on its own. */
 export function playKill(step = 0) {
+    // ⚠️ BEFORE audio(), so a dropped chime costs nothing at all rather than costing a context lookup and
+    // then being thrown away. Three inside 60ms is past what the ear can separate; see the note on spend().
+    if (!spend("kill", 60, 3)) return;
     const a = audio();
     if (!a) return;
     try {
@@ -234,6 +279,16 @@ export function playKill(step = 0) {
  * that says so.
  */
 export function playMulti(credit = 2) {
+    // ── ⚠️ ONE PER MOMENT, NOT ONE PER CORPSE ───────────────────────────────────────────────────────────
+    // This is the expensive one — up to nine notes and a vibrate, and the caller runs it inside the kill
+    // loop. A screen-wide one-shot is ONE multikill moment by this function's own definition, so twenty
+    // overlapping pentatonic runs are not twenty rewards, they are a single unreadable smear that costs
+    // three hundred and sixty nodes to produce.
+    //
+    // 200ms rather than a frame: kills land across several frames as bodies resolve, and the ear hears that
+    // whole span as one event. It also covers the vibrate, which Luke has already complained about once —
+    // "the vibrations are too much when im multikilling" — for the same reason, one level lower down.
+    if (!spend("multi", 200, 1)) return;
     const a = audio();
     if (!a) return;
     const n = Math.max(2, Math.min(8, Math.round(Number(credit) || 2)));
