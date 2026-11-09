@@ -49,6 +49,20 @@ PALETTE = {
     "leaf":       (0.17, 0.36, 0.14),
     "leaf_dark":  (0.10, 0.25, 0.10),
     "leaf_light": (0.26, 0.47, 0.18),
+    # goblin — green, and NOT a tint of the player's skin. A monster that
+    # shares a hue with the player reads as a recolour; this one is the only
+    # green in the set that is not a leaf.
+    "goblin":     (0.34, 0.44, 0.24),
+    "goblin_dark": (0.25, 0.33, 0.17),
+    "goblin_deep": (0.16, 0.22, 0.11),
+    # fire. ⚠️ THESE ARE THE ONLY BRIGHT COLOURS IN THE PALETTE and they are
+    # deliberately the only ones: in a set where everything else sits between
+    # 0.1 and 0.6, a 0.93 flame is the thing your eye goes to across a scene.
+    # Spend that somewhere else and the fire stops being the landmark.
+    "flame":      (0.85, 0.40, 0.09),
+    "flame_hot":  (0.93, 0.72, 0.20),
+    "ember":      (0.48, 0.13, 0.05),
+    "soot":       (0.12, 0.11, 0.10),
     # stone + metal + ore
     "stone":      (0.38, 0.38, 0.41),
     "stone_dark": (0.27, 0.27, 0.30),
@@ -95,6 +109,9 @@ PLAYER_HEIGHT = 1.85
 SCALE_OF = {
     "player":  (1.00, 1.00),
     "npc":      (0.80, 1.20),
+    # Anything meant to read as SMALLER than the player on sight. A goblin
+    # at 0.95 of the player is not a short goblin, it is a green man.
+    "small_npc": (0.50, 0.85),
     "tree":     (1.60, 3.00),
     "rock":     (0.25, 1.10),
     "prop":     (0.20, 1.60),

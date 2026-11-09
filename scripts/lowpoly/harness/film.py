@@ -80,7 +80,7 @@ def turntable(entry):
 def lineup(entries):
     """Every model on one floor, player first, spaced by their own widths."""
     shot.wipe_scene()
-    shot.stage(ground_size=40)
+    shot.stage(ground_size=160)
     order = ([e for e in entries if e["id"] == "player"]
              + [e for e in entries if e["id"] != "player"])
     x = 0.0
