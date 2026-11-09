@@ -720,6 +720,34 @@ export async function openChest(buyerId, tier) {
     // All of that is gated elsewhere on the same flag. Opening what you already hold is not earning.
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+
+    // ── ⚠️ THE MASTER KEY FIRES ON THE CHEST, NOT ON WHAT WAS IN IT ──────────────────────────────────
+    // GrayKitsune, in #bugs: "'One chest in three also gives you the chest one tier below it, to open
+    // yourself.' While equipped, opening 15 chests didnt proc effect."
+    //
+    // He was right twice over, and neither fault was the roll.
+    //
+    // FAULT ONE: THE ROLL LIVED ON THE GEAR BRANCH. It was made 180 lines down, after the chest's chain had
+    // already resolved — and that chain returns early for a recipe, seeds, a pet, a gem, a forge scroll, a
+    // consumable and a collection piece. A chest that paid any of those never reached the roll at all. Per
+    // scripts/chest-odds.mjs gear is 64-76% of opens depending on tier, so a power that promises ONE IN
+    // THREE was delivering about one in four and a half, and the shortfall was invisible because it only
+    // ever went missing on the opens that paid something else.
+    //
+    // ⚠️ SO IT MOVES HERE, BESIDE THE DECREMENT, because the decrement is the moment a CHEST WAS SPENT and
+    // that is exactly what the power's text is about. It cannot drift back onto one outcome from here.
+    const keyTier = (await hasPower(buyerId, "master_key")) && oneIn(3)
+        ? CHEST_ORDER[Math.max(0, CHEST_ORDER.indexOf(tier) - 1)]
+        : null;
+    // ⚠️ IT CARRIES ITS OWN LABEL. chests.js is server-only, so a client component cannot turn "gold" into
+    // "Gold Chest" — and FAULT TWO was that nothing told the player at all. The grant worked; the screen
+    // never mentioned it, so the chest appeared in the stash with no explanation and the power looked dead
+    // even on the opens where it fired. That is why the report reads "didnt proc" rather than "didn't say".
+    // [[reward-with-no-screen-is-not-shipped]]
+    const keyChest = keyTier && keyTier !== tier
+        ? { tier: keyTier, label: CHEST_TIERS[keyTier]?.label || "Chest", emoji: CHEST_TIERS[keyTier]?.emoji || "📦" }
+        : null;
+    if (keyChest) await addChests(buyerId, { [keyChest.tier]: 1 }, { source: "master_key" }).catch(() => {});
     // ── AND A HALLOWEEN CHEST GOES NOWHERE NEAR THE CHAIN BELOW ──────────────────────────────────────────
     // Branching here rather than threading four new tiers through seven rolls is the whole design. Every
     // table in the rest of this function is keyed by tier — RECIPE_CHANCE, SEED_CHANCE, GEM_CHEST_CHANCE,
@@ -791,7 +819,7 @@ export async function openChest(buyerId, tier) {
         const rec = await grantRecipeReward(buyerId, band).catch(() => null);
         // Null means they already know every recipe in this band — fall through to the ordinary loot rather
         // than paying out nothing, which is what a silent side-roll would have done.
-        if (rec) return { ok: true, remaining: dec.count, recipe: rec };
+        if (rec) return { ok: true, remaining: dec.count, keyChest, recipe: rec };
     }
 
     if (Math.random() < (SEED_CHANCE[tier] || 0)) {
@@ -809,12 +837,12 @@ export async function openChest(buyerId, tier) {
             const one = await grantSeedFromBand(buyerId, seedBand).catch(() => null);
             if (one) got.push(one);
         }
-        if (got.length) return { ok: true, remaining: dec.count, seeds: got };
+        if (got.length) return { ok: true, remaining: dec.count, keyChest, seeds: got };
     }
 
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
-    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
+    if (petDrop) return { ok: true, remaining: dec.count, keyChest, pet: petDrop };
 
     // ── A GEM, LOW TIERS ONLY ────────────────────────────────────────────────────────────────────────────
     // Gems had no real path into the game. Mining dropped them, the wheel had a wedge, the Armoury sold one —
@@ -841,7 +869,7 @@ export async function openChest(buyerId, tier) {
             : (tier === "celestial" || tier === "primordial") ? (Math.random() < 0.45 ? 3 : 2)
             : (Math.random() < 0.25 ? 2 : 1);
         const got = await grantGem(buyerId, gemId(kind.id, gTier), 1, "chest").catch(() => null);
-        if (got?.ok) return { ok: true, remaining: dec.count, gem: got.gem };
+        if (got?.ok) return { ok: true, remaining: dec.count, keyChest, gem: got.gem };
         // A gem that failed to grant falls through to ordinary loot rather than eating the chest.
     }
 
@@ -856,7 +884,7 @@ export async function openChest(buyerId, tier) {
         const cid = Math.random() < enchantOdds ? "forge_enchant_scroll" : "forge_power_scroll";
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+        return { ok: true, remaining: dec.count, keyChest, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
     }
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
@@ -865,7 +893,7 @@ export async function openChest(buyerId, tier) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+        return { ok: true, remaining: dec.count, keyChest, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
     }
 
     // ── WHAT YOU "OWN" INCLUDES WHAT IS SITTING ON THE AUCTION BLOCK ─────────────────────────────────────
@@ -895,7 +923,6 @@ export async function openChest(buyerId, tier) {
     // obviously — the first pass put it above the `let` and lint:undef caught the temporal dead zone.
     // Twin Hinges is a once-a-day double, claimed atomically so two taps cannot both take it.
     const twinHinges = await claimPowerUse(buyerId, "twin_hinges");
-    const masterKey = await hasPower(buyerId, "master_key") && oneIn(3);
     if (await hasPower(buyerId, "locksmith") && oneIn(3)) {
         const li = RARITY_LADDER.indexOf(rarity);
         if (li >= 0 && li < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[li + 1];
@@ -925,7 +952,7 @@ export async function openChest(buyerId, tier) {
         const { rollPieceDrop } = await import("@/lib/marketplace/collection-owned.js");
         const trophy = await rollPieceDrop(buyerId, { source: CHEST_PIECE_SOURCE, rarity, chance: 0.12 }).catch(() => null);
         if (trophy) {
-            return { ok: true, remaining: dec.count, piece: true,
+            return { ok: true, remaining: dec.count, keyChest, piece: true,
                 item: { id: trophy.id, name: trophy.name, rarity: trophy.rarity, slot: null, icon: trophy.icon, stats: null, reqLevel: null, signature: null, charged: false, chargeReward: null } };
         }
     }
@@ -964,12 +991,9 @@ export async function openChest(buyerId, tier) {
                 await grantItem(buyerId, second.id, isEliteRarity ? "elite" : "chest");
             }
         }
-        // The Master Key also hands you the chest one tier BELOW, unopened, so you get to open it yourself.
-        if (masterKey) {
-            const below = CHEST_ORDER[Math.max(0, CHEST_ORDER.indexOf(tier) - 1)];
-            if (below && below !== tier) await addChests(buyerId, { [below]: 1 }, { source: "master_key" }).catch(() => {});
-        }
-        return { ok: true, remaining: dec.count, second: second ? { id: second.id, name: second.name, rarity: second.rarity } : null, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
+        // ✂️ THE MASTER KEY GRANT WAS HERE, on the gear branch. It is beside the decrement now — see the
+        // note there for why a power about CHESTS cannot live inside one of the things a chest can pay.
+        return { ok: true, remaining: dec.count, keyChest, second: second ? { id: second.id, name: second.name, rarity: second.rarity } : null, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
     // THE SORTING TABLE. Dust is what a chest pays when you already own every item of the rolled rarity, so
     // this is the exact moment the power exists for: widen a rarity instead of paying out consolation gold.
@@ -980,7 +1004,7 @@ export async function openChest(buyerId, tier) {
         if (wider.length) {
             const item = wider[Math.floor(Math.random() * wider.length)];
             await grantItem(buyerId, item.id, "chest");
-            return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null }, sorted: true };
+            return { ok: true, remaining: dec.count, keyChest, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null }, sorted: true };
         }
     }
     // ── A CHEST MUST NEVER BE WORTH NOTHING ──────────────────────────────────────────────────────────────
@@ -1029,5 +1053,5 @@ export async function openChest(buyerId, tier) {
         const all = pool.filter((x) => x.rarity === r);
         return { rarity: r, owned: all.filter((x) => owned.has(x.id)).length, total: all.length };
     }).filter((x) => x.total > 0);
-    return { ok: true, remaining: dec.count, gold, rarity, parts, doubled: twinHinges, exhausted };
+    return { ok: true, remaining: dec.count, keyChest, gold, rarity, parts, doubled: twinHinges, exhausted };
 }

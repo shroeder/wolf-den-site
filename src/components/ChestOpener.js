@@ -351,6 +351,10 @@ function BulkReveal({ bulk, onClose, onAgain }) {
         // extra as `second`. Named on its own row: dropping it would be the summary quietly under-reporting
         // the best thing that can happen to a chest.
         if (o.second) put({ name: o.second.name, sub: "gear · doubled", rarity: o.second.rarity || "common" });
+        // ⚠️ AND THE MASTER KEY, for the same reason Twin Hinges is named here: a summary that drops a
+        // reward is a summary quietly under-reporting what the pile was worth. This is the one that was
+        // reported as not working at all, because nothing anywhere mentioned it.
+        if (o.keyChest) put({ name: o.keyChest.label, sub: "chest · master key", rarity: "rare" });
     }
     rows.sort((a, z) => RARITY_RANK(z.rarity) - RARITY_RANK(a.rarity) || z.n - a.n || a.name.localeCompare(z.name));
     const best = rows[0]?.rarity || "common";
@@ -552,6 +556,28 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         <span className="chest-badge-drop-text">
                             <strong>Rare badge drop!</strong>
                             <span>{reveal.badgeDrop.label}</span>
+                        </span>
+                    </div>
+                ) : null}
+
+                {/* ── ⚠️ THE MASTER KEY, SAID OUT LOUD ────────────────────────────────────────────────
+                    GrayKitsune, in #bugs: "'One chest in three also gives you the chest one tier below it,
+                    to open yourself.' While equipped, opening 15 chests didnt proc effect."
+
+                    The grant worked on the opens it reached. Nothing ever told him — the extra chest went
+                    straight to the stash with no line anywhere, so a power that fires one time in three
+                    looked like a power that never fires. That is the same fault this file already carries a
+                    note about one screen up: "The gem was always granted; only the telling of it was
+                    broken." Second time, same component.
+
+                    It rides the badge-drop row's shape because it is the same KIND of thing — a side reward
+                    that is not what you opened the chest for. */}
+                {reveal?.keyChest ? (
+                    <div className="chest-badge-drop" role="status">
+                        <span className="chest-badge-drop-icon" aria-hidden="true">{reveal.keyChest.emoji || "📦"}</span>
+                        <span className="chest-badge-drop-text">
+                            <strong>The Master Key turned</strong>
+                            <span>{reveal.keyChest.label} added to your stash, unopened</span>
                         </span>
                     </div>
                 ) : null}
