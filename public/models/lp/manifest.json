@@ -1,0 +1,172 @@
+{
+ "style": {
+  "player_height": 1.85,
+  "palette": {
+   "skin": [
+    0.76,
+    0.55,
+    0.38
+   ],
+   "skin_dark": [
+    0.56,
+    0.38,
+    0.25
+   ],
+   "hair": [
+    0.27,
+    0.16,
+    0.08
+   ],
+   "tunic": [
+    0.36,
+    0.24,
+    0.13
+   ],
+   "tunic_trim": [
+    0.5,
+    0.36,
+    0.18
+   ],
+   "trouser": [
+    0.23,
+    0.25,
+    0.32
+   ],
+   "boot": [
+    0.16,
+    0.11,
+    0.08
+   ],
+   "cloak": [
+    0.38,
+    0.12,
+    0.12
+   ],
+   "bark": [
+    0.28,
+    0.19,
+    0.11
+   ],
+   "bark_dark": [
+    0.19,
+    0.13,
+    0.08
+   ],
+   "leaf": [
+    0.17,
+    0.36,
+    0.14
+   ],
+   "leaf_dark": [
+    0.1,
+    0.25,
+    0.1
+   ],
+   "leaf_light": [
+    0.26,
+    0.47,
+    0.18
+   ],
+   "stone": [
+    0.38,
+    0.38,
+    0.41
+   ],
+   "stone_dark": [
+    0.27,
+    0.27,
+    0.3
+   ],
+   "iron": [
+    0.46,
+    0.48,
+    0.52
+   ],
+   "steel": [
+    0.62,
+    0.65,
+    0.7
+   ],
+   "ore_copper": [
+    0.62,
+    0.33,
+    0.14
+   ],
+   "ore_coal": [
+    0.1,
+    0.1,
+    0.12
+   ],
+   "gold": [
+    0.74,
+    0.58,
+    0.16
+   ]
+  }
+ },
+ "models": [
+  {
+   "id": "player",
+   "label": "Player",
+   "kind": "player",
+   "scale": "player",
+   "note": "Sixteen flat-shaded primitives, 1.85 m, six flat colours. The ruler every other model is sized against.",
+   "url": "/models/lp/player.glb",
+   "tris": 192,
+   "budget": 400,
+   "materials": [
+    "boot",
+    "trouser",
+    "tunic",
+    "tunic_trim",
+    "skin",
+    "skin_dark",
+    "hair"
+   ],
+   "height": 1.85,
+   "width": 0.76,
+   "depth": 0.36,
+   "bytes": 16468
+  },
+  {
+   "id": "rock",
+   "label": "Rock (copper)",
+   "kind": "prop",
+   "scale": "rock",
+   "note": "A seeded-jitter six-sided boulder with three copper flecks. 0.92 m, chest height on the player.",
+   "url": "/models/lp/rock.glb",
+   "tris": 76,
+   "budget": 200,
+   "materials": [
+    "stone",
+    "stone_dark",
+    "ore_copper"
+   ],
+   "height": 0.843,
+   "width": 1.2826,
+   "depth": 1.1583,
+   "bytes": 7828
+  },
+  {
+   "id": "tree",
+   "label": "Tree",
+   "kind": "scenery",
+   "scale": "tree",
+   "note": "Six parts: a flared six-sided trunk and three twisted canopy cones in three greens. 4.0 m, a shade over twice the player.",
+   "url": "/models/lp/tree.glb",
+   "tris": 70,
+   "budget": 250,
+   "materials": [
+    "bark_dark",
+    "bark",
+    "leaf_dark",
+    "leaf",
+    "leaf_light"
+   ],
+   "height": 3.94,
+   "width": 2.44,
+   "depth": 2.1131,
+   "bytes": 8488
+  }
+ ]
+}

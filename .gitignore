@@ -75,3 +75,7 @@ scripts/anim/_qa/
 scripts/anim/_film/
 __pycache__/
 scripts/hero/_look/
+
+# Low-poly renders are build output, not source.
+scripts/lowpoly/_film/
+scripts/lowpoly/_gate/

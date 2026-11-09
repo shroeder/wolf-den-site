@@ -84,7 +84,6 @@ export default function MarketplaceAdminClient({ admin, applications, vendors })
                     <Link href="/marketplace/admin/boss" className="pill">Boss admin</Link>
                     <Link href="/marketplace/admin/players" className="pill">Player roster</Link>
                     <Link href="/marketplace/model-lab" className="pill">Model Lab</Link>
-                    <Link href="/marketplace/iso-lab" className="pill">Iso Lab</Link>
                 </div>
             </section>
 

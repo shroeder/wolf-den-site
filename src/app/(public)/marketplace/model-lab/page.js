@@ -23,8 +23,9 @@ export default async function ModelLabPage() {
         <div className="stack">
             <h1 style={{ marginBottom: 2 }}>Model Lab</h1>
             <p className="muted" style={{ marginTop: 0, maxWidth: "62ch" }}>
-                The rigged hero, running its walk cycle in real time. Generated in Blender from a parametric
-                base mesh, rigged to a game skeleton, and exported as a Draco-compressed glTF.
+                The low-poly set. Flat-shaded, a few hundred triangles each, every colour out of one
+                palette. Built by <code>npm run lp:done</code> in Blender; this page reads the manifest
+                that build writes, so what is listed here is exactly what shipped.
             </p>
             <ModelLab />
         </div>

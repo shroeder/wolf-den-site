@@ -1,10 +1,14 @@
 # Working on the Wolf Den site
 
-## 🛑 If you are touching `scripts/anim/` — READ `scripts/anim/CLAUDE.md` FIRST
+## 🛑 If you are touching `scripts/lowpoly/` — READ `scripts/lowpoly/CLAUDE.md` FIRST
 
 That pipeline hands Luke **art**, not problems, and the definition of done is a command
-(`npm run anim:done`), not a judgement. The rule is there because it was written as prose,
+(`npm run lp:done`), not a judgement. The rule is there because it was written as prose,
 read, and then violated the same morning.
+
+It replaced `scripts/anim/` on 2026-11-09 — Luke: *"I want to go to ground. Reset it all."*
+The MPFB hero, the dragon and the clip mixer are gone and recoverable at `d43ab304`; the rules
+were carried over unchanged, because the rules were the part that worked.
 
 
 ## Before you cut anything for cost
