@@ -1,0 +1,216 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Den Quest — milestone</title>
+<style>
+    :root { color-scheme: dark; }
+    body {
+        margin: 0; background: #11181c; color: #cfe3e0;
+        font: 14px/1.5 ui-monospace, "IBM Plex Mono", monospace;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        padding: 14px;
+    }
+    canvas { width: 100%; max-width: 960px; border-radius: 8px; background: #16222a; display: block; }
+    .hud { display: flex; flex-wrap: wrap; gap: 6px 18px; max-width: 960px; width: 100%; }
+    .hud b { color: #7fd3c4; font-weight: 600; }
+    .hint { color: #7a8c8a; max-width: 960px; width: 100%; }
+    kbd { background: #22323a; border: 1px solid #33474f; border-radius: 3px; padding: 1px 5px; }
+</style>
+
+<canvas id="c" width="960" height="320"></canvas>
+<div class="hud">
+    <span>you <b id="me">—</b></span>
+    <span>tick <b id="tick">0</b></span>
+    <span>enemy hp <b id="hp">—</b></span>
+    <span>corrections <b id="corr">0</b></span>
+    <span>down <b id="bps">0</b> B/s</span>
+    <span>players <b id="n">0</b></span>
+</div>
+<div class="hint">
+    <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> to move · <kbd>space</kbd> to swing.
+    Open this page in a second window: both should show the same damage numbers on the same enemy
+    at the same moment.
+</div>
+
+<script>
+// Surfaces a module that fails to parse or resolve. Without this a bad
+// import is a silently blank page: the canvas is static HTML, so it renders
+// either way and the only symptom is a HUD that never leaves its defaults.
+addEventListener("error", (e) => {
+    console.error("[client] error:", e.message || e.error, e.filename || "");
+});
+</script>
+<script type="module">
+console.log("[client] module start");
+// ⚠️ ROOT-ABSOLUTE SPECIFIERS, NOT "./net.js". This page is served at BOTH
+// "/" and "/client/index.html", and a relative specifier resolves against
+// the DOCUMENT url -- so at "/" it asked for "/net.js", got a 404, and the
+// whole module graph failed before the first statement ran. The symptom is
+// a page that renders perfectly (the canvas and HUD are static markup) and
+// simply never connects, with no error in the console, because an import
+// that fails to resolve takes the console.log that would have told you
+// with it.
+import { createClient } from "/client/net.js";
+import { EVENT, FLAG, PLAYER } from "/sim/protocol.js";
+import { decodeEvent } from "/sim/codec.js";
+
+// ─────────────────────────────────────────────────────────────────────────
+// THE TEST PAGE. Rendering only -- every netcode decision lives in net.js,
+// which the headless milestone test drives with no DOM at all.
+//
+// ⚠️ THE SWING ANIMATION PLAYS ON KEYDOWN, NOT ON THE SERVER'S REPLY. That
+//    is the whole of "feels instant": the authoritative damage lands during
+//    the windup, roughly 30-60 ms later, and nobody can tell. What is NOT
+//    predicted is the consequence -- the number and the hp come from the
+//    server, once, and this page only draws them.
+// ─────────────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const el = (id) => document.getElementById(id);
+
+const proto = location.protocol === "https:" ? "wss:" : "ws:";
+const ws = new WebSocket(`${proto}//${location.host}/ws`);
+ws.binaryType = "arraybuffer";
+
+const client = createClient({ send: (d) => ws.readyState === 1 && ws.send(d), now: () => performance.now() });
+ws.addEventListener("open", () => console.log("[client] socket open"));
+ws.addEventListener("error", () => console.error("[client] socket error"));
+ws.addEventListener("close", (e) => console.warn("[client] socket close", e.code));
+ws.addEventListener("message", (ev) => {
+    const isBinary = ev.data instanceof ArrayBuffer;
+    client.onMessage(isBinary ? new Uint8Array(ev.data) : ev.data, isBinary);
+});
+
+const keys = new Set();
+addEventListener("keydown", (e) => {
+    if ([" ", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+    keys.add(e.key.toLowerCase());
+});
+addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+// Floating damage numbers, drawn from EVENTS and nothing else.
+const floaters = [];
+let lastEventCount = 0;
+
+// The visible slice of the world. The zone is 2048 wide; show the part the
+// fight happens in.
+const VIEW = { x0: 120, x1: 560 };
+const toScreen = (x) => ((x - VIEW.x0) / (VIEW.x1 - VIEW.x0)) * canvas.width;
+const GROUND = 250;
+
+let last = performance.now();
+let bytesAt = 0;
+let bytesThen = performance.now();
+
+function frame(nowMs) {
+    requestAnimationFrame(frame);
+    const dtMs = Math.min(nowMs - last, 100);
+    last = nowMs;
+
+    const left = keys.has("a") || keys.has("arrowleft");
+    const right = keys.has("d") || keys.has("arrowright");
+    const attack = keys.has(" ");
+    client.sendInput({ left, right, attack, dtMs });
+
+    // New events since the last frame become floaters.
+    const evs = client.state.events;
+    for (let i = lastEventCount; i < evs.length; i += 1) {
+        const e = evs[i];
+        if (e.event !== EVENT.HIT) continue;
+        const at = client.renderPosition(e.targetId);
+        floaters.push({ x: at ? at.x : 0, y: 0, amount: e.amount, crit: e.crit, born: nowMs });
+    }
+    lastEventCount = evs.length;
+
+    // ── DRAW ─────────────────────────────────────────────────────────
+    ctx.fillStyle = "#16222a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#1e2f38";
+    ctx.fillRect(0, GROUND, canvas.width, canvas.height - GROUND);
+    ctx.strokeStyle = "#2b3f49";
+    ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(canvas.width, GROUND); ctx.stroke();
+
+    let players = 0;
+    for (const [id, ent] of client.state.authoritative) {
+        const pos = client.renderPosition(id);
+        if (!pos) continue;
+        // ⚠️ CULL OFF-SCREEN ENTITIES. A player outside the view still had
+        // its swing arc drawn, and at a 90-unit reach against a 440-unit
+        // view that is a 200-pixel curve sweeping in from nowhere, centred
+        // on something you cannot see.
+        // The margin is tighter than the swing reach on purpose: at -60 a player
+        // whose body was off-canvas still drew its 90-unit arc, which read as a
+        // stray curve sweeping in from nowhere.
+        if (pos.x < VIEW.x0 + 10 || pos.x > VIEW.x1 - 10) continue;
+        const isEnemy = (ent.flags & FLAG.IS_ENEMY) !== 0;
+        const isMe = id === client.state.playerId;
+        if (!isEnemy) players += 1;
+        const sx = toScreen(pos.x);
+        const w = isEnemy ? 34 : 24;
+        const h = isEnemy ? 60 : 48;
+
+        ctx.fillStyle = isEnemy ? "#8a4b4b" : (isMe ? "#7fd3c4" : "#5b8fa8");
+        ctx.fillRect(sx - w / 2, GROUND - h, w, h);
+
+        // Swing arc, drawn from the flag the server sends -- but the LOCAL
+        // player also draws it from its own keypress, below, so it appears
+        // before the server has said anything.
+        const swinging = (ent.flags & FLAG.SWINGING) !== 0 || (isMe && attack);
+        if (swinging && !isEnemy) {
+            const dir = (ent.flags & FLAG.FACING_LEFT) ? -1 : 1;
+            ctx.strokeStyle = "#e6c88a";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(sx, GROUND - h / 2, toScreen(VIEW.x0 + PLAYER.reach) - toScreen(VIEW.x0),
+                dir > 0 ? -0.9 : Math.PI + 0.9, dir > 0 ? 0.9 : Math.PI - 0.9, dir < 0);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+        }
+
+        if (isEnemy) {
+            const maxHp = client.state.welcome?.enemies?.find((e) => e.id === id)?.maxHp || 400;
+            const frac = Math.max(0, ent.hp / maxHp);
+            ctx.fillStyle = "#2b3f49";
+            ctx.fillRect(sx - 30, GROUND - h - 16, 60, 7);
+            ctx.fillStyle = "#c0574f";
+            ctx.fillRect(sx - 30, GROUND - h - 16, 60 * frac, 7);
+            ctx.fillStyle = "#cfe3e0";
+            ctx.font = "12px ui-monospace, monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(String(ent.hp), sx, GROUND - h - 22);
+        } else {
+            ctx.fillStyle = "#7a8c8a";
+            ctx.font = "11px ui-monospace, monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(isMe ? `you (#${id})` : `#${id}`, sx, GROUND - h - 8);
+        }
+    }
+
+    for (let i = floaters.length - 1; i >= 0; i -= 1) {
+        const f = floaters[i];
+        const age = nowMs - f.born;
+        if (age > 1200) { floaters.splice(i, 1); continue; }
+        ctx.globalAlpha = Math.max(0, 1 - age / 1200);
+        ctx.fillStyle = f.crit ? "#e6c88a" : "#e8a0a0";
+        ctx.font = `${f.crit ? 20 : 16}px ui-monospace, monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(`-${f.amount}${f.crit ? "!" : ""}`, toScreen(f.x), GROUND - 120 - age * 0.04);
+        ctx.globalAlpha = 1;
+    }
+
+    // ── HUD ──────────────────────────────────────────────────────────
+    el("me").textContent = client.state.playerId ?? "—";
+    el("tick").textContent = client.state.serverTick;
+    const enemy = client.state.authoritative.get(47);
+    el("hp").textContent = enemy ? enemy.hp : "—";
+    el("corr").textContent = client.state.corrections;
+    el("n").textContent = players;
+    if (nowMs - bytesThen > 1000) {
+        el("bps").textContent = Math.round((client.state.bytesIn - bytesAt) * 1000 / (nowMs - bytesThen));
+        bytesAt = client.state.bytesIn;
+        bytesThen = nowMs;
+    }
+}
+requestAnimationFrame(frame);
+</script>
