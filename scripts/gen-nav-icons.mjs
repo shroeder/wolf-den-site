@@ -7,6 +7,12 @@
 //
 // Sets is deliberately absent: it already reuses the real Warplate Helm item sprite, which beats a new drawing.
 //
+// ⚠️ AND SO IS `denquest`, ON PURPOSE. Den Quest Online's icon is a RENDER of the player model out of that
+// game's own Blender pipeline (den-quest/scripts/lowpoly/harness/navicon.py), not a painting. It costs
+// nothing, it cannot drift from the look of the thing it points at, and for a destination that IS a 3D game
+// the actual model beats any symbol of one. Do not add a key for it here -- a second drawing would quietly
+// overwrite public/images/nav/denquest.png on the next full run.
+//
 // Usage:  node scripts/gen-nav-icons.mjs [key ...]     (no args = every missing icon; pass keys to force-redo)
 import { register } from "node:module";
 import fs from "node:fs";

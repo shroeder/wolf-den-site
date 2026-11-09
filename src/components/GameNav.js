@@ -62,6 +62,10 @@ const NAV_SPRITE = {
     // biggest room in the game wore a react-icons oak LEAF — a flat monochrome glyph beside forty painted
     // sprites. Luke: "It should be a sprite, not an icon or a glyph."
     "/marketplace/grove": "grove",
+    // ⚠️ NOT A /marketplace PATH. Den Quest Online is a different site; this key is the handoff that
+    // signs you into it. The table is keyed by href precisely so an entry that leaves the building
+    // still gets its drawing.
+    "/api/denquest/handoff": "denquest",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -181,6 +185,9 @@ export default function GameNav() {
     const casino = Boolean(hud?.casino);
     const cards = Boolean(hud?.cards);
     const grove = Boolean(hud?.grove);
+    // Who sees the door to Den Quest Online. Asked of the server like every other gate here -- the client
+    // does not know who it is and must not guess.
+    const denquest = Boolean(hud?.denquest);
 
     // ── THE TOWN GATE ───────────────────────────────────────────────────────────────────────────────
     // Luke: "when features are locked, they are visible in the menu, but clearly locked."
@@ -222,6 +229,7 @@ export default function GameNav() {
     // biggest thing in the game and it sat behind every utility screen in a strip you have to drag.
     const links = [...LINKS.slice(0, 1),
         ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove" }] : []),
+        ...(denquest ? [{ href: "/api/denquest/handoff", external: true, label: "Den Quest Online" }] : []),
         ...LINKS.slice(1),
         { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
@@ -391,6 +399,7 @@ export default function GameNav() {
             ...(casino ? [{ href: "/marketplace/casino", label: "The Casino", sub: "Nine machines" }] : []),
             ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards", sub: "A deck and a road" }] : []),
             ...(grove ? [{ href: "/marketplace/grove", Icon: GiOakLeaf, label: "The Grove", sub: "Twelve zones of forest" }] : []),
+            ...(denquest ? [{ href: "/api/denquest/handoff", external: true, label: "Den Quest Online", sub: "The 3D world" }] : []),
             ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [
@@ -467,14 +476,20 @@ export default function GameNav() {
                     {links.map((l) => {
                         const { badge, title } = badgeInfo(l.href);
                         const dot = dotFor(l.href);
+                        // ⚠️ A DESTINATION THAT LEAVES THE SITE MUST BE A PLAIN ANCHOR. next/link
+                        //    PREFETCHES whatever scrolls into view, and this href is not a page --
+                        //    it is the handoff, which MINTS A SINGLE-USE SIGN-IN CODE and redirects
+                        //    to another domain. Prefetching it would burn a code every time the
+                        //    strip drifted past, silently, forever.
+                        const Row = l.external ? "a" : Link;
                         return (
-                            <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${!badge && dot ? " has-dot" : ""}`}>
+                            <Row key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${!badge && dot ? " has-dot" : ""}`}>
                                 {renderIcon(l)} {l.label}
                                 {badge ? <span className="game-nav-badge" title={title}>{badge}</span> : null}
                                 {/* Same rule as the grid: the count wins. Both marks on one link drew a dot
                                     through the number. */}
                                 {!badge && dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
-                            </Link>
+                            </Row>
                         );
                     })}
                 </div>
@@ -510,8 +525,11 @@ export default function GameNav() {
                                                     </div>
                                                 );
                                             }
+                                            // Same reason as the strip above: an external destination is
+                                            // an anchor, never a prefetched Link.
+                                            const Tile = it.external ? "a" : Link;
                                             return (
-                                                <Link key={it.href} href={it.href} className={`gm-tile${isOn(pathname, it.href) ? " is-active" : ""}${it.owner ? " is-owner" : ""}`} onClick={() => setMenuOpen(false)}>
+                                                <Tile key={it.href} href={it.href} className={`gm-tile${isOn(pathname, it.href) ? " is-active" : ""}${it.owner ? " is-owner" : ""}`} onClick={() => setMenuOpen(false)}>
                                                     <span className="gm-tile-ico">{renderBigIcon(it)}</span>
                                                     <span className="gm-tile-label">{it.label}</span>
                                                     <span className="gm-tile-sub">{it.sub}</span>
@@ -525,7 +543,7 @@ export default function GameNav() {
                                                         already means "something is waiting"; the dot is the
                                                         version of that for when there is nothing to count. */}
                                                     {!badge && dot ? <span className="gm-tile-dot" title="Needs attention" /> : null}
-                                                </Link>
+                                                </Tile>
                                             );
                                         })}
                                     </div>

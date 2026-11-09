@@ -74,6 +74,18 @@ const PREVIEW_GUESTS = {
     // credit. Inviting somebody is inviting them to spend their own balance on inventory that leaves the
     // shelf. See docs/virtual-packs-and-the-card-vault.md §16.4.
     vault: new Set([]),
+    // The door to Den Quest Online. Luke, 2026-11-09: "Can you add a menu item for me, little wolf and
+    // aanw that brings us from den quest to den quest online." Same two names as the Grove, and "aanw"
+    // means aannw the same way it did on 2026-11-02 -- one n short of her alias, and still the only member
+    // on the roster it can mean.
+    //
+    // ⚠️ THIS GATES THE LINK, NOT THE GAME. denQuestOpen below is the switch that decides who may PLAY,
+    // and it is open to every signed-in member for the playtest -- so a URL handed to a friend still
+    // works without a deploy. This set only decides whose menu shows the way in.
+    denquest: new Set([
+        "27da67c2-8548-453f-bda4-4349c0e4ef06", // Littlewolf
+        "cd8f4cd8-330a-4ead-ab34-b664fdd6dacf", // aannw (alyssa.craven@)
+    ]),
 };
 
 /**

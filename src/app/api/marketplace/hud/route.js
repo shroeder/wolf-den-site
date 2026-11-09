@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { canPreview } from "@/lib/marketplace/owner.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { arenaNav } from "@/lib/marketplace/arena.js";
 import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
@@ -55,7 +56,7 @@ export async function GET(request) {
         if (!id) {
             return noStore({
                 signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false },
-                jeweller: false, casino: false, kitchen: false, cards: false, grove: false, vault: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
+                jeweller: false, casino: false, kitchen: false, cards: false, grove: false, vault: false, denquest: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
             });
@@ -133,6 +134,10 @@ export async function GET(request) {
             // groveOpen changes in one place, and a second copy of the rule in the menu would keep the door
             // shut for everyone after the page had opened. Same reason as the cards gate above.
             grove: groveOpen(id),
+            // Den Quest Online — the 3D game on its own domain. ⚠️ THIS IS WHO SEES THE DOOR, NOT WHO MAY
+            // PLAY: denQuestOpen is open to every signed-in member for the playtest, so a link handed to a
+            // friend keeps working. The menu entry is for the people testing it, which is the named set.
+            denquest: canPreview("denquest", id),
             // What is shut, and which town opens it. The menu dims these; the ROUTES check for themselves
             // through requireFeature — a dimmed row whose URL still serves the page is not locked.
             gate,
