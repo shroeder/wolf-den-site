@@ -42,6 +42,7 @@
         "check:grove-curve": "node scripts/check-grove-curve.mjs",
         "check:grove-roll": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-roll.mjs",
         "check:grove-bar": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-bar.mjs",
+        "check:grove-hitstop": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-hitstop.mjs",
         "check:grove-physics": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-physics.mjs",
         "check:grove-pet": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-pet.mjs",
         "check:grove-loot": "node --import ./scripts/lib/register-loader.mjs scripts/check-grove-loot.mjs",

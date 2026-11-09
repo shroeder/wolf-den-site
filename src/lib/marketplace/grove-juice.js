@@ -34,13 +34,80 @@ export const HITSTOP_MS = { hit: 50, crit: 95, kill: 130, hurt: 70 };
 // ⚠️ NOT A FULL FREEZE. At exactly zero the screen looks like it hitched; a sliver of motion keeps the frame
 // alive and still delivers the pause. This is the dt multiplier WHILE stopped.
 export const HITSTOP_SCALE = 0.06;
+// ── ⚠️ HOW MUCH MOTION A FREEZE OWES BACK ───────────────────────────────────────────────────────────────────
+// A multiple of the beat just spent, so the ceiling holds no matter what the durations above become: the world
+// can be frozen at most 1/(1 + STOP_RECOVER) of real time. At 1.5 that is 40%, and at 6% sim speed while
+// stopped it means a frantic screen-wide multikill runs at roughly two thirds pace instead of grinding to a
+// halt. Raise it if hit-stop ever reads as sluggish again; it cannot be lowered to zero without bringing back
+// the deadlock check:grove-hitstop exists to catch.
+export const STOP_RECOVER = 1.5;
 
 /** The clock the whole scene runs on: real ms in, simulation dt out. */
 export function makeClock() {
     return {
         stopUntil: 0,
-        /** Freeze both bodies for `ms`. Never shortens a freeze already running — a kill outranks a hit. */
-        stop(now, ms) { this.stopUntil = Math.max(this.stopUntil, now + ms); },
+        // How long the freeze currently running was asked for. The strength of the beat, not its end.
+        stopMs: 0,
+        /**
+         * Freeze both bodies for `ms`. A kill outranks a hit.
+         *
+         * ── ⚠️ ONLY A STRONGER BEAT MAY TAKE OVER A RUNNING ONE. THIS USED TO BE A Math.max. ──────────────
+         * Luke, 2026-11-08: "Still lots of lag. Is there intentional hit lag building up?" — and yes, that is
+         * exactly what it was. He diagnosed it from the feel.
+         *
+         * The old line was `this.stopUntil = Math.max(this.stopUntil, now + ms)`, which never shortens a
+         * freeze and so composes two beats. That is right for the two cases it was written for — a quaff
+         * (110ms) taking over the hurt (70ms) that triggered it, and a kill (130ms) outranking a hit (50ms).
+         * It is catastrophic for the case nobody checked: the SAME beat arriving again and again.
+         *
+         * killFoe calls stop(now, 130) once per corpse. One-shotting a screen of twenty creatures means
+         * twenty of those, landing across however many frames the bodies take to resolve — and each one
+         * pushes stopUntil another 130ms into the future from ITS own `now`. Kill anything more often than
+         * every 130ms and the freeze never lifts, so dt stays multiplied by HITSTOP_SCALE and the entire
+         * simulation runs at 6% speed indefinitely. The frame rate is fine. Time has stopped.
+         *
+         * ⚠️ AND IT SELF-SUSTAINS, which is why it does not recover. Hit-stop scales dt, but the swing
+         * cooldown is measured in real milliseconds (see the header: every duration in this file is real
+         * time on purpose). So the player keeps swinging at full rate inside the freeze, keeps landing hits
+         * (+50ms) and kills (+130ms), and re-arms the thing that is holding the world still.
+         *
+         * ⚠️ THE PRINCIPLE WAS ALREADY WRITTEN DOWN, one file over, where the pet was deliberately denied a
+         * clock.stop() of its own: "Hit-stop freezes the simulation, and a second body freezing it on its own
+         * schedule is a stutter rather than impact. The hero owns time here." Twenty corpses freezing time on
+         * twenty schedules is that same mistake, made by the kill path itself.
+         *
+         * So strength decides, which is what both documented cases actually wanted:
+         *   · a stream of kills at 130ms each   -> ONE 130ms beat, not twenty stacked
+         *   · a quaff (110) during a hurt (70)  -> the quaff takes over, as its note requires
+         *   · a hit (50) during a kill (130)    -> ignored, as "a kill outranks a hit" requires
+         *   · an emblem (190) during a kill     -> takes over, because it is the rarer moment
+         *
+         * Worst case is now a strictly escalating chain (hit -> crit -> kill -> emblem), which is bounded at
+         * well under half a second and then must expire before anything can arm again.
+         */
+        // ⚠️ AND WHEN THE WORLD MAY BE STOPPED AGAIN. Strength alone is not enough: check:grove-hitstop
+        // measured a kill on every frame at 87% frozen even with the strength rule, because the instant a
+        // freeze lapsed the next corpse armed a fresh one. Punctuation needs space around it or it is not
+        // punctuation, it is the new baseline.
+        readyAt: 0,
+        stop(now, ms) {
+            const running = now < this.stopUntil;
+            if (running) {
+                // Already punctuating something at least as big: let it finish. A second body does not get
+                // to restart the clock on its own schedule — see the pet's note in GroveScene.
+                if (ms <= this.stopMs) return;
+            } else if (now < this.readyAt) {
+                // The world owes itself some motion before it may be stopped again.
+                return;
+            }
+            this.stopMs = ms;
+            this.stopUntil = now + ms;
+            // ⚠️ THE GAP IS PROPORTIONAL TO THE BEAT JUST SPENT, not a fixed number. A 130ms kill earns
+            // ~200ms of motion; a 50ms hit earns 75ms. That caps the world at STOP_RECOVER/(1+STOP_RECOVER)
+            // of real time running, whatever durations anybody picks later — tuning HITSTOP_MS can no longer
+            // reintroduce the deadlock, which a constant here would have allowed.
+            this.readyAt = this.stopUntil + ms * STOP_RECOVER;
+        },
         stopped(now) { return now < this.stopUntil; },
         /** dt in 60fps frames, clamped for a resumed tab, scaled to near-zero during hit-stop. */
         dt(now, last) {
