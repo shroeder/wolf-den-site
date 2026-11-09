@@ -1967,6 +1967,24 @@ export const GROVE_CSS = `
 .gv-bar.is-chest .gv-bar-fill { background: linear-gradient(90deg, #ffc857, #ffe9a8); }
 .gv-bar-n { flex: none; font-size: 0.72rem; font-weight: 800; color: #b9c4ae;
     font-variant-numeric: tabular-nums; }
+/* ── ⚠️ THE TICK IS HOW A SINGLE KILL IS SEEN ───────────────────────────────────────────────────
+   One kill is 1/250 of the bar — 0.4%, about a pixel and a half at full width. No amount of length
+   makes that visible, so the advance is ANNOUNCED rather than measured: a bright sliver at the
+   leading edge that flares and fades. The eye is drawn to change far more reliably than to size,
+   which is the same argument the telegraph's pulsing rim was built on.
+
+   ⚠️ translateX(-50%) SO IT SITS ON THE EDGE, not after it — at 100% an un-centred tick would hang
+   off the end of the track and be clipped by the overflow. */
+.gv-bar-tick { position: absolute; top: 0; bottom: 0; width: 10px; margin-left: -5px;
+    border-radius: 999px; pointer-events: none;
+    background: linear-gradient(90deg, rgba(255,255,255,0), #ffffff, rgba(255,255,255,0));
+    animation: gvBarTick 420ms ease-out forwards; }
+@keyframes gvBarTick { from { opacity: 0.95; transform: scaleY(1.9); } to { opacity: 0; transform: scaleY(1); } }
+/* The number bumps with it. Same keyed-node trick, and it is the one element here that can report a
+   single kill exactly rather than approximately. */
+.gv-bar-n b { display: inline-block; font-weight: 900; color: #eaf5df;
+    animation: gvBarNum 380ms ease-out; }
+@keyframes gvBarNum { 0% { transform: scale(1.5); color: #fff; } 100% { transform: scale(1); } }
 @keyframes gvHaulIn { from { opacity: 0; transform: translateX(-14px) scale(0.92); }
     to { opacity: 1; transform: none; } }
 @keyframes gvHaulBump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #fff6df; }

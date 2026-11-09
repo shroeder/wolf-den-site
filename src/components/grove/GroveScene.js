@@ -4232,13 +4232,30 @@ export default function GroveScene({
                             <i className="gv-bar-fill" style={{
                                 width: `${Math.min(100, Math.round((100 * shown) / bar.need))}%`,
                             }} />
+                            {/* ── ⚠️ ONE KILL IS 0.4% OF THE BAR, WHICH IS ABOUT A PIXEL AND A HALF ──────
+                                Luke: "Killed 1 enemy, didnt see the bar raise." The live fill was by then
+                                working correctly — the problem is arithmetic. A 250-kill bar cannot show a
+                                single kill by getting longer, at any width, ever.
+
+                                So the increment is announced instead of measured: a bright tick at the
+                                leading edge, flashed on each advance.
+
+                                ⚠️ KEYED ON `shown`, WHICH IS THE ENTIRE TRICK. Mutating the style of a live
+                                element does not restart a CSS animation — the deleted haul counter carried
+                                this exact note for the same reason. The key makes React replace the node,
+                                and a fresh node runs its animation from frame zero. */}
+                            <i className="gv-bar-tick" key={shown} style={{
+                                left: `${Math.min(100, Math.round((100 * shown) / bar.need))}%`,
+                            }} />
                         </span>
                     </span>
                     {/* ⚠️ CLAMPED, LIKE THE WIDTH ABOVE. BAR_MAX_FILLS defers rewards rather than
                         destroying them, so a single enormous settle can leave MORE than a full bar on the
                         clock — 2,600 kills pays eight and leaves 600 sitting on a 250 bar. Nothing is lost
                         (the next kill pays it out), but "600/250" reads as a bug. */}
-                    <span className="gv-bar-n">{shown}/{bar.need}</span>
+                    {/* Keyed for the same reason as the tick: the number is the only thing on this strip
+                        that can show a single kill, so it has to be seen to change. */}
+                    <span className="gv-bar-n"><b key={shown}>{shown}</b>/{bar.need}</span>
                 </div>
                 );
             })() : null}
