@@ -801,7 +801,16 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     //
     // Failure-tolerant like the hunts and the belt: a bar that misses a tick is a reward that arrives a
     // little later, while a throw here is a settle that fails and loses loot somebody watched drop.
-    const bar = await bumpBar(buyerId, Number(zone?.map) || Math.ceil(zoneN / 12) || 1, list.length)
+    // ── ⚠️ CREATURES KILLED, NOT KILL-LOG ENTRIES ───────────────────────────────────────────────────
+    // This was `list.length`, and that is not how many things died. A multi-kill pushes ONE entry carrying
+    // `c: credit` — eight bodies dropped by one blow is a single row — so the bar counted it as one. For
+    // anyone one-shotting a screenful, which is the whole late game, the bar crawled at a fraction of the
+    // real rate and 250 kills meant something nearer 250 SWINGS.
+    //
+    // `got.slain` is already the honest tally: settleKills sums safeCredit per creature id precisely so a
+    // caller cannot make this mistake, and the town hunts have been reading it correctly all along.
+    const slainTotal = Object.values(got.slain || {}).reduce((a, n) => a + (Number(n) || 0), 0);
+    const bar = await bumpBar(buyerId, Number(zone?.map) || Math.ceil(zoneN / 12) || 1, slainTotal)
         .catch(() => null);
 
     // ⚠️ RE-ARMED AFTER THE FOOD IS DEBITED, NOT BEFORE. The belt empties mid-dive, and a player who

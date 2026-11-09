@@ -1778,11 +1778,11 @@ export default function GroveScene({
             // as a reward. Thrown straight up off the body, held a full second, with the kill chime pitched
             // up the same way the combo pitches it — a louder version of the thing that already means
             // "that one counted".
-            if (credit > 1) {
-                // ⚠️ NOT A SECOND playKill. The ordinary kill chime fires below for every kill and already
-                // climbs with the streak; another one on the same frame is two chimes, not a bigger one.
-                // playMulti plays one note per credit OVER it — see the note on it in grove-sfx.js.
-            }
+            // ✂️ A `credit > 1` BRANCH STOOD HERE and is empty now — it held the "x8" plate and playMulti,
+            // both removed on Luke's instruction. The rule it recorded is still true for whatever announces
+            // a multikill next: do NOT fire a second playKill. The ordinary kill chime below already plays
+            // for every kill and climbs with the streak, so another on the same frame is two chimes rather
+            // than one bigger one.
             // The counter is drawn from wd.killIndex, which the line above has just moved; this is what
             // tells React to look at it again. It is the same re-render the foe list needs anyway.
             rerender();
@@ -4190,13 +4190,31 @@ export default function GroveScene({
                 had already been announced twice over; this is the only place the bar exists, so hiding
                 it would make the feature invisible to a screen reader rather than merely quieter.
                 role="progressbar" with the real numbers, because that is exactly what it is. */}
-            {bar?.need ? (
+            {bar?.need ? (() => {
+                // ── ⚠️ IT FILLS AS YOU KILL, NOT WHEN THE SERVER NOTICES ────────────────────────────
+                // Luke: "Killing enemies doesn't make the bar fill."
+                //
+                // It only ever moved on a settle, and SETTLE_EVERY_MS is 45 SECONDS. So the honest reading
+                // of a bar that is supposed to answer "how close am I" was: kill thirty things, watch
+                // nothing happen, and conclude it is broken. It was not broken, it was asleep.
+                //
+                // ⚠️ THE LIVE VALUE NEEDS NO NEW STATE, AND THAT IS WHY THIS IS THE RIGHT SUM. `killLog`
+                // holds exactly the kills the server has NOT been told about yet, and `bar.kills` is the
+                // server's count of everything it HAS. Adding them is the whole answer, it cannot drift,
+                // and it resets itself the instant the log is spliced into a settle — no second counter to
+                // keep in step, and no window where the bar ticks backwards because two tallies disagree.
+                //
+                // ⚠️ AND IT SUMS CREDIT, NOT ROWS. One entry can be eight bodies (`c`), which is the same
+                // mistake the server was making until this commit — see the note on slainTotal in grove.js.
+                const pending = (world.killLog || []).reduce((a, k) => a + (Number(k?.c) || 1), 0);
+                const shown = Math.min(bar.need, (bar.kills || 0) + pending);
+                return (
                 <div className={`gv-bar${bar.next?.kind === "chest" ? " is-chest" : ""}`}
                     role="progressbar" aria-valuemin={0} aria-valuemax={bar.need}
-                    aria-valuenow={Math.min(bar.need, bar.kills || 0)}
+                    aria-valuenow={shown}
                     aria-label={bar.next?.kind === "chest"
-                        ? `${bar.need - (bar.kills || 0)} kills to a chest`
-                        : `${bar.need - (bar.kills || 0)} kills to ${bar.next?.name || "a tool"}`}>
+                        ? `${bar.need - shown} kills to a chest`
+                        : `${bar.need - shown} kills to ${bar.next?.name || "a tool"}`}>
                     {bar.next?.art ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={bar.next.art} alt="" width={30} height={30} draggable={false} />
@@ -4212,7 +4230,7 @@ export default function GroveScene({
                                 crossed two rewards can hand back a kills value the width maths would
                                 otherwise render as 180% — which paints outside the track. */}
                             <i className="gv-bar-fill" style={{
-                                width: `${Math.min(100, Math.round((100 * (bar.kills || 0)) / bar.need))}%`,
+                                width: `${Math.min(100, Math.round((100 * shown) / bar.need))}%`,
                             }} />
                         </span>
                     </span>
@@ -4220,9 +4238,10 @@ export default function GroveScene({
                         destroying them, so a single enormous settle can leave MORE than a full bar on the
                         clock — 2,600 kills pays eight and leaves 600 sitting on a 250 bar. Nothing is lost
                         (the next kill pays it out), but "600/250" reads as a bug. */}
-                    <span className="gv-bar-n">{Math.min(bar.need, bar.kills || 0)}/{bar.need}</span>
+                    <span className="gv-bar-n">{shown}/{bar.need}</span>
                 </div>
-            ) : null}
+                );
+            })() : null}
 
             {world.herald ? (
                 <div className={`gv-herald is-${world.herald.kind}`} aria-hidden="true">
