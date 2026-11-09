@@ -58,15 +58,7 @@
         "check:street": "node --import ./scripts/lib/register-loader.mjs scripts/check-street.mjs",
         "check:overlays": "node scripts/check-overlays.mjs",
         "check:slabs": "node --import ./scripts/lib/register-loader.mjs scripts/check-slab-surface.mjs",
-        "check:sql": "node scripts/check-sql-params.mjs",
-        "rt:serve": "node gameserver/server.mjs",
-        "rt:bot": "node gameserver/test/bot.mjs",
-        "rt:milestone": "node gameserver/test/milestone.mjs",
-        "rt:ticket": "node gameserver/test/ticket.mjs",
-        "lp:make": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/make.py",
-        "lp:film": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/harness/film.py",
-        "lp:gate": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/harness/gate.py",
-        "lp:done": "node scripts/lowpoly/harness/done.mjs"
+        "check:sql": "node scripts/check-sql-params.mjs"
     },
     "keywords": [],
     "author": "",

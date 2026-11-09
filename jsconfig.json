@@ -4,12 +4,6 @@
         "paths": {
             "@/*": [
                 "src/*"
-            ],
-            "@sim/*": [
-                "gameserver/sim/*"
-            ],
-            "@rtclient/*": [
-                "gameserver/client/*"
             ]
         }
     }

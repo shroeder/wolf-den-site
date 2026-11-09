@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
 import { SITE_HOSTNAME } from "@/lib/site";
 
-const GAME_ONLY = new Set(["/den-quest", "/enter", "/model-lab", "/walk-lab"]);
-
-function isGameHost(hostname) {
-    const h = String(hostname || "").toLowerCase();
-    return h === "denquestonline.com" || h === "www.denquestonline.com"
-        // Previews and local work have no second domain to test against, so the
-        // routes stay reachable there; production is where the line matters.
-        || h === "localhost" || h === "127.0.0.1" || h.endsWith(".vercel.app");
-}
-
 export function proxy(request) {
     const { nextUrl } = request;
 
@@ -18,24 +8,6 @@ export function proxy(request) {
         const redirectUrl = nextUrl.clone();
         redirectUrl.hostname = SITE_HOSTNAME;
         return NextResponse.redirect(redirectUrl, 308);
-    }
-
-    // ── ONE DEPLOYMENT, TWO PRODUCTS, AND THE HOST DECIDES ───────────────────────────────────────────────
-    // Luke, 2026-11-09: "I dont want the 3d game or any 3d labs in the existing website."
-    //
-    // denquestonline.com and wolfdengamingmn.com are the same Vercel project — that is what lets the game
-    // reuse the accounts table, the session code and the deploy pipeline without a second codebase. But
-    // sharing a deployment would otherwise mean sharing every ROUTE: /den-quest, /model-lab and /walk-lab
-    // would answer on the shop's domain too, just unlinked.
-    //
-    // ⚠️ UNLINKED IS NOT THE SAME AS ABSENT. A route nobody links to is still a route — reachable by anyone
-    //    who guesses it, and invisible to the next person who adds a nav item. The host check is what makes
-    //    the separation true rather than a convention.
-    //
-    // A total list, not a prefix: a prefix would quietly capture a future shop route starting with the same
-    // word. A 404 rather than a redirect, because redirecting would leak that the page exists elsewhere.
-    if (GAME_ONLY.has(nextUrl.pathname) && !isGameHost(nextUrl.hostname)) {
-        return new NextResponse(null, { status: 404 });
     }
 
     // Anonymous visitor id for marketplace engagement analytics (unique reach). The native app sends

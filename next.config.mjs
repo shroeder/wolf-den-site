@@ -27,20 +27,6 @@ const nextConfig = {
             // Serve the Android App Links verification file (public/ dot-folders aren't served).
             { source: "/.well-known/assetlinks.json", destination: "/api/assetlinks" },
 
-            // ── DEN QUEST HAS ITS OWN DOMAIN, ON THIS DEPLOYMENT ─────────────────────────────────────
-            // denquestonline.com is a second domain on the same Vercel project, so the game gets its own
-            // front door without a second codebase, a second accounts table, or a second thing to deploy.
-            // The host condition is what keeps the shop's own "/" untouched.
-            //
-            // ⚠️ A REWRITE, NOT A REDIRECT. A redirect would bounce visitors to wolfdengamingmn.com and
-            //    put the shop's URL in their address bar, which defeats the point of buying the domain.
-            //    A rewrite serves the page while the URL stays denquestonline.com -- and, critically, the
-            //    session cookie written by /enter stays on that host.
-            {
-                source: "/",
-                has: [{ type: "host", value: "(www\.)?denquestonline\.com" }],
-                destination: "/den-quest",
-            },
         ];
     },
     async redirects() {
