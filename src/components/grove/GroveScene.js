@@ -1596,131 +1596,9 @@ export default function GroveScene({
         // confident stale comment is worse than no comment.
 
 
-        // ── ⚠️ THE SKILL ENGINE: SIX PRIMITIVES, THIRTY-SIX SKILLS ──────────────────────────────────
-        // Luke: "what's going to be the most fun for people is having skills that do AoE ... the most
-        // important thing for me is that the AoE and the being able to see the AoE happen."
-        //
-        // The table lives in grove-skills.js and says WHAT each node does here; this is the half that makes
-        // it happen on screen. Six shapes, composed — nova, corpse, cleave, spread, aura, self — because
-        // thirty-six bespoke branches in this file is how a scene becomes unmaintainable.
-        //
-        // ⚠️ THE RING IS SIZED TO THE REAL RADIUS, and that is the whole point of it. An AoE you cannot see
-        // the edge of is a number appearing on things you did not hit; the ring is drawn at exactly the
-        // world radius the damage used, so the area IS the picture. Everything else that reads as a hit —
-        // the flash, the pop, the shake — is reused here rather than reinvented.
-        // ── ⚠️ WHICH SHAPE A SKILL WEARS ────────────────────────────────────────────────────────
-        // Luke: "everything is the same. A ring on the ground... Friend or foe ring all the same. I
-        // was picturing like legit skill effects. Like in maple story a literal lightning bolt strikes
-        // down for lightning skills."
-        //
-        // Twenty-nine skills all drew the same ground ellipse in one of four colours, and colour is
-        // the weakest signal there is in a scene this busy. Keyed by what the skill IS, not by which
-        // of the six mechanical primitives implements it — Bloodletting and Frostbite are both
-        // `corpse`, and they must not look alike.
-        //
-        // ⚠️ PREFIX FIRST, THEN THE EXCEPTIONS. rv_ is blood, wd_ is the guard, rc_ is elemental and
-        // splits by element. A skill with no entry falls through to the ring, which is why the ring
-        // is kept: a new skill looks plain rather than invisible.
-        // ⚠️ ALL THIRTY-SIX ARE NAMED. The first pass mapped by prefix with a handful of exceptions and
-        // left seven skills — Quickblade, Red Harvest, Bastion, Unbreakable, Aether Ward, Runic Overflow,
-        // Cataclysm — falling through to the ring, which is the thing being replaced. Luke counted the
-        // tree before I did: "Should be at least 9 effects right? Since isnt there 9 primary skills?"
-        // Four tiers of nine, 36 nodes, and the nine TIER-0 primaries are the ones a player meets first:
-        //
-        //   Rend · Quickblade · Killing Edge        the blade
-        //   Bulwark · Ironhide · Constitution       the guard
-        //   Kindle · Emberheart · Immolate          the fire
-        //
-        // Every one of those nine now has a silhouette of its own, and the remaining 27 are mapped to the
-        // nine rather than left on the fallback.
-        const SFX_BY_ID = {
-            // ── the blade ────────────────────────────────────────────────────────────────────────
-            rv_rend: "claw", rv_scent: "claw", rc_chill: "shards",
-            rv_quick: "flurry", rv_harvest: "flurry",
-            rv_edge: "slash", rv_riposte: "slash", rv_concuss: "slash",
-            rv_letting: "spray", rv_savage: "spray", rv_exsang: "spray",
-            rv_deep: "aura", rv_frenzy: "aura",
-            // ── the guard ────────────────────────────────────────────────────────────────────────
-            wd_bulwark: "dome", wd_deflect: "dome", wd_bastion: "dome", wd_unbreak: "dome",
-            wd_ironhide: "shards", wd_thorns: "shards",
-            wd_const: "aura", wd_mend: "aura", wd_blood: "aura",
-            wd_retrib: "slash", wd_grudge: "slash", wd_concuss: "slash",
-            // ── the fire and the runes ───────────────────────────────────────────────────────────
-            rc_kindle: "column", rc_ember: "column", rc_immolate: "aura", rc_soulfire: "column",
-            rc_frost: "shards", rc_rime: "shards",
-            rc_might: "bolt", rc_reservoir: "bolt", rc_overflow: "bolt",
-            rc_cata: "bolt", rc_ward: "dome",
-        };
-        const sfxFor = (sk) => {
-            if (SFX_BY_ID[sk.id]) return SFX_BY_ID[sk.id];
-            // Still a fallback by class, so a skill added tomorrow looks like its family rather than
-            // like nothing — and check:sfx below fails if anybody adds one without naming it.
-            if (sk.id.startsWith("wd_")) return "dome";
-            if (sk.id.startsWith("rv_")) return sk.at === "kill" ? "spray" : "slash";
-            return null;
-        };
-        // ── ⚠️ PAINTED ART WHERE IT EXISTS, SHAPE WHERE IT DOES NOT ─────────────────────────────
-        // Luke: "Aren't you able to make like real effects? ... Ideally something not too
-        // processing heavy given its a browser game."
-        //
-        // These ten frames were drawn, paid for and shipped for the arena months ago, and six of
-        // them ARE these shapes — rend IS the claw, freeze IS the shards, ward IS the dome. Drawing
-        // new art for them would be regenerating art that already shipped, which is against the
-        // house rule, and it would also be worse: this art has been looked at and kept.
-        //
-        // The art is painted on black and composited with screen blend — see grove-css.js. A shape
-        // with no entry here keeps its CSS silhouette, so the fallback is a real effect, not a gap.
-        //
-        // ⚠️ A PATH NAMED HERE MUST EXIST ON DISK. A missing file does not error, does not warn,
-        // and draws nothing at all — the node is there with no background. check:sfx stats every
-        // one of these, because I nearly shipped a guard mapped at a file that was never drawn.
-        // ⚠️ MAPPED BY LOOKING AT THE PICTURES, NOT BY READING THE FILENAMES. The first version of this map
-        // paired them by name and was wrong three times out of six: rend-peak is not a rend, it is a FIRE
-        // EXPLOSION, and flurry-peak is not a flurry, it is three CLAW STREAKS. Those two names come from
-        // arena moves, not from what the generator drew. scripts/fx-sheet.mjs renders every frame on disk
-        // next to the skill using it, which is the only reason I caught it.
-        const ART_BY_SHAPE = {
-            claw: "/images/arena/vfx/flurry-peak.webp",   // three curved streaks — Rend, exactly
-            flurry: "/images/arena/vfx/sunder-peak.webp", // a burst of blades, reads as many fast hits
-            column: "/images/arena/vfx/rend-peak.webp",   // a pillar of fire — Kindle, Emberheart, Soulfire
-            slash: "/images/arena/vfx/riposte-peak.webp", // a single teal crescent
-            spray: "/images/arena/vfx/drain-peak.webp",   // a red sphere pulled inward
-            shards: "/images/arena/vfx/freeze-peak.webp", // blue crystal starburst
-            dome: "/images/arena/vfx/ward-peak.webp",     // a blue shield sphere
-            // bolt stays a CSS silhouette and is NOT a gap: the drawn lightning bolt already reads as
-            // the thing Luke named by hand ("a literal lightning bolt strikes down"), and the nearest
-            // painted candidate, spell-peak, is a few faint purple wisps that vanish against foliage.
-            //
-            // aura stays CSS ON PURPOSE and is not a gap to be filled later: the generator was
-            // asked twice for exactly this (arena surge and gamble) and returned a soft glow wash
-            // both times, which blocks under compression and reads as a smear over the body. Shapes
-            // draw a breathing glow better than the model does, with no artifacts.
-        };
-        // How wide the art draws, in world units, per shape. The bodies are about 7 units, so a
-        // guard dome that reads as protective is wider than a blade flick that reads as fast.
-        // Widths in world units, set against a ~7-unit body on the contact sheet rather than guessed. The
-        // fire column is the tall one because it is a pillar; the crescent is small because it is a flick.
-        const ART_W = { claw: 13, flurry: 13, column: 14, slash: 13, spray: 12, shards: 13, dome: 13 };
-        /** Draw one skill shape at a world point. One element, one animation, no per-frame work. */
-        const skillFx = (shape, x, y) => {
-            const layer = fxRef.current;
-            if (!layer || !shape) return;
-            const el = document.createElement("i");
-            el.className = `gv-sfx is-${shape}`;
-            const art = ART_BY_SHAPE[shape];
-            if (art) {
-                el.classList.add("has-art");
-                // --art, not background-image: see the note on .gv-sfx.has-art in grove-css.js.
-                el.style.setProperty("--art", `url(${art})`);
-                el.style.setProperty("--art-w", String(ART_W[shape] || 10));
-            }
-            layer.appendChild(el);
-            // Rides the spark pool so it is positioned, aged and removed by the same loop as everything
-            // else — a second lifetime mechanism is a second place to leak nodes.
-            w.sparks.push({ x, y, vx: 0, vy: 0, g: 0,
-                born: w.sceneNow ? w.sceneNow() : performance.now(),
-                life: shape === "slash" ? 320 : shape === "bolt" ? 420 : 520, node: el, ring: true, flat: true });
-        };
+        // ✂️ skillFx IS GONE with the engine. It drew one shape per cast — slash, bolt, column, claw,
+        // flurry, spray, shards, dome — as a single element riding the spark pool's lifetime loop.
+
 
         // ✂️ THE NOVA RING IS GONE with the other ground circle. It drew the AoE's edge at its REAL radius,
         // which its own note called the whole point — "an AoE you cannot see the edge of is a number
@@ -1734,168 +1612,37 @@ export default function GroveScene({
         // a white screen and a cleared map. Two deep: a blow kills, the corpse bursts, that burst's kills
         // burst once more, and the third generation is silent. Luke: "we don't really have to worry so much
         // about balance" — this is not balance, it is a termination condition.
-        const NOVA_MAX_DEPTH = 2;
-        let novaDepth = 0;
+        // ✂️ NOVA_MAX_DEPTH and novaDepth went too. Worth recording what they were FOR, because the
+        // failure they prevented is the kind that only shows up in a full zone: Bloodletting at rank five
+        // detonated every corpse, and each detonation's kills detonated again — an unbounded chain that
+        // ended in a white screen and a cleared map. If any chain-on-kill mechanic is ever built again, it
+        // needs a termination condition from the first line, not after someone clears a map by accident.
 
-        // ── ⚠️ ONE WORD PER CHAIN, NOT ONE PER BODY ─────────────────────────────────────────────────
-        // Filmed on the bench: eight corpses bursting fired eight BLOODLETTINGs and eight RENDs into the
-        // same patch of screen on the same frame, and the sheet came back reading
-        // "REBLOODLETTINGNGNGNG" — three words deep in places. A call-out exists to tell you a thing
-        // happened; sixteen of them tell you nothing and bury the damage numbers underneath.
+        // ✂️ sayOnce went with it — the once-per-cast caption guard, so a nova catching nine
+        // bodies announced its name once instead of nine times.
+
+
+        // ✂️ skillNova went with the engine — the AoE primitive itself. "No more aoe".
+
+
+        // ✂️ nearestFoes went with it: the cleave/spread primitives' target picker.
+
+        // ── ✂️ THE SKILL ENGINE IS GONE, 2026-11-08 ────────────────────────────────────────────────
+        // Luke: "Remove all skill effects skills and the class related screens from the grove. No more aoe"
         //
-        // So a skill announces itself ONCE per cascade: at depth zero (the blow you actually struck), and
-        // never again for the kills that blow caused. Plus a short lockout per word, because two separate
-        // swings a tenth of a second apart are still one event as far as the eye is concerned.
-        const PROC_LOCKOUT_MS = 520;
-        const procSaid = new Map();
-        const sayOnce = (word, kind, art, atY, on, nowMs) => {
-            if (novaDepth > 0) return;
-            if (nowMs - (procSaid.get(word) || -1e9) < PROC_LOCKOUT_MS) return;
-            procSaid.set(word, nowMs);
-            procCall(word, kind, art, atY, on);
-        };
+        // Six primitives — nova, corpse, cleave, spread, aura, self — composed into thirty-six skills, fired
+        // from eleven triggers: hit, crit, kill, killN, swingN, block, guardBreak, hurt and the rest. The
+        // table that said WHAT each node did lived in grove-skills.js and is deleted with it.
+        //
+        // ⚠️ THIS REVERSES ITEM B OF THE FEEDBACK BACKLOG, which was built to this brief: "the whole class
+        // tree and everything, that all needs to also live in a menu in the Grove... you should be able to
+        // make class selections and tree decisions from that same area". That is a deliberate reversal, not
+        // a regression — see the note in docs/grove-feedback-backlog.md.
+        //
+        // ⚠️ WHAT SURVIVES: the class's STATS. combatStats still feeds might, armour, crit, lifesteal and
+        // the rest into the Grove's fighter through grove-kit, so a build is still worth what it is worth.
+        // What is gone is the class DOING things — the AoE, the procs and the art that announced them.
 
-        const skillNova = (now, x, y, r, dmg, o = {}) => {
-            if (!(r > 0)) return 0;
-            const kind = o.kind || "nova";
-            w.shake.add(TRAUMA.kill * Math.min(1.5, 0.45 + r / 9));
-            // ⚠️ A SNAPSHOT, NOT THE LIVE ARRAY. killFoe can set `dying` and the respawn pass can splice,
-            // and mutating what you are iterating is how one body in a crowd silently gets skipped.
-            const targets = w.foes.slice();
-            let struck = 0;
-            for (const f of targets) {
-                if (!f || f.dying || f.hp <= 0) continue;
-                if (o.not && f === o.not) continue;
-                const dx = f.x - x;
-                const dy = (f.y + f.h * 0.45) - y;
-                if (dx * dx + dy * dy > r * r) continue;
-                struck += 1;
-                if (o.stunMs > 0 && !(now < (f.lockImmuneUntil || 0))) {
-                    f.stunUntil = Math.max(f.stunUntil || 0, now + o.stunMs);
-                    f.nextAttack = Math.max(f.nextAttack || 0, f.stunUntil);
-                }
-                if (o.knock > 0) impulse(f, Math.sign(f.x - x || 1) * o.knock * 6, 2);
-                if (!(dmg > 0)) continue;
-                // Deep Cuts: anything already bleeding takes more from every source, this included.
-                const vuln = f.bleed && (stats?.groveVuln || 0) > 0 ? 1 + stats.groveVuln : 1;
-                const tick = Math.max(1, Math.round(dmg * vuln));
-                f.hp -= tick;
-                f.hurtAt = now;
-                lightUp(f, now);
-                if (f.big || f.rare) { w.bossBar = { hp: Math.max(0, f.hp), maxHp: f.maxHp }; w.bossHurtAt = now; }
-                // ⚠️ A NUMBER ON THE FIRST FEW ONLY. A nova catching nine bodies printed nine numbers into
-                // one ellipse and they overlapped into a smear — the ring already says how many were
-                // caught, and the health bars say it again. Four is enough to read the magnitude; the rest
-                // get the flash and the shake, which is what tells you they were hit.
-                // ⚠️ A BOSS ALWAYS GETS ITS NUMBER, whatever order it came back in: that one is the fight.
-                if (struck <= 4 || f.big || f.rare || f.isBoss) {
-                    addPop("nova", `${tick}`, f.x, f.y + f.h * 0.62, popWeight(tick, f.maxHp));
-                }
-                if (f.hp <= 0) {
-                    f.hp = 0;
-                    if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, f, now, tick); novaDepth -= 1; }
-                    else killFoe(w, f, now, 0);
-                }
-            }
-            return struck;
-        };
-
-        /** The n nearest living foes to a point, excluding one. For cleave and the seeking bolts. */
-        const nearestFoes = (x, y, n, not = null) => w.foes
-            .filter((f) => f && !f.dying && f.hp > 0 && f !== not)
-            .map((f) => ({ f, d: (f.x - x) ** 2 + ((f.y + f.h * 0.45) - y) ** 2 }))
-            .sort((a, b) => a.d - b.d).slice(0, Math.max(0, n)).map((e) => e.f);
-
-        /**
-         * Fire every skill registered for a trigger.
-         *
-         * `ctx` carries whatever that moment knows — the corpse, the blow that landed, the hero's own swing
-         * — and each primitive reads what it needs. Unknown fields are simply absent, which is why a skill
-         * that wants a corpse does nothing on a `hit`.
-         */
-        const fireSkills = (now, at, ctx = {}) => {
-            const list = stats?.skills;
-            if (!list?.length) return;
-            for (const sk of list) {
-                if (sk.at !== at) continue;
-                const n = sk.rank;
-                if (sk.chance != null && w.rand() > sk.chance * n) continue;
-                const foe = ctx.foe || null;
-                if (sk.kind === "corpse") {
-                    if (!foe) continue;
-                    if (sk.onlyCrit && !ctx.crit) continue;
-                    if (sk.onlyBurn && !ctx.wasBurning) continue;
-                    if (sk.onlyFrozen && !ctx.wasFrozen) continue;
-                    // ⚠️ OFF THE BODY'S OWN HEALTH, which is what makes this scale with the ZONE instead of
-                    // with the player. A rootrat pops; an Elderling levels the clearing. Luke's own example.
-                    skillNova(now, foe.x, foe.y + foe.h * 0.45, sk.radius * n,
-                        Math.max(1, foe.maxHp * sk.share * n),
-                        { kind: sk.onlyFrozen ? "frost" : "corpse", not: foe });
-                    skillFx(sfxFor(sk), foe.x, foe.y + foe.h * 0.1);
-                    sayOnce(sk.name.toUpperCase(), "nova", null, 1.25, foe, now);
-                } else if (sk.kind === "nova") {
-                    const src = sk.atHero ? w.hero : (foe || w.hero);
-                    const base = ctx.dealt || stats?.damage || 0;
-                    const dmg = sk.banked ? (w.banked || 0) : base * (sk.share || 0) * n;
-                    if (sk.banked) w.banked = 0;
-                    const strikes = sk.strikes ? Math.min(9, sk.strikes + n - 1) : 1;
-                    for (let i = 0; i < strikes; i += 1) {
-                        // A multi-strike WALKS the zone rather than stacking on one spot — the difference
-                        // between "a storm" and "a big circle".
-                        const ox = strikes > 1 ? (i - (strikes - 1) / 2) * (sk.radius * 0.45) : 0;
-                        skillNova(now, src.x + ox, src.y + src.h * 0.45, sk.radius * (sk.atHero ? 1 : n), dmg,
-                            { kind: sk.id.startsWith("rc_") ? "frost" : "nova",
-                                stunMs: (sk.stunMs || 0) * n, knock: (sk.knock || 0) * n });
-                    }
-                    // ⚠️ AT THE HERO WHEN IT IS THE HERO'S. The whole friend-or-foe complaint is that a
-                    // defensive proc looked like an attack; the dome has to grow out of HIM.
-                    skillFx(sfxFor(sk), sk.atHero || !foe ? w.hero.x : foe.x,
-                        sk.atHero || !foe ? w.hero.y + w.hero.h * 0.1 : foe.y + foe.h * 0.1);
-                    sayOnce(sk.name.toUpperCase(), "nova", null, 1.3, sk.atHero ? null : foe, now);
-                } else if (sk.kind === "cleave") {
-                    const base = ctx.dealt || stats?.damage || 0;
-                    const from = nearestFoes(ctx.x ?? w.hero.x, ctx.y ?? w.hero.y, Math.min(6, sk.n + n - 1), foe);
-                    for (const t of from) {
-                        const tick = Math.max(1, Math.round(base * sk.share * n));
-                        t.hp -= tick; t.hurtAt = now; lightUp(t, now);
-                        addPop("nova", `${tick}`, t.x, t.y + t.h * 0.62, popWeight(tick, t.maxHp));
-
-                        if (t.hp <= 0) {
-                            t.hp = 0;
-                            if (novaDepth < NOVA_MAX_DEPTH) { novaDepth += 1; killFoe(w, t, now, tick); novaDepth -= 1; }
-                        }
-                    }
-                    if (from.length) skillFx(sfxFor(sk), from[0].x, from[0].y + from[0].h * 0.1);
-                    if (from.length) sayOnce(sk.name.toUpperCase(), "nova", null, 1.2, from[0], now);
-                } else if (sk.kind === "spread") {
-                    if (!foe) continue;
-                    const src = sk.dot === "burn" ? foe.burn : sk.dot === "chill" ? { dmg: 1, leech: 0 } : foe.bleed;
-                    if (!src) continue;
-                    const r = sk.radius * n;
-                    for (const t of w.foes.slice()) {
-                        if (!t || t === foe || t.dying || t.hp <= 0) continue;
-                        const dx = t.x - foe.x;
-                        const dy = (t.y + t.h * 0.45) - (foe.y + foe.h * 0.45);
-                        if (dx * dx + dy * dy > r * r) continue;
-                        if (sk.dot === "chill") { t.chillUntil = Math.max(t.chillUntil || 0, now + 1200); continue; }
-                        const per = Math.max(1, Math.round((src.dmg || 1) * sk.share * n));
-                        t[sk.dot] = { dmg: per, leech: src.leech || 0, spread: false,
-                            left: sk.dot === "burn" ? BURN_TICKS : BLEED_TICKS,
-                            nextAt: now + (sk.dot === "burn" ? BURN_TICK_MS : BLEED_TICK_MS) };
-
-                    }
-                    skillFx(sfxFor(sk), foe.x, foe.y + foe.h * 0.1);
-                    sayOnce(sk.name.toUpperCase(), sk.dot === "burn" ? "ignite" : "bleed", null, 1.2, foe, now);
-                } else if (sk.kind === "self") {
-                    if (sk.tempo) w.hasteUntil = Math.max(w.hasteUntil || 0, now + (sk.ms || 2000));
-                    if (sk.healShare && foe?.bleed) {
-                        const heal = Math.max(1, Math.round((foe.bleed.dmg || 0) * (foe.bleed.left || 0) * sk.healShare * n));
-                        w.hp = Math.min(maxHp, w.hp + heal);
-                        addPop("heal", `+${heal}`, w.hero.x, w.hero.y + HERO_UNITS * 1.3);
-                    }
-                }
-            }
-        };
 
         // ── ⚠️ ONE FUNCTION PAYS A KILL, AND BOTH CALLERS GO THROUGH IT ───────────────────────────
         // Two paths for one payout always drift — see atomic-split-into-steps-drops-lines, which this repo
@@ -2078,15 +1825,8 @@ export default function GroveScene({
             // After the log and the credit, before the loot: a corpse that bursts and takes three more
             // bodies with it must have those three counted as their own kills, which is what calling
             // killFoe recursively (depth-guarded) through skillNova gives for free.
-            fireSkills(now, "kill", { foe, crit, dealt, wasBurning, wasFrozen });
+            
             wd.killStreak = (wd.killStreak || 0) + 1;
-            for (const sk of stats?.skills || []) {
-                if (sk.at !== "killN") continue;
-                const every = Math.max(6, (sk.every || 14) - sk.rank * 2);
-                if (wd.killStreak % every) continue;
-                fireSkills(now, "killN", { foe, dealt });
-                break;   // one call fires every killN skill; the loop only picks the cadence
-            }
 
             wd.combo = now < wd.comboUntil ? wd.combo + 1 : 1;
             wd.comboUntil = now + COMBO_WINDOW_MS;
@@ -2788,17 +2528,10 @@ export default function GroveScene({
                     // Before the kill check, because Runic Might's little blast and Killing Edge's cleave
                     // are part of the SAME swing — resolving them after the body falls would make a lethal
                     // hit quietly skip them, which is the one hit they most obviously belong on.
-                    fireSkills(now, "hit", { foe, dealt: hit.dealt, crit: hit.crit, x: foe.x, y: foe.y + foe.h * 0.45 });
-                    if (hit.crit) fireSkills(now, "crit", { foe, dealt: hit.dealt, crit: true, x: foe.x, y: foe.y + foe.h * 0.45 });
+                    
+                    if (hit.crit) 
                     // ── AND EVERY NTH SWING ─────────────────────────────────────────────────────
                     w.swingCount = (w.swingCount || 0) + 1;
-                    for (const sk of stats?.skills || []) {
-                        if (sk.at !== "swingN") continue;
-                        const every = Math.max(2, (sk.every || 6) - sk.rank);
-                        if (w.swingCount % every) continue;
-                        fireSkills(now, "swingN", { foe, dealt: hit.dealt, x: foe.x, y: foe.y + foe.h * 0.45 });
-                        break;
-                    }
                     if (foe.hp <= 0) killFoe(w, foe, now, hit.dealt);
                 }
             }
@@ -3222,13 +2955,13 @@ export default function GroveScene({
                 //
                 // ⚠️ `soaked` IS WHAT THE POOL ATE THIS BLOW, and it is the number Bastion pays out. Passed
                 // as `dealt` so the nova scales off what was actually absorbed rather than off a swing.
-                if (guard.blocked) fireSkills(now, "block", { foe, dealt: soaked || dealt, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
+                if (guard.blocked) 
                 // ⚠️ w.shield IS THE POOL, not w.ward. Both the Warden's guard and the Runecaller's ward
                 // share ONE absorb pool by design (see the note at the top of the guard block) — there is no
                 // separate w.ward and a check against one would never have fired, which is the quietest
                 // possible way for a headline skill to do nothing.
                 if (soaked > 0 && (w.shield || 0) <= 0) {
-                    fireSkills(now, "guardBreak", { foe, dealt: soaked, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
+                    
                 }
                 if (guard.blocked || soaked > 0) {
                     // Steel off the shield arm, thrown back toward whatever swung. A block that only
@@ -3244,7 +2977,7 @@ export default function GroveScene({
                 // Thornmail hits EVERY attacker rather than the one that connected, Rimeguard sets off a
                 // frost nova, Bloodscent turns you below half. `foe` is whatever swung, so a nova centred
                 // on it catches the crowd that closed in with it.
-                fireSkills(now, "hurt", { foe, dealt, x: w.hero.x, y: w.hero.y + w.hero.h * 0.45 });
+                
                 w.hurtAt = now;
                 w.clock.stop(now, HITSTOP_MS.hurt);
                 w.shake.add(TRAUMA.hurt);

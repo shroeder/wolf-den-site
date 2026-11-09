@@ -31,7 +31,6 @@ import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
 import { CLASSES, treeFor } from "@/lib/marketplace/arena-classes.js";
-import { groveSkills, skillsForClass as groveSkillsForClass } from "@/lib/marketplace/grove-skills.js";
 import { fighterFrom } from "@/lib/marketplace/arena.js";
 import {
     HERO_UNITS, PET_UNITS, SKY_TILE_COUNT,
@@ -558,34 +557,21 @@ const NOT_IN_THE_GROVE = {};
 }
 
 // ── ⚠️ WHAT THE SERVER HANDS THE CLIENT MUST SURVIVE SERIALIZATION ────────────────────────────────────────
-// The Grove page is a Server Component that renders `<GroveClient initial={await groveState(id)} />`, so
-// every value in that payload crosses the RSC boundary — and React refuses to carry a function across it.
+// ✂️ THE CHECK IS GONE WITH ITS SUBJECT (the Grove's skills, removed 2026-11-08) BUT THE RULE IS NOT, and
+// whoever adds the next thing to the Grove's payload needs it:
 //
-// groveSkills built its rows as `{ ...s, rank, text: s.grove(rank) }`, which spread the `grove` FORMATTER
-// into the row beside the string it had just produced. The row lands on `hero.skills`, so the whole page
-// threw in the render: "Functions cannot be passed directly to Client Components". In production that is a
-// bare digest with the message stripped, and it only fired for a member who had actually spent a point —
-// so it read as "the Grove crashes" while every client-side check in this repo stayed green, because
-// nothing client-side ever got to run.
+// The Grove page is a Server Component rendering `<GroveClient initial={await groveState(id)} />`, so every
+// value in that payload crosses the RSC boundary — and React refuses to carry a FUNCTION across it.
 //
-// A gate on the DATA cannot see that class of bug; only a gate on the SHAPE of the payload can. So: build
-// the richest possible skill set — every node of every class at max rank — and insist it is still JSON.
-{
-    const bad = [];
-    for (const c of CLASSES) {
-        const maxed = Object.fromEntries(groveSkillsForClass(c.id).map((s) => [s.id, 5]));
-        for (const row of groveSkills(c.id, maxed)) {
-            for (const [k, v] of Object.entries(row)) {
-                if (typeof v === "function") bad.push(`${c.name}'s ${row.name} carries \`${k}\` as a function`);
-            }
-            if (!row.text || typeof row.text !== "string") bad.push(`${c.name}'s ${row.name} has no resolved text`);
-        }
-    }
-    if (bad.length) fail.push(...bad.map((b) => `${b} — it cannot cross the RSC boundary and will crash the Grove page`));
-    const rows = CLASSES.reduce((a, c) => a + groveSkills(c.id, Object.fromEntries(groveSkillsForClass(c.id).map((s) => [s.id, 5]))).length, 0);
-    console.log(`\n  skill rows crossing to the client: ${rows}`
-        + (bad.length ? `, ${bad.length} of them NOT serializable` : ", all serializable, all with text"));
-}
+// groveSkills built its rows as `{ ...s, rank, text: s.grove(rank) }`, spreading the `grove` FORMATTER into
+// the row beside the string it had just produced. The whole page threw in the render — "Functions cannot be
+// passed directly to Client Components" — which in production is a bare digest with the message stripped,
+// and it only fired for a member who had actually spent a point. So it read as "the Grove crashes" while
+// every client-side check stayed green, because nothing client-side ever got to run.
+//
+// ⚠️ A GATE ON THE DATA CANNOT SEE THAT CLASS OF BUG. Only a gate on the SHAPE of the payload can. If
+// anything is ever spread out of a lookup table into groveState's output again, rebuild this: take the
+// richest possible version of it and insist it is still JSON.
 
 const VIEWPORTS = [
     [360, 640, "small phone"],

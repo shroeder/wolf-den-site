@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/db.js";
 import { combatStats, fighterFrom } from "@/lib/marketplace/arena.js";
 import { treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
-import { groveSkills } from "@/lib/marketplace/grove-skills.js";
 import { upgradeEffects } from "@/lib/marketplace/arena-upgrades.js";
 import { GROVE_EMBLEMS, emblemStars } from "@/lib/marketplace/grove-catalog.js";
 import { statueBonus } from "@/lib/marketplace/grove-statues.js";
@@ -293,11 +292,17 @@ export async function groveFighter(buyerId) {
         // The percentages above are the arena's reading of these nodes and they still apply. This is the
         // Grove's, and it is a different list on purpose — see the header of grove-skills.js. Same spent
         // points, so nothing is re-earned and there is no second tree to drift.
-        mine.skills = groveSkills(classId, takenNodes);
-        // Deep Cuts is the one skill that is not an EVENT — it makes everything else hit a bleeding thing
-        // harder, so the scene reads it as a multiplier rather than firing it. Pulled out of the same list
-        // so there is still only one place the rank is read.
-        mine.groveVuln = (mine.skills.find((x) => x.id === "rv_deep")?.rank || 0) * 0.05;
+        // ── ✂️ mine.skills AND groveVuln ARE GONE, 2026-11-08 ────────────────────────────────────
+        // Luke: "Remove all skill effects skills and the class related screens from the grove. No more aoe"
+        //
+        // groveSkills() turned the class tree's spent points into the Grove's own list of what those nodes
+        // DO in a forest, which the scene then fired from eleven triggers. The scene's engine is deleted,
+        // so this is the data with nothing left to read it.
+        //
+        // ⚠️ THE PERCENTAGES ABOVE STAY AND THAT IS THE WHOLE DISTINCTION. The class still feeds might,
+        // armour, crit, lifesteal, tempo and the rest into the Grove's fighter through combatStats, so a
+        // build is still worth exactly what it is worth. What is gone is the class DOING things — the AoE,
+        // the procs, and the art that announced them. Points are not lost; they are not re-earned either.
 
         // ── ⚠️ WHAT THE CLASS IS WORTH HERE, ASKED OF THE ENGINE RATHER THAN DESCRIBED ────────────
         // The obvious readout is a list of the nodes you have taken, and it would be wrong: the three

@@ -153,17 +153,11 @@ const familiesFor = ({ statuesHeld = 0 } = {}) => [
             { k: "statues", label: "Statues", art: "/images/grove/ui-emblems.webp", badge: statuesHeld || 0 },
         ],
     },
-    {
-        // ⚠️ ITS OWN FAMILY, NOT A ROW UNDER "Carry". Luke: "I hate the fact that the you have class
-        // specific details that are in the monster cards area. The whole class and skills, that shit,
-        // that as a first class citizen, it should have a completely different area where that lives in
-        // its own menu item." It sat as a sub-section of Monster Cards, which said it was a detail OF
-        // the cards -- a different kind of thing filed under the wrong one, exactly like the Armoury
-        // under the shelf. Go / Carry / Make / Train reads as four verbs, which is what they are.
-        title: "Train", rows: [
-            { k: "class", label: "Your Class", art: "/images/grove/ui-class.webp" },
-        ],
-    },
+    // ── ✂️ THE "Train" FAMILY WENT WITH THE CLASS ROOM ───────────────────────────────────────────
+    // It was given its own family rather than a row under "Carry" on Luke's instruction: "I hate the fact
+    // that the you have class specific details that are in the monster cards area... it should have a
+    // completely different area where that lives in its own menu item." Go / Carry / Train / Make was four
+    // verbs; Make went with the workbench and Train has gone with the class. Two left.
     // ✂️ THE "Make" FAMILY WAS HERE, holding the Workbench. Go / Carry / Train is three verbs now.
 ];
 
@@ -614,8 +608,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             // BLOODSCENT instead of HASTE. See procNames in grove-kit.js.
             procNames: h.procNames || {},
             // What the class DOES here, as opposed to what it adds. See grove-skills.js.
-            skills: h.skills || [],
-            groveVuln: h.groveVuln || 0,
+            // ✂️ `skills` and `groveVuln` went with the engine that read them.
         };
     }, [st?.hero]);
 
@@ -643,61 +636,15 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // ⚠️ FETCHED ON OPEN, NOT ON MOUNT. The Grove's own state is already a heavy read and most sessions
     // never open this room; paying for the arena's state on every entry to the forest would put a second
     // round trip on the hot path for a panel nobody asked for. Round trips are the meter that bills.
-    const [arena, setArena] = useState(null);
-    const [arenaBusy, setArenaBusy] = useState(false);
-    useEffect(() => {
-        if (view !== "class" || arena) return undefined;
-        let gone = false;
-        fetch("/api/marketplace/arena", { cache: "no-store" })
-            .then((r) => r.json())
-            .then((d) => { if (!gone) setArena(d || null); })
-            .catch(() => {});
-        return () => { gone = true; };
-    }, [view, arena]);
+    // ✂️ `arena` and `arenaBusy` went with the room they fed.
+    // ✂️ THE ARENA FETCH WENT WITH THE CLASS ROOM. It was deliberately lazy — only on opening the panel,
+    // never on the hot path — because a round trip is the meter that bills. Now it is never.
 
-    // The answer IS the new state -- every case on that route returns getArenaState after it validates,
-    // so nothing here has to guess what changed.
-    const arenaAct = useCallback(async (action, extra) => {
-        setArenaBusy(true);
-        try {
-            const r = await fetch("/api/marketplace/arena", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action, ...(extra || {}) }),
-            });
-            const d = await r.json().catch(() => null);
-            if (d && !d.error) setArena(d);
-            // ⚠️ THE GROVE HAS TO REFRESH TOO. grove-kit folds the class tree into the Grove fighter, so a
-            // point spent here changes what the next dive hits for -- and the hero line on this very
-            // screen is built from it. Not refreshing would show the tree update and the numbers it feeds
-            // stay still, which reads as the point having done nothing.
-            await refresh();
-        } finally {
-            setArenaBusy(false);
-        }
-    }, [refresh]);
+    // ✂️ arenaAct went with the class room — it posted node takes, refunds and respecs.
 
     const statueCount = useMemo(() => (st?.statues?.lines || [])
         .reduce((a, l) => a + Object.values(l.held || {}).reduce((x, n) => x + n, 0), 0), [st?.statues]);
 
-    // ── WHAT THE CLASS IS, AND WHAT IT IS WORTH IN HERE ────────────────────────────────────────────
-    // ⚠️ THE LABELS ARE THE GROVE'S OWN FOURTEEN, NOT THE TREE'S THIRTY. classGives arrives already in
-    // this engine's vocabulary because grove-kit measured it against this engine, so the map below only
-    // ever has to cover what a zone can actually do. A table of every stat the three trees grant would
-    // be a second copy of arena-classes, forever one node behind it.
-    const heroClass = useMemo(
-        () => CLASSES.find((c) => c.id === st?.hero?.classId) || null,
-        [st?.hero?.classId],
-    );
-    const classLines = useMemo(() => {
-        const gives = st?.hero?.classGives || {};
-        const out = [];
-        for (const [key, meta] of Object.entries(GROVE_STAT_READOUT)) {
-            const v = Number(gives[key]) || 0;
-            if (!v) continue;
-            out.push({ key, label: meta.label, value: meta.fmt(v) });
-        }
-        return out;
-    }, [st?.hero?.classGives]);
 
     const beltNow = useMemo(() => {
         const id = st?.belt;
@@ -1159,91 +1106,18 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     </Area>
                 ) : null}
 
-                {panel === "class" ? (
-                    <>
-                        {/* ── ⚠️ YOUR CLASS HAS BEEN COUNTING IN HERE ALL ALONG ────────────────────
-                        grove-kit folds the class tree into the Grove fighter -- a Reaver's Rend and
-                        a Warden's Bulwark genuinely change how a dive goes -- and nothing anywhere
-                        in the feature mentioned a class existed. Points spent, numbers moved, and
-                        the game silent about it, which is the same fault crafting had.
+                {/* ── ✂️ THE CLASS ROOM IS GONE FROM THE GROVE, 2026-11-08 ──────────────────────────
+                    Luke: "Remove all skill effects skills and the class related screens from the grove."
 
-                        ⚠️ AND IT SHOWS WHAT THE GROVE ACTUALLY USES, NOT WHAT THE TREE GRANTS. The
-                        three trees hand out about thirty stats and this engine reads fourteen, so a
-                        list of the nodes you have taken would claim Thornmail is working here. These
-                        numbers are measured by grove-kit against the engine itself -- the same
-                        fighter built with and without the tree -- so the screen cannot promise
-                        something the zone does not do. See classGives. */}
-                    <Area id="training" icon="ui-class" title="Your Class"
-                        count={heroClass ? heroClass.name : "no class"}>
-                        {heroClass ? (
-                            <div className="gv-train">
-                                <img className="gv-train-sigil" src={heroClass.emblem} alt=""
-                                    width={46} height={46} />
-                                <div className="gv-train-body">
-                                    <b style={{ color: heroClass.color }}>{heroClass.name}</b>
-                                    <em>{heroClass.tag}</em>
-                                    {classLines.length ? (
-                                        <ul className="gv-train-list">
-                                            {classLines.map((l) => (
-                                                <li key={l.key}><span>{l.label}</span><b>{l.value}</b></li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        // ⚠️ A CLASS WITH NO POINTS IN IT IS NOT A BROKEN READOUT.
-                                        // Picking a class costs nothing; the tree is where the choice
-                                        // actually happens, and an empty one is genuinely worth zero
-                                        // here. Saying so beats an empty box the player reads as a bug.
-                                        <p className="muted">No points spent yet — your tree is worth
-                                            nothing in the Grove until it has some.</p>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="muted">No class chosen. A class changes how you fight in
-                                here as much as it does in the Arena.</p>
-                        )}
-                    </Area>
+                    ⚠️ THIS REVERSES ITEM B OF THE BACKLOG, which was built to the opposite brief: "the
+                    whole class tree and everything, that all needs to also live in a menu in the Grove...
+                    you should be able to make class selections and tree decisions from that same area in
+                    the Grove." A deliberate reversal, logged, not a regression.
 
-                    {/* ── ⚠️ THE REAL TREE, NOT A PICTURE OF ONE ──────────────────────────────────
-                        Luke: "you should be able to make class selections and tree decisions from that
-                        same area in the Grove... And it shouldn't just explain it in a text blob. It
-                        should be very dopamine inducing."
-
-                        The Area above is the READOUT -- what the tree is worth in this forest,
-                        measured by grove-kit against the engine itself. It answers "is this doing
-                        anything here", and it could not answer "change it".
-
-                        These are the Arena's own SkillTree and SkillPanel, mounted here unchanged.
-                        Not a Grove copy of them: they are already built, already tuned, already the
-                        thing Luke means by dopamine, and a second implementation of a tree that spends
-                        a currency would be a second place for the spending rules to drift. Picking a
-                        class, taking a node, refunding one and respeccing all work from this room now.
-
-                        ⚠️ THE GOLD IS THE GROVE'S OWN. SkillTree prices a respec in gold and takes the
-                        balance as a prop; handing it the arena's stale copy would show one number here
-                        and charge another at the till. */}
-                    {arena?.progress ? (
-                        <Area id="tree" icon="ui-class" title="The Tree"
-                            count={arena.progress.points?.available
-                                ? `${arena.progress.points.available} to spend` : undefined}>
-                            <SkillTree progress={arena.progress} gold={st.gold ?? arena.gold ?? 0}
-                                busy={arenaBusy} onAct={arenaAct} />
-                        </Area>
-                    ) : null}
-
-                    {arena?.progress?.cls ? (
-                        <Area id="skills" icon="ui-merit" title="Skills"
-                            count={arena.progress.skillPoints?.available
-                                ? `${arena.progress.skillPoints.available} to spend` : undefined}>
-                            <SkillPanel progress={arena.progress} busy={arenaBusy} onAct={arenaAct} />
-                        </Area>
-                    ) : null}
-
-                    {/* A room that is still loading has to say so, or it reads as a room with nothing
-                        in it — which is exactly the complaint this whole panel exists to answer. */}
-                    {!arena ? <p className="muted">Reading your tree…</p> : null}
-                    </>
-                ) : null}
+                    ⚠️ SkillTree AND SkillPanel ARE NOT DELETED. They are the ARENA's components and were
+                    only MOUNTED here — the Arena still owns them and still uses them, which was the whole
+                    argument for mounting rather than rebuilding: one place that spends gold and points.
+                    Removing the mount costs the Arena nothing. */}
                 {panel === "emblems" ? (
                     <div className="gv-emblems">
                         {/* ── ⚠️ TWO THINGS LIVED IN ONE SCROLL AND READ AS ONE THING ──────────────
