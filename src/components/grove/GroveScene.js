@@ -1588,8 +1588,12 @@ export default function GroveScene({
         };
 
         // ✂️ THE GROUND RING IS GONE with the particles — the expanding circle an attack left where it
-        // resolved, fourteen call sites. The TELEGRAPH is untouched: that is `.gv-tel`, a separately
-        // rendered band, so attacks are still dodgeable. This was only the flash afterwards.
+        // resolved, fourteen call sites. This was only the flash afterwards.
+        //
+        // ⚠️ THIS NOTE USED TO SAY "the TELEGRAPH is untouched... so attacks are still dodgeable". That was
+        // true when it was written and stopped being true an hour later, when the band went too. The attack
+        // still resolves and still hit-tests; nothing draws it. Corrected rather than deleted because a
+        // confident stale comment is worse than no comment.
 
 
         // ── ⚠️ THE SKILL ENGINE: SIX PRIMITIVES, THIRTY-SIX SKILLS ──────────────────────────────────
@@ -1900,6 +1904,21 @@ export default function GroveScene({
         // A damage-over-time tick passes nothing, because the fifth tick of a bleed is not one strike.
         const killFoe = (wd, foe, now, dealt = 0) => {
             const crit = foe.lastCrit;
+            // ── ⚠️ IT DROPS WHATEVER IT WAS WINDING UP ──────────────────────────────────────────
+            // Luke: "Ensure enemies cant attack from the dead."
+            //
+            // A telegraph is an entry in wd.tels that resolves on a clock of its own, and nothing here ever
+            // took one back. Kill a creature mid-wind-up and its blow still landed, in full, from a corpse.
+            // Worse: once the body was gone the resolver could not find the foe at all and fell through to
+            // a hardcoded 5 damage, so the hit arrived from nobody.
+            //
+            // ⚠️ THE SAME LINE THE STUN PATH ALREADY USED, and that is the tell this was an oversight rather
+            // than a decision — being frozen cancels your attack, being killed did not. Filtered rather than
+            // flagged because React owns these nodes; see the identical call in `lock`.
+            //
+            // ⚠️ AND IT IS ABOVE THE BOSS BRANCH, which returns early. A boss dies mid-telegraph more often
+            // than anything else in the game — it is the only thing that telegraphs on a cycle.
+            wd.tels = wd.tels.filter((t) => t.foeUid !== foe.uid);
             wd.clock.stop(now, HITSTOP_MS.kill);
             wd.shake.add(foe.isBoss ? TRAUMA.boss : TRAUMA.kill);
             // The death pop: launched away from the blow, spinning, fading. ⚠️ IT IS A REAL IMPULSE
@@ -3105,8 +3124,15 @@ export default function GroveScene({
                 // ⚠️ MATCHED ON uid. This read tel.foeId against f.uid, which never matched, so every attack
                 // in the Grove fell through to a hardcoded 5 damage and the whole difficulty curve was dead.
                 const foe = w.foes.find((f) => f.uid === tel.foeUid) || null;
+                // ── ⚠️ NO BLOW FROM A DEAD OWNER. THE SECOND GUARD, AND IT IS THE ONE THAT HOLDS ──────
+                // killFoe now takes a dying creature's telegraphs back, which is the real fix. This is the
+                // backstop for every other way an owner can stop existing — despawn, zone rebuild, a body
+                // removed by the respawn pass — and for the `|| null` directly above, which used to mean
+                // "owner not found, deal 5 anyway". An attack with nobody behind it is not a hard fight,
+                // it is a bug the player correctly reads as being hit by thin air.
+                if (!foe || foe.dying || foe.hp <= 0) continue;
                 if (!telegraphHits(tel, w.hero.x, w.hero.y)) { playWhiff(); continue; }
-                const base = foe ? foe.dmg[0] + Math.round(w.rand() * (foe.dmg[1] - foe.dmg[0])) : 5;
+                const base = foe.dmg[0] + Math.round(w.rand() * (foe.dmg[1] - foe.dmg[0]));
                 // A sweep is wide and weak, a slam is narrow and hard. The multiplier is what makes them
                 // read differently rather than just look different.
                 const raw = Math.max(1, Math.round(base * (Number(tel.mult) || 1)));
@@ -3633,15 +3659,11 @@ export default function GroveScene({
                 pf2.node.style.width = `${pf2.w * unit}px`;
             }
 
-            // ⚠️ AND THE BANDS RIDE THEIR OWN FLOOR. A telegraph is drawn at the y of the creature that
-            // made it, so an attack from a ledge is announced on that ledge. Painted at the ground line and
-            // resolved on x alone, a creature standing a tier up hit you through the floor it stood on.
-            for (const t of w.tels) {
-                if (!t.node) continue;
-                t.node.style.transform =
-                    `translate3d(${(t.x - cam - t.r) * unit}px, ${-((t.y || 0) - camY) * unit}px, 0)`;
-                t.node.style.width = `${t.r * 2 * unit}px`;
-            }
+            // ✂️ THE TELEGRAPH POSITIONER WAS HERE. Worth keeping the reason it existed, because the bug
+            // it fixed is in the DATA and still live: a telegraph belongs at the y of the creature that made
+            // it, so an attack from a ledge is announced on that ledge. Resolved on x alone at the ground
+            // line, a creature a tier up hit you through the floor it stood on — telegraphHits still reads
+            // t.y, so that rule survives the band being removed.
 
             for (const dr of w.doors) {
                 if (!dr.node) continue;
@@ -4142,10 +4164,20 @@ export default function GroveScene({
                     Luke asked for attacks that "telecast where they will damage". The fill sweeps over the
                     attack's own wind-up, so what is on screen IS the window you have — the duration is set
                     inline from the attack rather than guessed at in the stylesheet. */}
-                {world.tels.map((t) => (
-                    <span key={t.uid} className={`gv-tel is-${t.kind}`} ref={(n) => { t.node = n; }}
-                        style={{ animationDuration: `${t.ms}ms` }} aria-hidden="true" />
-                ))}
+                {/* ── ✂️ THE TELEGRAPH BAND IS GONE, 2026-11-08 ────────────────────────────────────────
+                    Luke: "Remove the orange circle attack animation." This was it — a pulsing orange ellipse
+                    on the ground at the attack's real reach, with a fill sweeping across it over the
+                    wind-up, so what was on screen WAS the window you had to move.
+
+                    ⚠️ THE ATTACK ITSELF IS UNTOUCHED. w.tels still exists, still resolves on its own clock
+                    and still hit-tests against the hero through telegraphHits — only the picture is gone.
+                    What announces a blow now is the creature's own wind-up (see `wind` in the body pass),
+                    which is a pose rather than a ground marker.
+
+                    ⚠️ SO AN ATTACK IS NOW HARDER TO DODGE, AND THAT IS THE TRADE. The band was built
+                    because "a telegraph must be dodgeable" and it showed reach as well as timing; a leaning
+                    sprite shows timing alone. If dodging stops feeling fair, this is the thing to put back,
+                    and it is one JSX block plus its positioner. */}
 
                 {/* Loot on the floor: the item's own sprite and a name you can read, per Luke's note.
                     The drawn tier-stone stays as the fallback for anything with no art yet — a new part

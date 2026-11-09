@@ -2001,34 +2001,6 @@ export const GROVE_CSS = `
 .gv-num.is-nova { color: #ffbf7a; --gv-nb: 1.04; font-weight: 900;
     text-shadow: 0 2px 6px rgba(0,0,0,0.95), 0 0 16px rgba(255,140,60,0.85); }
 
-.gv-tel { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    height: calc(3.6 * var(--gv-unit, 1%)); margin-bottom: calc(-1.8 * var(--gv-unit, 1%));
-    border-radius: 50%; pointer-events: none; overflow: hidden; will-change: transform;
-    border: 3px solid rgba(255,255,255,0.75); background: rgba(8,3,2,0.55);
-    box-shadow: 0 0 14px 3px rgba(255,90,60,0.5), inset 0 0 12px rgba(0,0,0,0.6);
-    animation: gvTelPulse 300ms ease-in-out infinite alternate; }
-.gv-tel::after { content: ""; position: absolute; inset: 0; transform-origin: 0 50%;
-    animation: gvTel linear forwards; animation-duration: inherit; }
-/* The rim pulses so a telegraph that has only just appeared is still caught by peripheral vision — the eye
-   is drawn to change far more reliably than to colour. */
-@keyframes gvTelPulse { from { filter: brightness(0.85); } to { filter: brightness(1.3); } }
-.gv-tel.is-slam { border-color: rgba(255,140,105,0.95); box-shadow: 0 0 16px 4px rgba(255,80,50,0.6), inset 0 0 12px rgba(0,0,0,0.6); }
-.gv-tel.is-slam::after { background: linear-gradient(90deg, rgba(255,90,60,0.75), rgba(255,160,100,0.95)); }
-.gv-tel.is-sweep { height: calc(2.8 * var(--gv-unit, 1%)); margin-bottom: calc(-1.4 * var(--gv-unit, 1%));
-    border-color: rgba(255,225,135,0.95); box-shadow: 0 0 16px 4px rgba(255,190,60,0.55), inset 0 0 12px rgba(0,0,0,0.6); }
-.gv-tel.is-sweep::after { background: linear-gradient(90deg, rgba(255,180,60,0.7), rgba(255,235,140,0.92)); }
-.gv-tel.is-volley { border-color: rgba(200,175,255,0.95); box-shadow: 0 0 16px 4px rgba(150,110,255,0.6), inset 0 0 12px rgba(0,0,0,0.6); }
-.gv-tel.is-volley::after { background: linear-gradient(90deg, rgba(140,100,255,0.72), rgba(210,185,255,0.95)); }
-@keyframes gvTel { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-
-/* ── THE SCREEN'S OWN REACTION ────────────────────────────────────────────────────────────────
-   A red wash at the edges on being hit, and a slow pulse while nearly dead. The one piece of feedback a
-   player cannot miss while watching their own character instead of the bar — and in a zone where dying
-   sends you back to town, "I did not notice I was low" is the complaint it prevents.
-
-   ⚠️ A VIGNETTE, NOT A TINT. It is clear in the middle on purpose: a full-frame red overlay would flatten
-   the whole zone to one colour, which is the mistake no-overlay-for-lighting is about, and it would hide
-   the telegraph you are trying to step out of. */
 .gv-vign { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none;
     background: radial-gradient(ellipse at 50% 50%, rgba(255,0,0,0) 46%, rgba(185,12,12,0.62) 100%);
     box-shadow: inset 0 0 70px rgba(170,0,0,0.38); }
@@ -2052,28 +2024,6 @@ export const GROVE_CSS = `
 
    ⚠️ WIDTH IS SET IN PIXELS BY THE LOOP, NOT scaleX. Scaling a 2r-wide box would stretch its border and
    its fill with it, so a wide sweep would have a four-pixel edge and a slam a one-pixel one. */
-.gv-tel { position: absolute; left: 0; bottom: calc(var(--gv-ground, 13%) - 10px); height: 12px; border-radius: 3px;
-    pointer-events: none; overflow: hidden; will-change: transform;
-    border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.3); }
-.gv-tel::after { content: ""; position: absolute; inset: 0; transform-origin: 0 50%;
-    animation: gvTel linear forwards; animation-duration: inherit; }
-.gv-tel.is-slam { border-color: rgba(255,120,90,0.75); }
-.gv-tel.is-slam::after { background: linear-gradient(90deg, rgba(255,90,60,0.35), rgba(255,140,80,0.75)); }
-.gv-tel.is-sweep { height: 9px; border-color: rgba(255,210,110,0.7); }
-.gv-tel.is-sweep::after { background: linear-gradient(90deg, rgba(255,180,60,0.3), rgba(255,225,120,0.65)); }
-.gv-tel.is-volley { height: 14px; border-color: rgba(170,140,255,0.8); }
-.gv-tel.is-volley::after { background: linear-gradient(90deg, rgba(140,100,255,0.35), rgba(200,170,255,0.8)); }
-@keyframes gvTel { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-
-/* ⚠️ .gv-float IS GONE. It was the only damage feedback the Grove had: a span appended to the scene
-   at a fixed left: 50%, bottom: 40% with a CSS keyframe moving it 34px up. So every number in the game
-   appeared in the MIDDLE OF THE SCREEN regardless of what had been hit or where it was standing, four at
-   a time during a volley, stacked on top of each other. A damage number has to be at the thing it
-   describes or it is a HUD element pretending to be feedback. See .gv-num above, which is thrown as a
-   physics body from the point of contact. */
-
-/* Below the HUD row rather than tucked against it - the name and the health bar are two lines and they were
-   crowding the hp bar and the kill count. */
 .gv-boss { position: absolute; top: calc(40px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: 70%;
     text-align: center; pointer-events: none; }
 .gv-boss b { display: block; font-size: 0.8rem; letter-spacing: .1em; text-transform: uppercase;
