@@ -25,13 +25,12 @@ NAME = "rock"
 LABEL = "Rock (copper)"
 KIND = "prop"
 SCALE = "rock"
-NOTE = ("A seeded-jitter six-sided boulder with three copper flecks. 0.92 m, "
-        "chest height on the player.")
+NOTE = ("A seeded-jitter six-sided boulder with three copper flecks. 0.62 m -- a third of the player, which is a rock you mine rather than a rock you shelter behind.")
 
 SEED = 7
 SIDES = 6
-JITTER = 0.095          # metres, per axis, uniform
-RADIUS = 0.58
+JITTER = 0.075          # metres, per axis, uniform
+RADIUS = 0.42
 
 
 def _jitter(ob, rng, amount=JITTER, floor=None):
@@ -48,15 +47,15 @@ def _jitter(ob, rng, amount=JITTER, floor=None):
 def build():
     rng = random.Random(SEED)
 
-    body = kit.prism("Body", (0, 0, 0.28), RADIUS, 0.56, "stone",
+    body = kit.prism("Body", (0, 0, 0.21), RADIUS, 0.42, "stone",
                      sides=SIDES, top_radius=RADIUS * 0.82)
-    _jitter(body, rng, floor=-0.27)
+    _jitter(body, rng, floor=-0.20)
 
     # A low, shifted cap. At 0.34 high with a leaning apex it read as a
     # tent rather than a boulder -- the point was the whole silhouette.
-    cap = kit.prism("Cap", (0, 0, 0.66), RADIUS * 0.84, 0.22, "stone_dark",
+    cap = kit.prism("Cap", (0, 0, 0.50), RADIUS * 0.84, 0.18, "stone_dark",
                     sides=SIDES, top_radius=RADIUS * 0.42, twist=30)
-    _jitter(cap, rng, amount=JITTER * 0.8, floor=-0.16)
+    _jitter(cap, rng, amount=JITTER * 0.8, floor=-0.13)
 
     parts = [body, cap]
 
@@ -66,11 +65,11 @@ def build():
     for i, face in enumerate((0, 2, 4)):
         a = 2 * math.pi * face / SIDES
         r = RADIUS * 0.92
-        z = 0.20 + 0.11 * i
+        z = 0.15 + 0.09 * i
         parts.append(kit.box(
             "Ore_%d" % i,
             (r * math.cos(a), r * math.sin(a), z),
-            (0.17, 0.17, 0.13), "ore_copper",
+            (0.13, 0.13, 0.10), "ore_copper",
             rot=(0, 0, math.degrees(a))))
 
     return kit.join(parts, "Rock")

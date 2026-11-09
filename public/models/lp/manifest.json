@@ -269,7 +269,7 @@
    "label": "Rock (copper)",
    "kind": "prop",
    "scale": "rock",
-   "note": "A seeded-jitter six-sided boulder with three copper flecks. 0.92 m, chest height on the player.",
+   "note": "A seeded-jitter six-sided boulder with three copper flecks. 0.62 m -- a third of the player, which is a rock you mine rather than a rock you shelter behind.",
    "url": "/models/lp/rock.glb",
    "tris": 76,
    "budget": 200,
@@ -278,17 +278,17 @@
     "stone_dark",
     "ore_copper"
    ],
-   "height": 0.843,
-   "width": 1.2826,
-   "depth": 1.1583,
-   "bytes": 7828
+   "height": 0.6476,
+   "width": 0.9377,
+   "depth": 0.8485,
+   "bytes": 7832
   },
   {
    "id": "tree",
    "label": "Tree",
    "kind": "scenery",
    "scale": "tree",
-   "note": "Six parts: a flared six-sided trunk and three twisted canopy cones in three greens. 4.0 m, a shade over twice the player.",
+   "note": "Six parts: a flared six-sided trunk and three twisted canopy cones in three greens. 5.5 m -- three times the player, with 3.5 m of bare trunk so you walk UNDER it rather than past it.",
    "url": "/models/lp/tree.glb",
    "tris": 70,
    "budget": 250,
@@ -299,10 +299,10 @@
     "leaf",
     "leaf_light"
    ],
-   "height": 3.94,
-   "width": 2.44,
-   "depth": 2.1131,
-   "bytes": 8488
+   "height": 5.5,
+   "width": 2.68,
+   "depth": 2.3209,
+   "bytes": 8456
   }
  ]
 }

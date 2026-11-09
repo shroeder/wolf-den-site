@@ -21,9 +21,9 @@ export default async function WalkLabPage() {
         <div className="stack">
             <h1 style={{ marginBottom: 2 }}>Walk Lab</h1>
             <p className="muted" style={{ marginTop: 0, maxWidth: "62ch" }}>
-                The low-poly set as a place, at the eye height of the man who is 1.85 m tall. The model lab
-                shows one object filling a frame, which is the view in which everything looks correctly
-                sized — this is the one that can tell you it isn&apos;t.
+                The low-poly set as a place, seen from 30° above the ground with the 1.85 m player as the
+                avatar. The model lab shows one object filling a frame, which is the view in which everything
+                looks correctly sized — this is the one that can tell you it isn&apos;t.
             </p>
             <WalkLab />
         </div>

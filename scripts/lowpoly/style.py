@@ -112,8 +112,11 @@ SCALE_OF = {
     # Anything meant to read as SMALLER than the player on sight. A goblin
     # at 0.95 of the player is not a short goblin, it is a green man.
     "small_npc": (0.50, 0.85),
-    "tree":     (1.60, 3.00),
-    "rock":     (0.25, 1.10),
+    # ⚠️ A tree under twice the player is a shrub. Raised from (1.60, 3.00) on
+    # 2026-11-09 when the walk lab put the camera at 30 degrees and the 4 m tree
+    # stopped reading as a tree at all.
+    "tree":     (2.40, 3.40),
+    "rock":     (0.22, 0.70),
     "prop":     (0.20, 1.60),
 }
 
