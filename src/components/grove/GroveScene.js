@@ -1545,6 +1545,7 @@ export default function GroveScene({
                 });
                 s.born = w.sceneNow ? w.sceneNow() : performance.now();
                 s.g = dust ? DUST.gravity : SPARK.gravity;
+                s.drag = dust ? DUST.drag : SPARK.drag;
                 const el = document.createElement("i");
                 el.className = `gv-spark is-${kind}${crit ? " is-crit" : ""}`;
                 layer.appendChild(el);
@@ -1955,8 +1956,19 @@ export default function GroveScene({
             impulse(foe, foe.deathDir * -dk.launch, dk.up);
             foe.dying = now;
             lightUp(foe, now);
-            burst(foe.x, foe.y + foe.h * 0.45, { crit: true, dir: -(foe.face || 1), kind: "spark" });
-            burst(foe.x, foe.y, { kind: "dust" });
+            // ── ⚠️ THE BURST AND THE NUMBER MUST NOT SHARE A POINT ──────────────────────────────
+            // The kill pop goes up at foe.y + 0.7h on foe.x. Spraying the sparks from 0.45h on the same
+            // x put six small bright things directly under a glyph ten times their size — see the note
+            // on SPARK in grove-juice.js, where the held frame showed them eating the "3" of "1300".
+            //
+            // Pushed to the STRIKE SIDE and lower: the sparks now leave from where the blow landed and
+            // travel away from the number rather than through it. Two separate events in two places,
+            // which is what lets the eye read both.
+            const hitX = foe.x + (foe.face || 1) * foe.halfW * 0.5;
+            burst(hitX, foe.y + foe.h * 0.38, { crit: true, dir: -(foe.face || 1), kind: "spark" });
+            // ⚠️ DUST AT THE FLOOR, NOT AT THE BODY. A corpse disturbs the ground it falls on; thrown
+            // from the body's centre it was a grey disc floating over the sprite.
+            burst(foe.x, 0, { kind: "dust" });
 
             if (foe.big || foe.rare) { wd.bossBar = null; wd.barName = null; }
 
@@ -3745,11 +3757,34 @@ export default function GroveScene({
                 if (age > s.life) { s.node?.remove(); w.sparks.splice(i, 1); continue; }
                 const k = age / s.life;
                 if (!s.ring) {
+                    // ── ⚠️ DRAG, THEN GRAVITY. THIS IS WHAT MAKES IT READ AS AN IMPACT ──────────────
+                    // Without the velocity shed a particle keeps its launch speed sideways for its whole
+                    // life and reads as drifting. Debris is thrown hard and stopped by the air; the
+                    // deceleration IS the force. See SPARK.drag.
+                    const drag = s.drag || 0;
+                    if (drag) { const keep = Math.max(0, 1 - drag * dt); s.vx *= keep; s.vy *= keep; }
                     s.vy -= s.g * dt;
                     s.x += s.vx * dt;
                     s.y += s.vy * dt;
+                    // ── ⚠️ STRETCHED ALONG TRAVEL, WHICH IS WHY IT IS A SPARK AND NOT A BUBBLE ──────
+                    // A circle moving across the screen reads as a ball. The same circle stretched along
+                    // its own velocity vector reads as a streak of light, and the stretch falling away as
+                    // it slows is the particle visibly losing its energy. Only the loop can do this — it
+                    // is the only place that knows which way the thing is going.
+                    const sp = Math.hypot(s.vx, s.vy);
+                    // Screen Y runs downward and the world's runs up, hence the negation.
+                    const ang = (Math.atan2(-s.vy, s.vx) * 180) / Math.PI;
+                    const stretch = 1 + Math.min(1.8, sp * 1.5);
+                    const size = (s.size || 1) * (1 - k * 0.45);
                     s.node.style.transform =
-                        `translate3d(${(s.x - cam) * unit}px, ${-(s.y - camY) * unit}px, 0) scale(${1 - k})`;
+                        `translate3d(${(s.x - cam) * unit}px, ${-(s.y - camY) * unit}px, 0)`
+                        + ` rotate(${ang.toFixed(1)}deg) scale(${size.toFixed(3)}) scaleX(${stretch.toFixed(2)})`;
+                    // ⚠️ HELD BRIGHT, THEN DROPPED — the same curve the damage numbers use, and for the
+                    // same reason written over them: "a number that fades from frame one is never read".
+                    // A linear fade spends the whole life being half-there, which is what made these
+                    // register as haze rather than as light.
+                    s.node.style.opacity = String(k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45);
+                    continue;
                 } else if (s.flat) {
                     // ⚠️ POSITION ONLY. A shape's whole identity is its own keyframes — a bolt snapping
                     // down, fire growing up — and writing a scale() here every frame would overwrite the

@@ -618,8 +618,44 @@ export function shadowFor(heightAboveFloor, bodyH) {
 //
 // ⚠️ THEY ARE DELIBERATELY FEW. Eight sparks a hit at thirty bodies is still nothing, but two hundred is a
 // phone dropping frames in the middle of a fight, which costs more feel than the sparks add.
-export const SPARK = { n: 8, nCrit: 14, speed: 0.55, speedCrit: 0.95, life: 320, lifeCrit: 440, gravity: 0.028 };
-export const DUST = { n: 5, speed: 0.22, life: 380, gravity: 0.006 };
+//
+// ── ⚠️ RETUNED 2026-11-08: THEY RENDERED AND THEY DID NOT READ ──────────────────────────────────────────────
+// Luke: "The particles never were visible." Measured on the live page they were emphatically present — 101
+// of them at peak, 6.7px across, opacity 0.8, visibility visible, on screen. Shot as a held frame with and
+// without them, the damage number read "100" with the particles on and "1300" with them off: they had eaten
+// the 3. That is the whole bug. They were not invisible, they were INDISTINGUISHABLE — eight small slow dots
+// in the damage number's own cream, spawned at the damage number's own point, under a glyph ten times their
+// size. The eye filed them as texture on the text.
+//
+// So this is the standard impact-particle treatment, and every line of it is a legibility decision:
+//
+//   FEWER AND FASTER. Count reads as fuzz; speed reads as force. Six that leave hard beat eight that drift.
+//   DRAG, NOT JUST GRAVITY. Constant horizontal velocity reads as floating. Real debris is thrown and then
+//     stopped by the air, so the speed has to fall off sharply — this is the single biggest win of the lot.
+//   SHORTER LIVES. An impact is over before you can look at it. A particle still on screen 400ms later is
+//     not an impact, it is litter.
+//
+// The colour and the stretch are the other half and they live where they belong: the hue in grove-css
+// (sparks are amber now, a hue neither the cream numbers nor the green forest use), the stretch-along-
+// velocity in the scene's update, because only the loop knows which way a particle is travelling.
+export const SPARK = {
+    n: 6, nCrit: 9,
+    speed: 0.85, speedCrit: 1.25,
+    life: 220, lifeCrit: 300,
+    gravity: 0.06,
+    // ── ⚠️ DRAG IS WHAT BOUNDS THE TRAVEL, AND THE FIRST TUNE GOT IT WRONG ──────────────────────────────
+    // Filmed at 0.12 against a doubled launch speed, the burst crossed a third of the screen and was still
+    // strewn about 500ms later: a comet trail, not an impact. Total travel is roughly v0/drag, so at 0.12
+    // with a crit's 2.2 peak that is ~18 world units — two and a half hero heights from a sword blow.
+    //
+    // 0.32 puts it near 5 units, about two thirds of a hero. The burst now stops where the blow stopped,
+    // which is the entire job: a particle that outruns the body it came off reads as a firework.
+    drag: 0.32,
+};
+// ⚠️ DUST IS A FLOOR EFFECT AND IT IS THROWN AT THE FLOOR. Slower, wider, shorter-lived and far fainter
+// than a spark — it says WEIGHT, not contact, so it must never compete with the spark for the eye. Its old
+// 1.1-unit beige circle at the body's CENTRE was the grey blob sitting on the corpse in the shot.
+export const DUST = { n: 4, speed: 0.3, life: 300, gravity: 0.004, drag: 0.16 };
 
 /** One particle, thrown from a point. Angles are fanned deterministically so a burst reads as a burst. */
 export function makeSpark(i, n, x, y, { speed, life, dir = 0, rand }) {
@@ -628,7 +664,12 @@ export function makeSpark(i, n, x, y, { speed, life, dir = 0, rand }) {
     const spread = (i / Math.max(1, n - 1)) * Math.PI - Math.PI / 2;
     const a = spread + (dir ? dir * 0.5 : 0) + (rand() - 0.5) * 0.4;
     const v = speed * (0.55 + rand() * 0.75);
-    return { x, y, vx: Math.cos(a) * v, vy: Math.abs(Math.sin(a)) * v * 0.9 + 0.1, born: 0, life, node: null };
+    return {
+        x, y, vx: Math.cos(a) * v, vy: Math.abs(Math.sin(a)) * v * 0.9 + 0.1, born: 0, life, node: null,
+        // ⚠️ SIZE VARIES PER PARTICLE. Identical dots read as a UI element — a ring of pips. Debris is
+        // never uniform, and the variance is what stops six circles looking like a loading spinner.
+        size: 0.7 + rand() * 0.8,
+    };
 }
 
 // ── THE SCREEN ITSELF REACTS ────────────────────────────────────────────────────────────────────────────────

@@ -1788,12 +1788,33 @@ export const GROVE_CSS = `
 .gv-boss s { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block;
     border-radius: inherit; background: #fff; opacity: var(--gv-bf, 0); }
 
+/* ── ⚠️ AMBER, NOT CREAM — THE COLOUR IS A LEGIBILITY DECISION ───────────────────────────────────
+   These were #fff6cf: the damage number's own cream, spawned at the damage number's own point, at a
+   tenth of its size. Held as a frozen frame with and without them, the number read "100" with the
+   particles on and "1300" with them off — they had eaten the 3. They were never invisible, they were
+   indistinguishable, which is worse because it also damages the thing they sit on.
+
+   A spark now has a white-hot CORE and a saturated amber body, which is a hue neither the cream
+   numbers nor the green forest occupies. The radial-gradient is what gives it the core: a flat fill
+   reads as a dot, a hot centre reads as light. Bigger too — 0.62 of a unit rather than 0.5 — because
+   there are fewer of them now and each one has to carry its own weight. See SPARK in grove-juice.js.
+
+   ⚠️ THE ELLIPSE IS THE POINT, SO DO NOT TOUCH border-radius. The loop stretches these along their own
+   velocity with scaleX; on a 50% radius that turns the circle into a streak of light, which is what
+   says "thrown" rather than "floating". A square or a fixed-px radius would stretch into a lozenge. */
 .gv-spark { position: absolute; left: 0; bottom: var(--gv-ground, 13%);
-    width: calc(0.5 * var(--gv-unit, 1%)); height: calc(0.5 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.25 * var(--gv-unit, 1%)) calc(-0.25 * var(--gv-unit, 1%));
+    width: calc(0.62 * var(--gv-unit, 1%)); height: calc(0.62 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.31 * var(--gv-unit, 1%)) calc(-0.31 * var(--gv-unit, 1%));
     border-radius: 50%; pointer-events: none; will-change: transform, opacity;
-    background: #fff6cf; box-shadow: 0 0 6px 2px rgba(255,220,130,0.8); }
-.gv-spark.is-crit { background: #fff; box-shadow: 0 0 9px 3px rgba(255,170,60,0.95); }
+    /* ⚠️ NO WHITE CORE. The first pass started at #fffdf5, and shot beside the numbers that still read
+       as cream at this size — the hue has to leave the text's family entirely, not sit next to it.
+       Gold into deep orange is the furthest a warm spark can get from cream while still reading hot. */
+    background: radial-gradient(circle at 50% 50%, #ffd45e 0%, #ff8c1e 55%, #f2560c 100%);
+    box-shadow: 0 0 8px 2px rgba(255,110,20,0.8); }
+/* A crit is hotter and whiter — the core grows rather than the dot changing colour, so it reads as
+   more energy in the same object instead of as a different kind of particle. */
+.gv-spark.is-crit { background: radial-gradient(circle at 50% 50%, #fff3c4 0%, #ffa32a 50%, #ff4d07 100%);
+    box-shadow: 0 0 12px 3px rgba(255,120,20,0.95); }
 /* The pet's bite throws its own colour, and fewer of them (PET_SPARKS). Smaller too: the spark is the
    thing that says a blow CONNECTED, and the pet's connects for less. */
 .gv-spark.is-pet { width: calc(0.34 * var(--gv-unit, 1%)); height: calc(0.34 * var(--gv-unit, 1%));
@@ -1850,9 +1871,15 @@ export const GROVE_CSS = `
     margin: 0 0 calc(-0.35 * var(--gv-unit, 1%)) calc(-0.35 * var(--gv-unit, 1%));
     background: #c6ffb0; box-shadow: 0 0 12px 4px rgba(120,255,160,0.85); }
 /* Dust is bigger, slower and has no light of its own — it is displaced earth, not energy. */
-.gv-spark.is-dust { width: calc(1.1 * var(--gv-unit, 1%)); height: calc(1.1 * var(--gv-unit, 1%));
-    margin: 0 0 calc(-0.55 * var(--gv-unit, 1%)) calc(-0.55 * var(--gv-unit, 1%));
-    background: rgba(170,152,120,0.55); box-shadow: none; }
+/* ── ⚠️ DUST SAYS WEIGHT AND MUST NEVER COMPETE WITH THE SPARK ───────────────────────────────────
+   This was a 1.1-unit disc of flat rgba(170,152,120,0.55) thrown at the BODY's centre — the grey blob
+   sitting on the corpse in the before shot. It is softer, fainter and smaller now, with the opacity in
+   the gradient so it has no hard edge: dust with a crisp rim is a pebble. It is also thrown at the
+   FLOOR by the caller, which is where a falling body actually disturbs anything. */
+.gv-spark.is-dust { width: calc(0.85 * var(--gv-unit, 1%)); height: calc(0.85 * var(--gv-unit, 1%));
+    margin: 0 0 calc(-0.42 * var(--gv-unit, 1%)) calc(-0.42 * var(--gv-unit, 1%));
+    background: radial-gradient(circle at 50% 50%, rgba(196,180,150,0.34) 0%, rgba(170,152,120,0.14) 70%, rgba(170,152,120,0) 100%);
+    box-shadow: none; }
 
 /* The ring an attack leaves when it resolves. It is the difference between damage arriving and damage
    LANDING somewhere — the player needs to see the place the thing they dodged went off. */
