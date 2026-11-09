@@ -43,7 +43,7 @@ export function createClient({ send, now }) {
         tracks: new Map(),           // id -> [{t, x, y}]
         // Our own predicted position.
         spawned: false,
-        predicted: { x: 0, y: 0, facingLeft: false },
+        predicted: { x: 0, y: 0, facing: 0, hp: 100 },
         pendingInputs: [],
         seq: 0,
         lastAckedSeq: 0,
@@ -112,7 +112,7 @@ export function createClient({ send, now }) {
             if (id === state.playerId) continue;
             let track = state.tracks.get(id);
             if (!track) { track = []; state.tracks.set(id, track); }
-            track.push({ sm: serverMs, x: ent.x, y: ent.y, flags: ent.flags });
+            track.push({ sm: serverMs, x: ent.x, y: ent.y, facing: ent.facing, flags: ent.flags });
             while (track.length > 32) track.shift();
         }
 
@@ -131,12 +131,20 @@ export function createClient({ send, now }) {
                 state.spawned = true;
                 state.predicted.x = mine.x;
                 state.predicted.y = mine.y;
+                state.predicted.facing = mine.facing;
                 state.pendingInputs = [];
                 return;
             }
+            // ⚠️ HP IS NEVER PREDICTED. The predictor replays movement over
+            //    the authoritative position; if it also carried hp, a
+            //    replay would re-apply nothing and the number would simply
+            //    be whatever the last snapshot said -- which is correct, so
+            //    it is read, not simulated. Damage is the server's alone.
+            state.predicted.hp = mine.hp;
             // Drop every input the server has already accounted for.
             state.pendingInputs = state.pendingInputs.filter((i) => i.seq > snap.lastSeq);
-            const before = state.predicted.x;
+            const beforeX = state.predicted.x;
+            const beforeY = state.predicted.y;
             // Snap to truth...
             state.predicted.x = mine.x;
             state.predicted.y = mine.y;
@@ -144,7 +152,8 @@ export function createClient({ send, now }) {
             for (const input of state.pendingInputs) {
                 stepPlayer(state.predicted, input, input.dtMs);
             }
-            const correction = Math.abs(state.predicted.x - before);
+            const correction = Math.hypot(
+                state.predicted.x - beforeX, state.predicted.y - beforeY);
             if (correction > 0.5) {
                 state.corrections += 1;
                 state.maxCorrection = Math.max(state.maxCorrection, correction);
@@ -153,13 +162,18 @@ export function createClient({ send, now }) {
     }
 
     /** Called every animation frame. Returns the input it sent, if any. */
-    function sendInput({ left, right, attack, dtMs }) {
+    function sendInput({ left, right, forward, back, attack, dtMs }) {
         if (!state.connected) return null;
         state.seq += 1;
         const buttons = (left ? INPUT_BITS.LEFT : 0)
             | (right ? INPUT_BITS.RIGHT : 0)
+            | (forward ? INPUT_BITS.FORWARD : 0)
+            | (back ? INPUT_BITS.BACK : 0)
             | (attack ? INPUT_BITS.ATTACK : 0);
-        const input = { seq: state.seq, dtMs: Math.min(dtMs, TICK_MS * 3), left, right, attack, buttons };
+        const input = {
+            seq: state.seq, dtMs: Math.min(dtMs, TICK_MS * 3),
+            left, right, forward, back, attack, buttons,
+        };
 
         // Predict immediately, before the packet has even left.
         stepPlayer(state.predicted, input, input.dtMs);
@@ -194,13 +208,24 @@ export function createClient({ send, now }) {
         for (let i = track.length - 1; i >= 0; i -= 1) {
             if (track[i].sm <= target) { a = track[i]; b = track[i + 1] || null; break; }
         }
-        if (!a) return { x: track[0].x, y: track[0].y, flags: track[0].flags };
-        if (!b) return { x: a.x, y: a.y, flags: a.flags };
+        if (!a) return { x: track[0].x, y: track[0].y, facing: track[0].facing, flags: track[0].flags };
+        if (!b) return { x: a.x, y: a.y, facing: a.facing, flags: a.flags };
         // span is a whole number of ticks by construction, so f advances at
         // the rate real time advances and the drawn speed is the real speed.
         const span = b.sm - a.sm;
         const f = span > 0 ? Math.min(1, Math.max(0, (target - a.sm) / span)) : 0;
-        return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, flags: a.flags };
+        // ⚠️ FACING IS NOT LERPED NUMERICALLY. It wraps at 255->0, so a
+        //    straight average between 250 and 5 spins the model the long
+        //    way round -- three quarters of a turn to cover 7 degrees.
+        //    Take the shorter arc.
+        let df = ((b.facing - a.facing + 384) % 256) - 128;
+        if (df < -128) df += 256;
+        return {
+            x: a.x + (b.x - a.x) * f,
+            y: a.y + (b.y - a.y) * f,
+            facing: (((a.facing + df * f) % 256) + 256) % 256,
+            flags: a.flags,
+        };
     }
 
     return { state, onMessage, sendInput, renderPosition, FLAG };

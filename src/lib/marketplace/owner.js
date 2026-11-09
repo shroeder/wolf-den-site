@@ -78,6 +78,19 @@ export function canPreview(feature, buyerId) {
  */
 export const groveOpen = (buyerId) => canPreview("grove", buyerId);
 
+// ── DEN QUEST: ONE SWITCH ────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ A GATE THAT DOES NOT HEAR THE LAUNCH SWITCH IS A GATE THAT NEVER OPENS, and the Halloween event taught
+// that the hard way -- so Den Quest has exactly one line, here, and everything that lets someone in asks this
+// function. Flip it and every signed-in member can play; flip it back and it is owners and named guests again.
+//
+// It is deliberately NOT a check on NODE_ENV: a playtest happens on production with real friends on real
+// accounts, which is the whole point of it being behind a switch rather than behind a build.
+const DENQUEST_PUBLIC = true;
+
+/** May this buyer enter Den Quest? Any signed-in member while the playtest is open. */
+export const denQuestOpen = (buyerId) =>
+    (DENQUEST_PUBLIC ? Boolean(buyerId) : false) || canPreview("denquest", buyerId);
+
 // ⚠️ REAL_STREET_IDS LIVED HERE and lasted about an hour. It decided whose plaza was REPLACED by their
 // Grove town, which was the right shape for a plan that no longer exists: the plaza is the City now and
 // nobody's is replaced, so a list that answers "whose street gets swapped" has nothing left to answer.

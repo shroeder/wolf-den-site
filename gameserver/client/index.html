@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Den Quest — milestone</title>
+<title>Den Quest — wire view</title>
 <style>
     :root { color-scheme: dark; }
     body {
@@ -28,8 +28,8 @@
 </div>
 <div class="hint">
     <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> to move · <kbd>space</kbd> to swing.
-    Open this page in a second window: both should show the same damage numbers on the same enemy
-    at the same moment.
+    A top-down view of exactly what the wire carries — no models, no three.js. The real client is
+    /marketplace/den-quest on the Wolf Den site; this is for watching the protocol.
 </div>
 
 <script>
@@ -106,9 +106,12 @@ let lastEventCount = 0;
 
 // The visible slice of the world. The zone is 2048 wide; show the part the
 // fight happens in.
-const VIEW = { x0: 120, x1: 560 };
-const toScreen = (x) => ((x - VIEW.x0) / (VIEW.x1 - VIEW.x0)) * canvas.width;
-const GROUND = 250;
+// The visible slice of the world, in metres, centred on the spawn.
+const VIEW = { half: 42 };
+let camX = 512;
+let camY = 560;
+const sx = (x) => ((x - camX) / (VIEW.half * 2)) * canvas.width + canvas.width / 2;
+const sy = (y) => ((y - camY) / (VIEW.half * 2)) * canvas.height + canvas.height / 2;
 
 let last = performance.now();
 let bytesAt = 0;
@@ -119,94 +122,77 @@ function frame(nowMs) {
     const dtMs = Math.min(nowMs - last, 100);
     last = nowMs;
 
-    const left = keys.has("a") || keys.has("arrowleft");
-    const right = keys.has("d") || keys.has("arrowright");
-    const attack = keys.has(" ");
-    client.sendInput({ left, right, attack, dtMs });
+    client.sendInput({
+        left: keys.has("a") || keys.has("arrowleft"),
+        right: keys.has("d") || keys.has("arrowright"),
+        forward: keys.has("w") || keys.has("arrowup"),
+        back: keys.has("s") || keys.has("arrowdown"),
+        attack: keys.has(" "),
+        dtMs,
+    });
 
-    // New events since the last frame become floaters.
     const evs = client.state.events;
     for (let i = lastEventCount; i < evs.length; i += 1) {
         const e = evs[i];
         if (e.event !== EVENT.HIT) continue;
         const at = client.renderPosition(e.targetId);
-        floaters.push({ x: at ? at.x : 0, y: 0, amount: e.amount, crit: e.crit, born: nowMs });
+        floaters.push({ x: at ? at.x : 0, y: at ? at.y : 0, amount: e.amount, crit: e.crit, born: nowMs });
     }
     lastEventCount = evs.length;
 
-    // ── DRAW ─────────────────────────────────────────────────────────
+    const me = client.state.predicted;
+    camX = me.x; camY = me.y;
+
     ctx.fillStyle = "#16222a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#1e2f38";
-    ctx.fillRect(0, GROUND, canvas.width, canvas.height - GROUND);
-    ctx.strokeStyle = "#2b3f49";
-    ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(canvas.width, GROUND); ctx.stroke();
+    ctx.strokeStyle = "#1e2f38";
+    for (let g = Math.floor(camX - VIEW.half); g <= camX + VIEW.half; g += 10) {
+        ctx.beginPath(); ctx.moveTo(sx(g), 0); ctx.lineTo(sx(g), canvas.height); ctx.stroke();
+    }
+    for (let g = Math.floor(camY - VIEW.half); g <= camY + VIEW.half; g += 10) {
+        ctx.beginPath(); ctx.moveTo(0, sy(g)); ctx.lineTo(canvas.width, sy(g)); ctx.stroke();
+    }
 
     let players = 0;
     for (const [id, ent] of client.state.authoritative) {
         const pos = client.renderPosition(id);
         if (!pos) continue;
-        // ⚠️ CULL OFF-SCREEN ENTITIES. A player outside the view still had
-        // its swing arc drawn, and at a 90-unit reach against a 440-unit
-        // view that is a 200-pixel curve sweeping in from nowhere, centred
-        // on something you cannot see.
-        // The margin is tighter than the swing reach on purpose: at -60 a player
-        // whose body was off-canvas still drew its 90-unit arc, which read as a
-        // stray curve sweeping in from nowhere.
-        if (pos.x < VIEW.x0 + 10 || pos.x > VIEW.x1 - 10) continue;
         const isEnemy = (ent.flags & FLAG.IS_ENEMY) !== 0;
         const isMe = id === client.state.playerId;
+        const dead = (ent.flags & FLAG.DEAD) !== 0;
         if (!isEnemy) players += 1;
-        const sx = toScreen(pos.x);
-        const w = isEnemy ? 34 : 24;
-        const h = isEnemy ? 60 : 48;
+        if (dead) continue;
 
+        const px = sx(pos.x);
+        const py = sy(pos.y);
+        const r = isEnemy ? 7 : 9;
         ctx.fillStyle = isEnemy ? "#8a4b4b" : (isMe ? "#7fd3c4" : "#5b8fa8");
-        ctx.fillRect(sx - w / 2, GROUND - h, w, h);
+        ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
 
-        // Swing arc, drawn from the flag the server sends -- but the LOCAL
-        // player also draws it from its own keypress, below, so it appears
-        // before the server has said anything.
-        const swinging = (ent.flags & FLAG.SWINGING) !== 0 || (isMe && attack);
-        if (swinging && !isEnemy) {
-            const dir = (ent.flags & FLAG.FACING_LEFT) ? -1 : 1;
-            ctx.strokeStyle = "#e6c88a";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(sx, GROUND - h / 2, toScreen(VIEW.x0 + PLAYER.reach) - toScreen(VIEW.x0),
-                dir > 0 ? -0.9 : Math.PI + 0.9, dir > 0 ? 0.9 : Math.PI - 0.9, dir < 0);
-            ctx.stroke();
-            ctx.lineWidth = 1;
-        }
+        // Facing, as a spine out of the circle -- the thing a top-down view
+        // is actually good for.
+        const fa = ((pos.facing ?? ent.facing ?? 0) / 256) * Math.PI * 2;
+        ctx.strokeStyle = "#cfe3e0";
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.sin(fa) * r * 2, py - Math.cos(fa) * r * 2);
+        ctx.stroke();
 
-        if (isEnemy) {
-            const maxHp = client.state.welcome?.enemies?.find((e) => e.id === id)?.maxHp || 400;
-            const frac = Math.max(0, ent.hp / maxHp);
-            ctx.fillStyle = "#2b3f49";
-            ctx.fillRect(sx - 30, GROUND - h - 16, 60, 7);
-            ctx.fillStyle = "#c0574f";
-            ctx.fillRect(sx - 30, GROUND - h - 16, 60 * frac, 7);
-            ctx.fillStyle = "#cfe3e0";
-            ctx.font = "12px ui-monospace, monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(String(ent.hp), sx, GROUND - h - 22);
-        } else {
-            ctx.fillStyle = "#7a8c8a";
-            ctx.font = "11px ui-monospace, monospace";
-            ctx.textAlign = "center";
-            ctx.fillText(isMe ? `you (#${id})` : `#${id}`, sx, GROUND - h - 8);
-        }
+        ctx.fillStyle = "#7a8c8a";
+        ctx.font = "11px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(isEnemy ? String(ent.hp) : (isMe ? "you" : `#${id}`), px, py - r - 5);
     }
 
     for (let i = floaters.length - 1; i >= 0; i -= 1) {
         const f = floaters[i];
         const age = nowMs - f.born;
-        if (age > 1200) { floaters.splice(i, 1); continue; }
-        ctx.globalAlpha = Math.max(0, 1 - age / 1200);
+        if (age > 1100) { floaters.splice(i, 1); continue; }
+        ctx.globalAlpha = Math.max(0, 1 - age / 1100);
         ctx.fillStyle = f.crit ? "#e6c88a" : "#e8a0a0";
-        ctx.font = `${f.crit ? 20 : 16}px ui-monospace, monospace`;
+        ctx.font = `${f.crit ? 19 : 15}px ui-monospace, monospace`;
         ctx.textAlign = "center";
-        ctx.fillText(`-${f.amount}${f.crit ? "!" : ""}`, toScreen(f.x), GROUND - 120 - age * 0.04);
+        ctx.fillText(`-${f.amount}`, sx(f.x), sy(f.y) - 22 - age * 0.02);
         ctx.globalAlpha = 1;
     }
 
@@ -215,6 +201,7 @@ function frame(nowMs) {
     el("tick").textContent = client.state.serverTick;
     const enemy = client.state.authoritative.get(47);
     el("hp").textContent = enemy ? enemy.hp : "—";
+    el("me").textContent = client.state.playerId ?? "—";
     el("corr").textContent = client.state.corrections;
     el("n").textContent = players;
     if (nowMs - bytesThen > 1000) {

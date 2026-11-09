@@ -27,18 +27,41 @@ export const TICK_MS = 1000 / TICK_HZ;
 // that, and the buffer is the cheapest thing in the system.
 export const HISTORY_TICKS = TICK_HZ;
 
+// ⚠️ THE WORLD IS A SQUARE ON THE GROUND PLANE, AND THE WIRE ALREADY
+//    CARRIED IT. The sim started as a side-scroller: x was travel and y was
+//    height, pinned at 0. Going 3D did not need a new field -- it needed
+//    the SECOND field to mean the second ground axis instead of a height
+//    nothing used. So sim (x, y) is the ground, and the renderer maps it to
+//    three.js (x, z). Height is not simulated at all: there is no jumping,
+//    no terrain, and inventing a third axis before anything needs one is
+//    how a prototype grows a physics engine.
 export const WORLD = {
-    minX: 0,
-    maxX: 2048,
-    groundY: 0,
+    min: 0,
+    max: 1024,
+    // Where everyone arrives. Near the middle, so the first thing a new
+    // player sees is other players rather than a boundary.
+    spawn: { x: 512, y: 560 },
+    spawnSpread: 26,
 };
 
+// One world unit is one metre, the same scale the low-poly models are built
+// at -- the player model is 1.85 units tall. A 1024-unit world is a square
+// kilometre, which is far more than a prototype needs and costs nothing.
 export const PLAYER = {
-    speed: 220,            // units/second
-    reach: 90,             // melee range, world units
+    speed: 5.2,            // m/s -- a fast jog; a prototype is not a walking simulator
+    reach: 2.4,            // melee range in metres, about an arm and a weapon
     swingCooldownMs: 500,
     hitDamage: 25,
     maxHp: 100,
+    respawnMs: 4000,
+};
+
+export const ENEMY = {
+    speed: 3.1,            // slower than you, so disengaging always works
+    reach: 2.0,
+    hitDamage: 7,
+    attackCooldownMs: 1200,
+    aggroRange: 14,
 };
 
 // ── THE WIRE SCHEMA ──────────────────────────────────────────────────────
@@ -54,18 +77,25 @@ export const PLAYER = {
 //    becomes unrunnable. One extra byte per entity, and the number is the
 //    number. Revisit when a real entity count makes it matter.
 export const ENTITY_FIELDS = [
-    { name: "x", bits: 16, min: WORLD.minX, max: WORLD.maxX },
-    { name: "y", bits: 16, min: -256, max: 256 },
+    { name: "x", bits: 16, min: WORLD.min, max: WORLD.max },
+    { name: "y", bits: 16, min: WORLD.min, max: WORLD.max },
     { name: "hp", bits: 16, int: true },
+    { name: "facing", bits: 8, int: true },
     { name: "flags", bits: 8, int: true },
 ];
 
 export const FLAG = {
     SWINGING: 1 << 0,
-    FACING_LEFT: 1 << 1,
     DEAD: 1 << 2,
     IS_ENEMY: 1 << 3,
 };
+
+// ⚠️ FACING IS ITS OWN FIELD NOW, NOT A FLAG. A side-scroller only ever
+//    needed "left or right" and a single bit carried it. On a ground plane
+//    a character faces any of 360 degrees, and a renderer that cannot turn
+//    a model to face where it is walking produces people who moonwalk.
+//    8 bits is 1.4 degrees, which nobody can see.
+export const FACING_STEPS = 256;
 
 // ── MESSAGE TYPES ────────────────────────────────────────────────────────
 export const MSG = {
@@ -93,6 +123,8 @@ export const EVENT = {
 export const INPUT_BITS = {
     LEFT: 1 << 0,
     RIGHT: 1 << 1,
+    FORWARD: 1 << 3,
+    BACK: 1 << 4,
     ATTACK: 1 << 2,
 };
 

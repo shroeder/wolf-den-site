@@ -5,8 +5,17 @@ import { fileURLToPath } from "node:url";
 
 import { WebSocketServer } from "ws";
 
+// ⚠️ LOCAL ONLY, AND IT CANNOT RUN ON FLY. The file it reads is on Luke's
+//    machine; in a container the read throws and is swallowed, so the server
+//    falls back to the secrets Fly injected. A local run therefore needs no
+//    exported environment at all, and a deployed one is untouched.
+if (!process.env.FLY_MACHINE_ID) {
+    const { loadLocalEnv } = await import("./test/_env.mjs");
+    loadLocalEnv();
+}
+
 import {
-    EVENT, FLAG, HISTORY_TICKS, MSG, PLAYER, TICK_MS,
+    ENEMY, EVENT, FLAG, HISTORY_TICKS, MSG, PLAYER, TICK_MS, WORLD,
 } from "./sim/protocol.js";
 import {
     applyToBaseline, decodeInput, encodeEvent, encodeSnapshot,
@@ -155,8 +164,14 @@ wss.on("connection", (ws, req) => {
     }
 
     const id = nextPlayerId++;
-    // Spawn them apart so two windows are visibly two players.
-    const player = makePlayer(id, 180 + (id % 4) * 70);
+    // Spawn them a little apart, deterministically, so two windows are
+    // visibly two players without landing on top of each other.
+    const ring = (id % 8) * (Math.PI / 4);
+    const player = makePlayer(
+        id,
+        WORLD.spawn.x + Math.cos(ring) * WORLD.spawnSpread,
+        WORLD.spawn.y + Math.sin(ring) * WORLD.spawnSpread
+    );
 
     const client = {
         id,
@@ -299,9 +314,8 @@ function step() {
     world.simMs += TICK_MS;
     const events = [];
 
-    // 1. Player input. Every queued input for this tick is applied in
-    //    sequence order, which is how a client that sent three frames in
-    //    one tick keeps all three.
+    // 1. Player input, in sequence order, so a client that sent three
+    //    frames in one tick keeps all three.
     for (const client of clients.values()) {
         const player = world.players.get(client.id);
         if (!player) continue;
@@ -311,33 +325,34 @@ function step() {
             stepPlayer(player, {
                 left: Boolean(input.buttons & 1),
                 right: Boolean(input.buttons & 2),
+                forward: Boolean(input.buttons & 8),
+                back: Boolean(input.buttons & 16),
             }, input.dtMs);
             player.lastSeq = input.seq;
 
             if ((input.buttons & 4) && canSwing(player, world.simMs)) {
                 beginSwing(player, world.simMs);
-                // Resolve against the REWOUND world, not the current one.
+                // Resolved against the REWOUND world, not the current one.
                 const past = worldAsSeenBy(client);
-                for (const [, enemy] of past.enemies) {
-                    const live = world.enemies.get(enemy.id);
+                // ⚠️ NEAREST VALID TARGET, NOT THE FIRST ONE IN THE MAP.
+                //    With several enemies in reach, iteration order decided
+                //    who got hit -- which is insertion order, which is
+                //    stable and arbitrary and absolutely not what the
+                //    player aimed at.
+                let bestHit = null;
+                for (const [, seen] of past.enemies) {
+                    const live = world.enemies.get(seen.id);
                     if (!live || live.hp <= 0) continue;
-                    const hit = resolveSwing(player, enemy, rng);
-                    if (!hit) continue;
-                    // The damage ACTUALLY APPLIED, not the damage rolled.
-                    //
-                    // ⚠️ OVERKILL MUST NOT BE BROADCAST AS A NUMBER. A
-                    //    50-point crit on an enemy with 25 hp removes 25 --
-                    //    and the first version still told every client
-                    //    "-50". The milestone's own arithmetic check caught
-                    //    it: events summed to 100 against 25 hp lost. It is
-                    //    a small lie and it is the exact class the decision
-                    //    record exists to prevent, because the number on
-                    //    screen is the one thing a player can audit.
-                    const applied = Math.min(hit.damage, live.hp);
+                    const hit = resolveSwing(player, seen, rng);
+                    if (hit && (!bestHit || hit.distance < bestHit.distance)) bestHit = hit;
+                }
+                if (bestHit) {
+                    const live = world.enemies.get(bestHit.targetId);
+                    const applied = Math.min(bestHit.damage, live.hp);
                     live.hp -= applied;
                     events.push({
                         event: EVENT.HIT, actorId: player.id,
-                        targetId: live.id, amount: applied, crit: hit.crit,
+                        targetId: live.id, amount: applied, crit: bestHit.crit,
                     });
                     if (live.hp === 0) {
                         events.push({
@@ -345,55 +360,79 @@ function step() {
                             targetId: live.id, amount: 0, crit: false,
                         });
                     }
-                    break;
                 }
             }
         }
     }
 
-    // 2. The world's own motion, and respawn.
-    //
-    // ⚠️ A DEAD ENEMY THAT NEVER RETURNS MAKES THE WHOLE PAGE UNTESTABLE.
-    //    The first screenshot of the client showed hp 0 and nothing to do:
-    //    one bot had killed it minutes earlier and the zone was permanently
-    //    empty. Respawn is not content here, it is what makes the milestone
-    //    re-runnable without restarting the server.
+    // 2. The world's own motion: enemies chase, attack, respawn.
+    const living = [...world.players.values()];
     for (const [, enemy] of world.enemies) {
-        if (enemy.hp > 0) { stepEnemy(enemy, TICK_MS); continue; }
+        if (enemy.hp > 0) {
+            const blow = stepEnemy(enemy, living, TICK_MS, world.simMs);
+            if (blow) {
+                const victim = world.players.get(blow.targetId);
+                if (victim && victim.hp > 0) {
+                    const applied = Math.min(blow.damage, victim.hp);
+                    victim.hp -= applied;
+                    events.push({
+                        event: EVENT.HIT, actorId: enemy.id,
+                        targetId: victim.id, amount: applied, crit: false,
+                    });
+                    if (victim.hp === 0) {
+                        victim.deadUntilMs = world.simMs + PLAYER.respawnMs;
+                        events.push({
+                            event: EVENT.DEATH, actorId: enemy.id,
+                            targetId: victim.id, amount: 0, crit: false,
+                        });
+                    }
+                }
+            }
+            continue;
+        }
         if (!enemy.deadAtMs) { enemy.deadAtMs = world.simMs; continue; }
         if (world.simMs - enemy.deadAtMs >= RESPAWN_MS) {
             enemy.hp = enemy.maxHp;
-            enemy.x = 312;
-            enemy.drift = 1;
+            enemy.x = enemy.homeX;
+            enemy.y = enemy.homeY;
             enemy.deadAtMs = 0;
         }
     }
 
-    // 3. History, for the next rewind.
+    // 3. Players come back where they came in.
+    for (const [, p] of world.players) {
+        if (p.hp > 0 || !p.deadUntilMs || world.simMs < p.deadUntilMs) continue;
+        p.hp = PLAYER.maxHp;
+        p.deadUntilMs = 0;
+        p.x = WORLD.spawn.x + Math.cos(p.id) * WORLD.spawnSpread;
+        p.y = WORLD.spawn.y + Math.sin(p.id) * WORLD.spawnSpread;
+    }
+
+    // 4. History, for the next rewind.
     history.push(snapshotWorld(world));
     while (history.length > HISTORY_TICKS) history.shift();
 
-    // 4. Broadcast. Events first -- a damage number must not arrive after
+    // 5. Broadcast. Events first -- a damage number must not arrive after
     //    the hp that it explains.
     const entities = [];
     for (const [, p] of world.players) {
         entities.push({
-            id: p.id, x: p.x, y: p.y, hp: p.hp,
+            id: p.id, x: p.x, y: p.y, hp: p.hp, facing: p.facing,
             flags: (world.simMs < p.swingUntilMs ? FLAG.SWINGING : 0)
-                | (p.facingLeft ? FLAG.FACING_LEFT : 0)
                 | (p.hp <= 0 ? FLAG.DEAD : 0),
         });
     }
     for (const [, e] of world.enemies) {
         entities.push({
-            id: e.id, x: e.x, y: e.y, hp: e.hp,
-            flags: FLAG.IS_ENEMY | (e.facingLeft ? FLAG.FACING_LEFT : 0)
+            id: e.id, x: e.x, y: e.y, hp: e.hp, facing: e.facing,
+            flags: FLAG.IS_ENEMY
+                | (world.simMs < e.attackUntilMs ? FLAG.SWINGING : 0)
                 | (e.hp <= 0 ? FLAG.DEAD : 0),
         });
     }
 
     for (const client of clients.values()) {
-        if (client.ws.readyState !== client.ws.OPEN) continue;
+        if (client.ws.readyState !== client.ws.OPEN || !client.authed) continue;
         for (const ev of events) client.ws.send(encodeEvent(ev));
         const frame = encodeSnapshot({
             tick: world.tick,
@@ -402,7 +441,6 @@ function step() {
             baseline: client.baseline,
         });
         client.pendingAcks.set(world.tick, { entities: entities.map((e) => ({ ...e })), removed: [] });
-        // Bound the memory a silent client can cost us.
         if (client.pendingAcks.size > HISTORY_TICKS * 4) {
             const oldest = Math.min(...client.pendingAcks.keys());
             client.pendingAcks.delete(oldest);

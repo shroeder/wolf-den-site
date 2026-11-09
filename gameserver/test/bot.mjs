@@ -8,6 +8,10 @@
 //     node gameserver/test/bot.mjs
 // ─────────────────────────────────────────────────────────────────────────
 import { WebSocket } from "ws";
+
+import { loadLocalEnv } from "./_env.mjs";
+
+loadLocalEnv();
 import { createClient } from "../client/net.js";
 import { devTicket } from "./_ticket.mjs";
 const now = () => Date.now();
@@ -22,8 +26,12 @@ setInterval(() => {
   const t = now(); frames++;
   const enemy = c.renderPosition(47), me = c.renderPosition(c.state.playerId);
   const dx = enemy && me ? enemy.x - me.x : 0;
-  const inRange = Math.abs(dx) < 54;
-  c.sendInput({ left: !inRange && dx < 0, right: !inRange && dx > 0,
-                attack: inRange && frames % 14 === 0, dtMs: t - last });
+  const dy = enemy && me ? enemy.y - me.y : 0;
+  const inRange = Math.hypot(dx, dy) < 1.7;
+  c.sendInput({
+    left: !inRange && dx < -0.3, right: !inRange && dx > 0.3,
+    forward: !inRange && dy < -0.3, back: !inRange && dy > 0.3,
+    attack: inRange && frames % 14 === 0, dtMs: t - last,
+  });
   last = t;
 }, 16);

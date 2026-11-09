@@ -2,6 +2,10 @@ import { generateKeyPairSync, randomUUID, sign } from "node:crypto";
 
 import { WebSocket } from "ws";
 
+import { loadLocalEnv } from "./_env.mjs";
+
+loadLocalEnv();
+
 import { verifyTicket } from "../auth/ticket.js";
 
 // ─────────────────────────────────────────────────────────────────────────
