@@ -4705,8 +4705,22 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
    Measured live against a gated account: computed colour rgb(255,215,94), painted grey.
 
    Dimming the ART and leaving the text alone is what the old comment always meant. */
+/* ⚠️ THE TRANSLATE HAS TO BE REPEATED HERE, AND LEAVING IT OUT MOVED EVERY SHUTTERED BUILDING.
+   transform is ONE property, not a list that cascades. The plain .tw-building rule sets
+   translate(-50%, -100%) -- which is what puts a building's BASE on the ground line and centres it on
+   its own x% -- and this rule, at two classes to that rule's one, won on specificity and replaced it
+   outright with a bare scale(). Both halves of the positioning went with it.
+
+   So a shuttered building sat half its own width to the RIGHT of where it belonged, and a full
+   building-height BELOW the ground line -- which drops the name and the gold "Opens at Fenhollow"
+   underneath the scene's own overflow clip. On a phone that is two unexplained dark houses jammed into
+   the bottom edge, which is exactly what it was reported as.
+
+   The dimming was never the problem; the text that EXPLAINS the dimming was being clipped off the
+   bottom of the scene. Same label, second cause -- see the 42%-brightness note above. A locked
+   building whose "Opens at" line cannot be read is not an advertisement, it is a blemish. */
 .tw-building.is-shuttered { cursor: default; pointer-events: none; text-align: center;
-    transform: scale(0.88); transform-origin: 50% 100%; }
+    transform: translate(-50%, -100%) scale(0.88); transform-origin: 50% 100%; }
 .tw-building.is-shuttered .tw-building-art,
 .tw-building.is-shuttered .tw-b-emoji {
     opacity: 0.9; filter: grayscale(0.55) brightness(0.42) contrast(1.05); }
