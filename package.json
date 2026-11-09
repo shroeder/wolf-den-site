@@ -62,6 +62,7 @@
         "rt:serve": "node gameserver/server.mjs",
         "rt:bot": "node gameserver/test/bot.mjs",
         "rt:milestone": "node gameserver/test/milestone.mjs",
+        "rt:ticket": "node gameserver/test/ticket.mjs",
         "lp:make": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/make.py",
         "lp:film": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/harness/film.py",
         "lp:gate": "node scripts/lowpoly/harness/run.mjs scripts/lowpoly/harness/gate.py",

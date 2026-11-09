@@ -74,7 +74,18 @@ const ws = new WebSocket(`${proto}//${location.host}/ws`);
 ws.binaryType = "arraybuffer";
 
 const client = createClient({ send: (d) => ws.readyState === 1 && ws.send(d), now: () => performance.now() });
-ws.addEventListener("open", () => console.log("[client] socket open"));
+// ⚠️ THE TICKET IS THE FIRST MESSAGE ON THE SOCKET, NEVER IN THE URL.
+// Query strings land in access logs, proxy logs and browser history, and a
+// 60-second credential in a log is still a credential. In the real client
+// this comes from POST /api/marketplace/rt-ticket on the app's own origin;
+// here it comes from the dev endpoint, which production cannot serve.
+ws.addEventListener("open", async () => {
+    console.log("[client] socket open");
+    const r = await fetch("/dev/ticket", { method: "GET", cache: "no-store" }).catch(() => null);
+    if (!r?.ok) { console.error("[client] no ticket available"); return; }
+    const { ticket } = await r.json();
+    ws.send(JSON.stringify({ type: "ticket", ticket }));
+});
 ws.addEventListener("error", () => console.error("[client] socket error"));
 ws.addEventListener("close", (e) => console.warn("[client] socket close", e.code));
 ws.addEventListener("message", (ev) => {

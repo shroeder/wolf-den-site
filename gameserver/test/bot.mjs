@@ -9,10 +9,12 @@
 // ─────────────────────────────────────────────────────────────────────────
 import { WebSocket } from "ws";
 import { createClient } from "../client/net.js";
+import { devTicket } from "./_ticket.mjs";
 const now = () => Date.now();
 const ws = new WebSocket(process.env.RT_URL || "ws://127.0.0.1:8090/ws");
 ws.binaryType = "arraybuffer";
 const c = createClient({ send: (d) => ws.send(d), now });
+ws.on("open", () => ws.send(JSON.stringify({ type: "ticket", ticket: devTicket("bot") })));
 ws.on("message", (d, b) => c.onMessage(d, b));
 let last = now(), frames = 0;
 setInterval(() => {

@@ -2,6 +2,7 @@ import { WebSocket } from "ws";
 
 import { EVENT, FLAG, TICK_MS } from "../sim/protocol.js";
 import { createClient } from "../client/net.js";
+import { devTicket } from "./_ticket.mjs";
 
 // ─────────────────────────────────────────────────────────────────────────
 // THE MILESTONE, AS ASSERTIONS
@@ -39,6 +40,7 @@ function connect(name) {
         client.name = name;
         ws.on("message", (data, isBinary) => client.onMessage(data, isBinary));
         ws.on("open", () => {
+            ws.send(JSON.stringify({ type: "ticket", ticket: devTicket("test-" + name) }));
             const t = setInterval(() => {
                 if (client.state.connected) { clearInterval(t); resolve({ ws, client }); }
             }, 10);

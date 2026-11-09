@@ -11,6 +11,7 @@ import {
 import {
     applyToBaseline, decodeInput, encodeEvent, encodeSnapshot,
 } from "./sim/codec.js";
+import { originAllowed, parseOrigins, verifyTicket } from "./auth/ticket.js";
 import {
     beginSwing, canSwing, makePlayer, makeRng, makeWorld,
     resolveSwing, snapshotWorld, stepEnemy, stepPlayer,
@@ -44,6 +45,10 @@ import {
 const PORT = Number(process.env.PORT || 8080);
 // Long enough that a 5-second test never sees a respawn mid-run.
 const RESPAWN_MS = 8000;
+const ALLOWED_ORIGINS = parseOrigins(process.env.RT_ALLOWED_ORIGINS);
+// A connection that never presents a ticket is closed rather than left
+// holding a socket. Short, because an honest client sends it immediately.
+const TICKET_GRACE_MS = 5000;
 // ⚠️ fileURLToPath, NOT new URL(...).pathname. A URL pathname is
 // percent-encoded, and this repo lives in "wolf den site" -- the space
 // comes back as %20 and every static file 404s while the socket, the tick
@@ -73,6 +78,27 @@ const http = createServer(async (req, res) => {
         }));
         return;
     }
+    // ── A DEV TICKET, AND PRODUCTION CANNOT SERVE ONE ────────────────
+    // The real flow is: the client fetches a ticket from Next.js, which
+    // holds the private key, and presents it here. That needs two servers,
+    // which is friction for a page whose whole job is to be opened twice
+    // in ten seconds.
+    //
+    // ⚠️ THE GUARD IS NOT A FLAG, IT IS THE KEY. This endpoint can only
+    //    mint if RT_TICKET_PRIVATE_KEY is in the environment -- and the
+    //    game server is deliberately only ever given the PUBLIC half. A
+    //    production box has nothing to sign with, so the endpoint cannot
+    //    work there even if someone set a flag, shipped a debug build, or
+    //    reverted this comment. That is the difference between a door that
+    //    is closed and a door that does not exist.
+    if (url === "/dev/ticket") {
+        if (!process.env.RT_TICKET_PRIVATE_KEY) { res.writeHead(404).end(); return; }
+        const { devTicket } = await import("./test/_ticket.mjs");
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ ticket: devTicket("dev-" + Math.floor(Date.now() / 1000 % 100000)) }));
+        return;
+    }
+
     // The client is served by the game server itself so that opening two
     // windows is one URL and no second process.
     const file = url === "/" ? "/client/index.html" : url;
@@ -98,17 +124,48 @@ const http = createServer(async (req, res) => {
     }
 });
 
+
+// ── REFUSE, AND MEAN IT ──────────────────────────────────────────────────
+// ⚠️ ws.close() ALONE IS NOT PROMPT THROUGH FLY'S PROXY. Measured: a close
+//    frame sent at the 5 second grace mark reaches the client at 5.02s on
+//    loopback and at 10.17s through the proxy -- five seconds late, every
+//    time. A socket that an attacker can hold open for ten seconds per
+//    attempt by simply saying nothing is a cheap way to occupy the server.
+//
+//    So the close frame goes first (it carries the code and reason, which
+//    a well-behaved client wants), and the connection is then destroyed
+//    shortly after whether or not the proxy has relayed it.
+function refuse(ws, code, reason) {
+    try { ws.close(code, reason); } catch { /* already gone */ }
+    setTimeout(() => { try { ws.terminate(); } catch { /* already gone */ } }, 250);
+}
+
 const wss = new WebSocketServer({ server: http, path: "/ws" });
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
+    // ── THE DOOR ─────────────────────────────────────────────────────────
+    // ⚠️ ORIGIN FIRST, ON THE UPGRADE ITSELF. There is no same-origin policy
+    //    on WebSockets and no preflight -- any page on the internet can open
+    //    one. It could not forge a ticket, but it could burn a real one that
+    //    a signed-in visitor's own browser had just fetched.
+    if (!originAllowed(req.headers.origin, ALLOWED_ORIGINS)) {
+        console.log(JSON.stringify({ event: "refused", why: "origin", origin: req.headers.origin || null }));
+        refuse(ws, 4003, "origin");
+        return;
+    }
+
     const id = nextPlayerId++;
     // Spawn them apart so two windows are visibly two players.
     const player = makePlayer(id, 180 + (id % 4) * 70);
-    world.players.set(id, player);
 
     const client = {
         id,
         ws,
+        // ⚠️ NOT IN THE WORLD UNTIL THE TICKET CHECKS OUT. An unauthenticated
+        //    socket gets an entity, a position and a place in every other
+        //    player's snapshot if you add it on connect and verify after.
+        buyer: null,
+        authed: false,
         // ⚠️ PER-CLIENT BASELINE, advanced only on ack. See codec.js.
         baseline: new Map(),
         pendingAcks: new Map(),   // tick -> entities snapshotted at that tick
@@ -119,29 +176,68 @@ wss.on("connection", (ws) => {
         lastPingAt: 0,
     };
     clients.set(ws, client);
-
     ws.binaryType = "nodebuffer";
-    ws.send(JSON.stringify({
-        type: "welcome",
-        playerId: id,
-        tickHz: 1000 / TICK_MS,
-        player: { speed: PLAYER.speed, reach: PLAYER.reach, maxHp: PLAYER.maxHp },
-        enemies: [...world.enemies.values()].map((e) => ({ id: e.id, maxHp: e.maxHp })),
-    }));
-    console.log(JSON.stringify({ event: "join", id, players: world.players.size }));
+
+    const graceTimer = setTimeout(() => {
+        if (!client.authed) {
+            console.log(JSON.stringify({ event: "refused", why: "no_ticket", id }));
+            refuse(ws, 4001, "ticket required");
+        }
+    }, TICKET_GRACE_MS);
+
+    function admit(claims) {
+        client.authed = true;
+        client.buyer = { id: claims.sub, name: claims.name, sprite: claims.sprite || null, zone: claims.zone };
+        clearTimeout(graceTimer);
+        world.players.set(id, player);
+        console.log(JSON.stringify({
+            event: "join", id, buyer: claims.sub, name: claims.name,
+            zone: claims.zone, players: world.players.size,
+        }));
+        ws.send(JSON.stringify({
+            type: "welcome",
+            playerId: id,
+            you: { name: claims.name, sprite: claims.sprite || null },
+            tickHz: 1000 / TICK_MS,
+            player: { speed: PLAYER.speed, reach: PLAYER.reach, maxHp: PLAYER.maxHp },
+            enemies: [...world.enemies.values()].map((e) => ({ id: e.id, maxHp: e.maxHp })),
+        }));
+    }
 
     ws.on("message", (data, isBinary) => {
         if (!isBinary) {
-            // JSON path is for the latency probe only; everything that runs
-            // every tick is binary.
-            try {
-                const msg = JSON.parse(String(data));
-                if (msg.type === "pong" && client.lastPingAt) {
-                    client.rttMs = Date.now() - client.lastPingAt;
+            // JSON carries exactly two things: the ticket, once, and the
+            // latency pong. Everything that runs every tick is binary.
+            let msg = null;
+            try { msg = JSON.parse(String(data)); } catch { return; }
+
+            if (msg?.type === "ticket" && !client.authed) {
+                const result = verifyTicket(msg.ticket);
+                if (!result.ok) {
+                    // The reason goes to our log, never to the caller:
+                    // telling a forger which check failed tells them which
+                    // part to work on next.
+                    console.log(JSON.stringify({ event: "refused", why: result.reason, id }));
+                    // The grace timer must go too, or it fires later against
+                    // a socket that is already gone and logs a second,
+                    // misleading "no_ticket" refusal for the same client.
+                    clearTimeout(graceTimer);
+                    ws.send(JSON.stringify({ type: "denied" }));
+                    refuse(ws, 4001, "ticket");
+                    return;
                 }
-            } catch { /* ignore */ }
+                admit(result.claims);
+                return;
+            }
+            if (msg?.type === "pong" && client.lastPingAt) {
+                client.rttMs = Date.now() - client.lastPingAt;
+            }
             return;
         }
+        // ⚠️ NOTHING BINARY IS READ BEFORE THE TICKET. Input from an
+        //    unauthenticated socket must not reach the simulation at all --
+        //    not dropped later by a check inside step(), but never queued.
+        if (!client.authed) return;
         const bytes = new Uint8Array(data);
         if (bytes[0] !== MSG.INPUT) return;
         const input = decodeInput(bytes);
@@ -168,11 +264,14 @@ wss.on("connection", (ws) => {
     });
 
     ws.on("close", () => {
+        clearTimeout(graceTimer);
         clients.delete(ws);
         world.players.delete(id);
-        console.log(JSON.stringify({ event: "leave", id, players: world.players.size }));
+        if (client.authed) {
+            console.log(JSON.stringify({ event: "leave", id, buyer: client.buyer?.id, players: world.players.size }));
+        }
     });
-    ws.on("error", () => { clients.delete(ws); world.players.delete(id); });
+    ws.on("error", () => { clearTimeout(graceTimer); clients.delete(ws); world.players.delete(id); });
 });
 
 // ── REWIND ───────────────────────────────────────────────────────────────
