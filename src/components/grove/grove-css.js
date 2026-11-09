@@ -1928,30 +1928,44 @@ export const GROVE_CSS = `
 
    ⚠️ pointer-events: none. It is a readout, and it sits over ground a thumb reaches into to hit things.
    The one thing worse than not showing the bar is swallowing a tap meant for a creature. */
-.gv-bar { position: absolute; left: max(8px, env(safe-area-inset-left)); top: 42%;
-    transform: translateY(-50%); z-index: 5; pointer-events: none;
-    display: flex; align-items: center; gap: 8px; padding: 5px 11px 5px 5px;
-    border-radius: 999px; background: rgba(8,11,8,0.68); border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.4); backdrop-filter: blur(3px);
-    max-width: min(58vw, 240px); }
+/* ── ⚠️ ACROSS THE BOTTOM, FULL WIDTH ───────────────────────────────────────────────────────────
+   Luke: "The bar for the next item should be across the bottom, larger width wose."
+
+   It was a pill on the left edge at 42%, in the slot the deleted haul list used to own — which made it
+   a NOTIFICATION, something you glance at and dismiss. A progress bar you are meant to read against is
+   furniture: it wants a fixed place and enough length that the fill MOVING is visible. 250 kills across
+   240px moves a pixel a kill; across the full width it moves three or four.
+
+   ⚠️ IT CLEARS THE NOTE, WHICH SITS AT 68px. This strip ends at about 46px, so the two do not stack —
+   see the note on .gv-note.is-zone, which took the bottom-left corner first and keeps it.
+
+   ⚠️ STILL pointer-events: none. It now spans the whole width at the bottom of the screen, which is
+   exactly where a thumb reaches to hit something in the foreground. A readout that eats taps would be
+   a far worse bug than one nobody can read. */
+.gv-bar { position: absolute; z-index: 5; pointer-events: none;
+    left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 7px;
+    border-radius: 999px; background: rgba(8,11,8,0.72); border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
 /* object-fit: contain, because a tool sprite is not square and must not be stretched to this box.
    [[sprite-floats-object-fit-contain]] */
 .gv-bar img { flex: none; width: 30px; height: 30px; object-fit: contain; display: block;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
 .gv-bar-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.gv-bar-name { font-size: 0.72rem; font-weight: 700; color: #e6e0d2; letter-spacing: 0.01em;
+.gv-bar-name { font-size: 0.78rem; font-weight: 700; color: #e6e0d2; letter-spacing: 0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* ⚠️ A REAL BOX, NOT A PERCENTAGE OF NOTHING. The track needs its own height or the fill inside it
    collapses — [[percentage-needs-a-real-box]], which this repo has paid for four times. */
-.gv-bar-track { position: relative; height: 5px; border-radius: 999px; overflow: hidden;
-    background: rgba(255,255,255,0.14); }
+.gv-bar-track { position: relative; height: 7px; border-radius: 999px; overflow: hidden;
+    background: rgba(255,255,255,0.16); }
 .gv-bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px;
     background: linear-gradient(90deg, #7fd48a, #d8f06a);
     transition: width 420ms cubic-bezier(0.2, 0.7, 0.2, 1); }
 /* The chest phase, once every tool of the tier is held. A different colour because it is a different
    kind of reward, and the player should be able to tell which phase they are in at a glance. */
 .gv-bar.is-chest .gv-bar-fill { background: linear-gradient(90deg, #ffc857, #ffe9a8); }
-.gv-bar-n { flex: none; font-size: 0.64rem; font-weight: 800; color: #b9c4ae;
+.gv-bar-n { flex: none; font-size: 0.72rem; font-weight: 800; color: #b9c4ae;
     font-variant-numeric: tabular-nums; }
 @keyframes gvHaulIn { from { opacity: 0; transform: translateX(-14px) scale(0.92); }
     to { opacity: 1; transform: none; } }

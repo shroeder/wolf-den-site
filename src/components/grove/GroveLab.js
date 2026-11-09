@@ -7,7 +7,7 @@ import GroveMarshal from "@/components/grove/GroveMarshal";
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import { GROVE_CSS } from "@/components/grove/grove-css.js";
-import { GROVE_ZONES } from "@/lib/marketplace/grove-catalog.js";
+import { GROVE_ZONES, toolArt } from "@/lib/marketplace/grove-catalog.js";
 // ⚠️ THE PLAN MODULE, NOT THE SERVER ONE. grove-coliseum.js is server-only.
 import { runPlan } from "@/lib/marketplace/grove-coliseum-plan.js";
 
@@ -305,6 +305,21 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 petBite={scene === "pet" ? 0.39 : 0.13}
                 belt={beltFor(scene)}
                 bagRoom={bagRoomFor(scene)}
+                // ── ⚠️ THE KILL BAR, SO THE BENCH CAN ACTUALLY SEE IT ────────────────────────────────
+                // GroveScene takes `bar` as a prop fed by GroveClient from the server, so mounting the
+                // scene against a fixture drew no bar at all — which looked exactly like a broken strip
+                // when the thing being judged was its geometry. A lab that cannot show a piece of the HUD
+                // cannot be used to judge that piece of the HUD.
+                //
+                // Two thirds along and naming a real tool, because the two questions this is used for are
+                // "does the fill read as movement" and "does the name fit beside it at this width".
+                bar={{ map: 1, kills: 167, need: 250, fills: 3,
+                    next: { kind: "tool", slot: "shovel", name: "Barrow Spade", tier: 1,
+                        // ⚠️ toolArt(), NOT A TYPED PATH. The first version of this fixture guessed the
+                        // filename and drew nothing — which is the lab lying about the real thing, since
+                        // the server resolves this through exactly this helper.
+                        numeral: "I", art: toolArt("shovel", 1) },
+                    toolsHeld: 3, toolsTotal: 12 }}
                 labScene={scene}
                 gearArt={LAB_GEAR}
                 // Locked while the boss stands, open once it falls — the one thing this change is about.
