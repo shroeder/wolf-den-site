@@ -2228,6 +2228,16 @@ export const GROVE_CSS = `
    [[sprite-floats-object-fit-contain]] */
 .gv-pop-tool { display: block; width: 96px; height: 96px; margin: 10px auto 0; object-fit: contain;
     filter: drop-shadow(0 6px 16px rgba(0,0,0,0.65)); }
+/* ── ONE ROW PER THING THE CHEST HELD ────────────────────────────────────────────────────────────
+   A settle that crossed several fills pays several rewards, and they are stacked rather than summed:
+   "2 rewards" with one sprite would be the card under-reporting what was actually earned, which is
+   the rule the bulk chest summary is built on. Capped by scroll rather than by count — a long
+   session should never silently drop the last one. */
+.gv-pop-won { display: block; margin-top: 4px; }
+.gv-pop-won + .gv-pop-won { margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.1); }
+.gv-pop-won .gv-pop-tool { width: 88px; height: 88px; margin-top: 4px; }
+.gv-pop-card { max-height: 78vh; overflow-y: auto; }
 .gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
     text-transform: uppercase; color: #9b9487; }
 @keyframes gvPopIn { from { opacity: 0; } to { opacity: 1; } }

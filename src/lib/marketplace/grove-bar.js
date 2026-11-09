@@ -5,6 +5,7 @@ import { addChests, CHEST_ORDER, CHEST_TIERS } from "@/lib/marketplace/chests.js
 import { rollQuality } from "@/lib/marketplace/grove-forge.js";
 import { TOOL_SLOTS, toolNumeral } from "@/lib/marketplace/grove-recipes.js";
 import { toolArt } from "@/lib/marketplace/grove-catalog.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 
 // ── THE KILL BAR ─────────────────────────────────────────────────────────────────────────────────────────────
 // Luke, 2026-11-08: "You kill enemies in an area. A bar fills. It reaches full. You get a reward. The reward
@@ -125,13 +126,26 @@ export async function barState(buyerId, mapN) {
         kills: Number(row?.kills) || 0,
         need: BAR_KILLS,
         fills: Number(row?.fills) || 0,
-        // ⚠️ WHAT IS COMING, NAMED AND DRAWN. A bar that fills toward "a reward" is a progress bar; a bar
-        // that fills toward the Antler Pick with its sprite on the end is a goal. The art is resolved here
-        // because toolArt is a pure lookup and the client would otherwise need the tier rule to do it.
+        // ── ⚠️ THE BAR FILLS TOWARD A CHEST, AND NEVER NAMES THE PRIZE ──────────────────────────────
+        // Luke: "it shouldn't say im getting item x, it should show a chest, and when that chests bumps
+        // around and opens, it reveals what I get."
+        //
+        // It used to read "Barrow Spade I" with the tool's own sprite on it — a correct answer to the
+        // wrong question. Knowing exactly what is coming for 250 kills is an errand; not knowing is the
+        // thing people open chests for. The reward underneath is unchanged — the ladder still pays each
+        // tool in TOOL_SLOTS order and then chests — the BAR simply stops spoiling it.
+        //
+        // `next` is still computed and still sent, because the reveal has to know what to open INTO and
+        // the client cannot work that out. It is just not drawn on the strip any more.
         next: next
             ? { kind: "tool", slot: next.slot, name: next.name, tier: m,
                 numeral: toolNumeral(m), art: toolArt(next.slot, m) }
             : { kind: "chest", ceiling: barCeiling(m) },
+        // ⚠️ A REAL SPRITE, NOT A GLYPH. [[no-icons-or-glyphs-in-the-game]] — every destination gets drawn
+        // art, and a chest emoji here would hide the gap rather than fill it. These are the same painted
+        // chests the equipment screen and the casino counter use, so the thing on the bar is the thing
+        // that opens. Null rather than a character on failure; a missing sprite should read as missing.
+        chestArt: (await getChestArt().catch(() => ({})))[barCeiling(m)] || null,
         // How many of the twelve this map still owes, for the "7 of 12" line.
         toolsHeld: TOOL_SLOTS.filter((t) => (Number(tools[t.slot]) || 0) >= m).length,
         toolsTotal: TOOL_SLOTS.length,

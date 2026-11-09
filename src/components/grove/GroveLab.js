@@ -313,7 +313,9 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 //
                 // Two thirds along and naming a real tool, because the two questions this is used for are
                 // "does the fill read as movement" and "does the name fit beside it at this width".
-                bar={{ map: 1, kills: 167, need: 250, fills: 3,
+                // chestArt is a blob URL in production; the bench uses a local chest sprite so the strip
+                // draws the same shape without reaching for the network.
+                bar={{ map: 1, kills: 167, need: 250, fills: 3, chestArt: "/images/ui/chest.png",
                     next: { kind: "tool", slot: "shovel", name: "Barrow Spade", tier: 1,
                         // ⚠️ toolArt(), NOT A TYPED PATH. The first version of this fixture guessed the
                         // filename and drew nothing — which is the lab lying about the real thing, since

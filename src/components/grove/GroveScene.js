@@ -641,6 +641,14 @@ export default function GroveScene({
     const [gen, bumpGen] = useState(0);
     const rerender = useCallback(() => bumpGen((g) => g + 1), []);
 
+    // ⚠️ THE FLUSH GUARD CLEARS WHEN THE SERVER ANSWERS. `fills` only moves when a reward was actually
+    // paid, so this re-arms on the payout rather than on any old refresh — which is what stops one full
+    // bar firing a settle on every frame until the response lands. See the flush in killFoe.
+    useEffect(() => {
+        const w = worldRef.current;
+        if (w) w.barFlushed = false;
+    }, [bar?.fills, bar?.kills]);
+
     // ── ✂️ WHAT THE CREATURES IN THIS ZONE WERE CARRYING OFF YOUR LIST ──────────────────────────
     // Up to three wishlisted PART sprites floated over any creature that dropped one, so you could pick
     // your target out of nineteen bodies by what it was carrying. Deleted with parts on 2026-11-08, along
@@ -1816,6 +1824,31 @@ export default function GroveScene({
             if (way && !wd.clearFlushed && (Number(zone.kills) || 0) + wd.killCredit >= zone.toUnlock) {
                 wd.clearFlushed = true;
                 if (wd.killLog.length) {
+                    const ate = wd.eaten; wd.eaten = {};
+                    Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
+                }
+            }
+
+            // ── ⚠️ THE BAR PAYS AT THE MOMENT IT FILLS, NOT UP TO 45 SECONDS LATER ──────────────
+            // Luke: "When i get the full bar. Nothing happens."
+            //
+            // He was describing a real structural gap, not a missing animation. The bar fills from kills
+            // the client already knows about, but the REWARD is granted by bumpBar inside the settle — and
+            // the ordinary settle is on a 45-second timer. So the strip could sit at 250/250 with the
+            // payout most of a minute away, and the moment it is supposed to celebrate had already passed
+            // by the time anything arrived. A full bar that does nothing is worse than no bar.
+            //
+            // So crossing the line flushes immediately, exactly as clearing a zone does above and for the
+            // same reason: the server has to be told NOW because something is waiting on its answer.
+            //
+            // ⚠️ GUARDED BY A FLAG, NOT BY THE COUNT. The pending log is spliced by the flush, so the sum
+            // drops back under the line on the very next frame — but a second kill landing before the
+            // response returns would cross it again against the OLD bar.kills and fire a second settle.
+            // `barFlushed` clears when a fresh bar arrives (see the effect on bar.fills).
+            if (bar?.need && !wd.barFlushed) {
+                const pend = wd.killLog.reduce((a, k) => a + (Number(k?.c) || 1), 0);
+                if ((Number(bar.kills) || 0) + pend >= bar.need) {
+                    wd.barFlushed = true;
                     const ate = wd.eaten; wd.eaten = {};
                     Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
                 }
@@ -4215,16 +4248,15 @@ export default function GroveScene({
                     aria-label={bar.next?.kind === "chest"
                         ? `${bar.need - shown} kills to a chest`
                         : `${bar.need - shown} kills to ${bar.next?.name || "a tool"}`}>
-                    {bar.next?.art ? (
+                    {/* ⚠️ THE CHEST, NOT THE PRIZE. It used to draw bar.next's own sprite and name — which
+                        told you exactly what 250 kills was going to hand over before you had earned any of
+                        it. The strip shows a closed chest now and the reveal does the telling. */}
+                    {bar.chestArt ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={bar.next.art} alt="" width={30} height={30} draggable={false} />
+                        <img src={bar.chestArt} alt="" width={30} height={30} draggable={false} />
                     ) : null}
                     <span className="gv-bar-txt">
-                        <b className="gv-bar-name">
-                            {bar.next?.kind === "chest"
-                                ? "A chest"
-                                : `${bar.next?.name || "A tool"} ${bar.next?.numeral || ""}`.trim()}
-                        </b>
+                        <b className="gv-bar-name">Next chest</b>
                         <span className="gv-bar-track">
                             {/* ⚠️ CLAMPED AT 100%. The remainder carries across a fill, so a settle that
                                 crossed two rewards can hand back a kills value the width maths would

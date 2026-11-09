@@ -304,6 +304,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // it lands in the stash where chests already live; a card for that would be a card nobody reads by
     // the tenth one, which is how a game teaches you to tap through its celebrations. Chests take the
     // note instead. [[no-pity-progress-bars]] is the same judgement from the other end.
+    // `{ phase: "shaking"|"open", art, won: [...] }` — the chest the bar paid, and what came out of it.
     const [toolWon, setToolWon] = useState(null);
     const [bossWon, setBossWon] = useState(null);
     // The charm armed for the next dive, or null. ⚠️ NOT PERSISTED AND DELIBERATELY SO — arming is a
@@ -493,37 +494,30 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // so nothing else the session holds is lost.
         if (d.bar) setSession((prev) => (prev ? { ...prev, bar: { ...prev.bar, ...d.bar } } : prev));
 
-        // ── ⚠️ EVERY FILL IS ANNOUNCED, AND A TOOL OUTRANKS EVERYTHING ──────────────────────────────
-        // One settle can cross several fills (see the loop in bumpBar), so this is a list and not a
-        // single reward. A tool is the rarest thing on it — twelve per map tier, and it moves a number in
-        // another system — so it takes the card, and it wins the slot even against a gear drop.
+        // ── ⚠️ EVERY BAR PAYOUT OPENS THE CHEST, WHATEVER IS IN IT ──────────────────────────────────
+        // Luke: "it should show a chest, and when that chests bumps around and opens, it reveals what I
+        // get."
         //
-        // ⚠️ THE CARD TAKES THE LAST TOOL, NOT THE FIRST. If a long settle paid two, the second is the one
-        // the player now holds the better version of, and showing the first would name a rung they have
-        // already passed.
+        // This used to fork: a tool took a card, a chest took a one-line note. That fork is the thing the
+        // bar now promises against — the strip shows a closed chest for both, so BOTH have to open one.
+        // A chest on the bar that resolves into a text note would be the screen going back on its word.
+        //
+        // One settle can cross several fills (see the loop in bumpBar), so the whole list goes in and the
+        // reveal shows all of it. `chestArt` rides the bar for the shaking phase; d.bar is this settle's
+        // copy and session.bar is the one already on screen, which covers the first fill of a visit.
         const paid = Array.isArray(d.bar?.paid) ? d.bar.paid : [];
-        const toolsPaid = paid.filter((x) => x?.kind === "tool");
-        const chestsPaid = paid.filter((x) => x?.kind === "chest");
-
-        if (toolsPaid.length) {
-            setToolWon({ ...toolsPaid[toolsPaid.length - 1], key: `${Date.now()}` });
-            // ⚠️ AND THE CHESTS STILL GET SAID, in the note under the card, rather than being swallowed by
-            // it. A reward granted and never mentioned is the defect that hid the Coliseum's dead gear.
-            if (chestsPaid.length) {
-                setNote(`${chestsPaid.length} chest${chestsPaid.length === 1 ? "" : "s"} in your stash too`);
-            }
-        } else if (chestsPaid.length) {
-            // ⚠️ NAMED BY TIER, because "a chest" and "a Mythic Chest" are not the same news, and the
-            // best one leads.
-            //
-            // ⚠️ THE LABEL AND THE RUNG COME FROM THE SERVER. chests.js carries `import "server-only"`,
-            // so this component cannot read CHEST_TIERS or CHEST_ORDER — importing them here fails the
-            // build outright. bumpBar resolves both and sends them.
-            const label = [...chestsPaid].sort((a, b) => (b.rung || 0) - (a.rung || 0))[0]?.label
-                || "A chest";
-            setNote(chestsPaid.length === 1
-                ? `${label} — it is in your stash`
-                : `${label} and ${chestsPaid.length - 1} more in your stash`);
+        if (paid.length) {
+            // ⚠️ NO SPRITE, NO SHAKE. Chest art is admin-generated and can simply be absent for a tier
+            // (see chest-art.js), and a rattle phase with nothing in it is 1.2 seconds of blank screen
+            // between the player and their reward — strictly worse than no anticipation at all. The
+            // anticipation is a bonus; the reveal is the thing that must always happen.
+            const chestArt = d.bar?.chestArt || session?.bar?.chestArt || null;
+            setToolWon({
+                phase: chestArt ? "shaking" : "open",
+                art: chestArt,
+                won: paid,
+                key: `${Date.now()}`,
+            });
         } else if (gearGot.length) {
             // ── ⚠️ GEAR ON THE RECEIPT, NOT JUST IN THE BAG ───────────────────────────
             // settle grants it and returns it; the scene already shouted the piece's name on the kill.
@@ -681,12 +675,23 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         return () => clearTimeout(t);
     }, [unlockedNow]);
 
-    // Same five seconds and the same self-clear as the unlock card above, and the sound fires from here
-    // rather than from the settle handler so it is tied to the card actually being on screen.
+    // ── ⚠️ TWO PHASES, AND THE WAIT IS THE WHOLE POINT ──────────────────────────────────────────────
+    // Luke: "I expect a clear dopamine moment of reveal... it should show a chest, and when that chests
+    // bumps around and opens, it reveals what I get."
+    //
+    // A chest that opens instantly is a notification. The rattle is the beat that makes the opening MEAN
+    // something, and it is the same 1.2s the game's own chest opener uses — reusing that timing rather
+    // than picking a new one, because a player should not have to learn two speeds for one gesture.
     useEffect(() => {
         if (!toolWon) return undefined;
+        if (toolWon.phase === "shaking") {
+            // ⚠️ THE SOUND FIRES ON THE OPEN, NOT ON THE SHAKE. Landing it at the start would spend the
+            // payoff on the anticipation and leave the reveal silent, which is the wrong way round.
+            const t = setTimeout(() => setToolWon((p) => (p ? { ...p, phase: "open" } : p)), 1200);
+            return () => clearTimeout(t);
+        }
         celebrateUnlock();
-        const t = setTimeout(() => setToolWon(null), 5000);
+        const t = setTimeout(() => setToolWon(null), 6000);
         return () => clearTimeout(t);
     }, [toolWon]);
 
@@ -716,19 +721,50 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // moment the zone view unmounts. A card rendered only inside the zone would be destroyed by the
     // thing that triggered it.
     const toolNode = toolWon ? (
-        <div className="gv-pop" onClick={() => setToolWon(null)}>
-            <div className="gv-pop-card">
-                <span className="gv-pop-rays" aria-hidden="true" />
-                <span className="gv-pop-kicker">Tool earned</span>
-                <b className="gv-pop-name">{toolWon.name} {toolWon.numeral}</b>
-                {/* The sprite, not a background — a tool is a drawn object and gv-pop-art is a
-                    cover-fitted plate meant for a backdrop. */}
-                {toolWon.art ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img className="gv-pop-tool" src={toolWon.art} alt="" width={96} height={96} />
-                ) : null}
-                <span className="gv-pop-go">Tap to continue</span>
-            </div>
+        /* ── ⚠️ THE GAME'S OWN CHEST SEQUENCE, NOT A SECOND ONE ──────────────────────────────────────
+           .chest-stage / .chest-glowpad / .chest-shake / .chest-img-big are the classes the loot chest
+           opener already uses, and they live in globals.css rather than in a component — so the Grove's
+           chest rattles at exactly the rhythm, glow and scale the Den's chests do. A bespoke one here
+           would be a second answer to "what does opening a chest look like", and the first thing to drift.
+
+           ⚠️ NOT DISMISSIBLE WHILE IT SHAKES. A tap during the anticipation would skip the only beat that
+           makes the reveal land, and a player tapping to get on with a fight would never see what they
+           earned. It takes taps once it is open. */
+        <div className="gv-pop" onClick={toolWon.phase === "open" ? () => setToolWon(null) : undefined}>
+            {toolWon.phase === "shaking" ? (
+                <div className="chest-stage">
+                    <div className="chest-glowpad" style={{ "--chest": "#ffd75e" }} />
+                    <div className="chest-shake">
+                        {toolWon.art ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img className="chest-img-big" src={toolWon.art} alt="" />
+                        ) : null}
+                    </div>
+                    <p className="chest-opening">Opening…</p>
+                </div>
+            ) : (
+                <div className="gv-pop-card">
+                    <span className="gv-pop-rays" aria-hidden="true" />
+                    <span className="gv-pop-kicker">
+                        {toolWon.won.length > 1 ? `${toolWon.won.length} rewards` : "The chest held"}
+                    </span>
+                    {/* ⚠️ EVERY REWARD THE SETTLE PAID, NOT JUST THE BEST ONE. A long session can cross
+                        several fills at once, and a card that showed one of four would be the summary
+                        quietly under-reporting — the same rule the bulk chest reveal is built on. */}
+                    {toolWon.won.map((w, i) => (
+                        <span className="gv-pop-won" key={`${w.kind}-${w.slot || w.tier}-${i}`}>
+                            {w.art ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img className="gv-pop-tool" src={w.art} alt="" width={88} height={88} />
+                            ) : null}
+                            <b className="gv-pop-name">
+                                {w.kind === "tool" ? `${w.name} ${w.numeral || ""}`.trim() : (w.label || "A chest")}
+                            </b>
+                        </span>
+                    ))}
+                    <span className="gv-pop-go">Tap to continue</span>
+                </div>
+            )}
         </div>
     ) : null;
 
