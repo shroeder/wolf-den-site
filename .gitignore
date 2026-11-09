@@ -76,3 +76,6 @@ __pycache__/
 # Low-poly renders are build output, not source.
 scripts/lowpoly/_film/
 scripts/lowpoly/_gate/
+
+# The realtime server is its own deploy (Fly), not part of the Next build.
+gameserver/node_modules
