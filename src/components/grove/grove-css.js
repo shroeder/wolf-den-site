@@ -2233,11 +2233,37 @@ export const GROVE_CSS = `
    "2 rewards" with one sprite would be the card under-reporting what was actually earned, which is
    the rule the bulk chest summary is built on. Capped by scroll rather than by count — a long
    session should never silently drop the last one. */
+/* ── ⚠️ THE CHEST LOSING THE FIGHT ──────────────────────────────────────────────────────────────
+   Luke: "it should spend more time hyping uo thr chest opeming."
+
+   The last second before it opens, and it is a CHANGE rather than more of the same — a rattle held at
+   one intensity is a loop, and a loop says nothing is coming. Faster, wider, brighter, straining: the
+   lid is losing. That change is the whole signal; the extra time on its own would just be a wait.
+
+   ⚠️ IT OVERRIDES THE SHARED RULE RATHER THAN REPLACING IT. .chest-img-big keeps its own rattle and
+   drop-shadow from globals.css — this only steepens them, so the Den's chest and the Grove's are still
+   obviously the same object doing the same thing, one of them harder. */
+.chest-stage.is-crescendo .chest-img-big { animation-duration: 0.17s;
+    filter: drop-shadow(0 0 48px var(--chest, #ffd75e)) brightness(1.25); }
+.chest-stage.is-crescendo .chest-glowpad { animation-duration: 0.5s; }
+.chest-stage.is-crescendo .chest-opening { animation-duration: 0.3s; letter-spacing: 0.26em; }
+
 .gv-pop-won { display: block; margin-top: 4px; }
 .gv-pop-won + .gv-pop-won { margin-top: 10px; padding-top: 10px;
     border-top: 1px solid rgba(255,255,255,0.1); }
 .gv-pop-won .gv-pop-tool { width: 88px; height: 88px; margin-top: 4px; }
-.gv-pop-card { max-height: 78vh; overflow-y: auto; }
+/* ── ⚠️ IT ONLY SCROLLS IF IT HAS TO, AND IT NEVER SHOWS A BAR ──────────────────────────────────
+   Luke: "its got scroll bars". That was this rule: overflow-y auto on a celebration card reserves
+   a scrollbar gutter and, on Windows, paints a permanent grey track down a thing that is meant to
+   read as a prize. The overflow still has to exist — a settle that crosses four fills stacks four
+   rewards and the last one must not be unreachable — so it is kept and the CHROME is hidden.
+
+   ⚠️ HIDING A SCROLLBAR IS NORMALLY WRONG and it is right here for one reason: this card is
+   tap-anywhere-to-dismiss, so the scrollbar is not the only way out of it. On anything a player can
+   get stuck inside, leave the bar alone. */
+.gv-pop-card { max-height: 86vh; overflow-y: auto;
+    scrollbar-width: none; -ms-overflow-style: none; }
+.gv-pop-card::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
     text-transform: uppercase; color: #9b9487; }
 @keyframes gvPopIn { from { opacity: 0; } to { opacity: 1; } }

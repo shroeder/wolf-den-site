@@ -675,19 +675,26 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         return () => clearTimeout(t);
     }, [unlockedNow]);
 
-    // ── ⚠️ TWO PHASES, AND THE WAIT IS THE WHOLE POINT ──────────────────────────────────────────────
-    // Luke: "I expect a clear dopamine moment of reveal... it should show a chest, and when that chests
-    // bumps around and opens, it reveals what I get."
+    // ── ⚠️ THREE PHASES, BECAUSE ANTICIPATION HAS TO BUILD AND NOT JUST LAST ────────────────────────
+    // Luke: "its a little too fast it should spend more time hyping uo thr chest opeming."
     //
-    // A chest that opens instantly is a notification. The rattle is the beat that makes the opening MEAN
-    // something, and it is the same 1.2s the game's own chest opener uses — reusing that timing rather
-    // than picking a new one, because a player should not have to learn two speeds for one gesture.
+    // The first pass was a flat 1.2s rattle borrowed from the loot opener. Two things were wrong with it.
+    // It was short for what it is announcing — a loot chest is a tap, this is 250 kills — and a rattle at
+    // ONE intensity for its whole life is a loop, not a build. A loop tells you nothing is coming; it is
+    // the CHANGE in tempo that says something is about to give.
+    //
+    // So: 1.4s of ordinary rattle, then 1.1s of it visibly losing the fight — faster, brighter, straining
+    // — and then it opens. 2.5s in total, about double, and the second half is the half that sells it.
     useEffect(() => {
         if (!toolWon) return undefined;
         if (toolWon.phase === "shaking") {
+            const t = setTimeout(() => setToolWon((p) => (p ? { ...p, phase: "crescendo" } : p)), 1400);
+            return () => clearTimeout(t);
+        }
+        if (toolWon.phase === "crescendo") {
             // ⚠️ THE SOUND FIRES ON THE OPEN, NOT ON THE SHAKE. Landing it at the start would spend the
             // payoff on the anticipation and leave the reveal silent, which is the wrong way round.
-            const t = setTimeout(() => setToolWon((p) => (p ? { ...p, phase: "open" } : p)), 1200);
+            const t = setTimeout(() => setToolWon((p) => (p ? { ...p, phase: "open" } : p)), 1100);
             return () => clearTimeout(t);
         }
         celebrateUnlock();
@@ -731,8 +738,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
            makes the reveal land, and a player tapping to get on with a fight would never see what they
            earned. It takes taps once it is open. */
         <div className="gv-pop" onClick={toolWon.phase === "open" ? () => setToolWon(null) : undefined}>
-            {toolWon.phase === "shaking" ? (
-                <div className="chest-stage">
+            {toolWon.phase !== "open" ? (
+                <div className={`chest-stage${toolWon.phase === "crescendo" ? " is-crescendo" : ""}`}>
                     <div className="chest-glowpad" style={{ "--chest": "#ffd75e" }} />
                     <div className="chest-shake">
                         {toolWon.art ? (
