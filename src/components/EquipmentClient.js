@@ -9,6 +9,7 @@ import CoinCta from "@/components/CoinCta";
 import HelmetSprite from "@/components/HelmetSprite";
 import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
+import ToolCase from "@/components/ToolCase";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { GiOpenBook } from "react-icons/gi";
@@ -242,7 +243,18 @@ const chargeErr = (code) => ({
     unauthorized: "Please sign in again.",
 }[code] || "Couldn't start that redemption. Try again.");
 
-export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null, view = "gear", heroShelf = null }) {
+export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, spriteFlip = false, displayLabel = "Hero", level = 1, backdropUrl = null, view = "gear", heroShelf = null, toolCase = null }) {
+    // ── WHICH HALF OF THE SCREEN YOU ARE LOOKING AT ──────────────────────────────────────────────────────
+    // Eric: "Maybe a second tab to swap between gear and crafting gear."
+    //
+    // ⚠️ NOT PERSISTED, AND THAT IS DELIBERATE. bagSort below is remembered because re-picking a sort order
+    // every visit is a chore; which tab you were on is not — this screen's job is the gear doll, and a
+    // member who opened the tool case once should not find their equipment screen replaced by it next week.
+    //
+    // ⚠️ AND IT IS ONLY EVER "tools" IF THERE IS A CASE TO SHOW. The page sends toolCase=null for everybody
+    // outside the Grove allow-list, so for the other 212 members this constant is "gear" and the screen is
+    // byte-for-byte what it was.
+    const [tab, setTab] = useState("gear");
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [slot, setSlot] = useState(null); // open picker for this slot
@@ -599,7 +611,31 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
     return (
         <div className="equip">
-            {view !== "store" ? (<>
+            {/* ── GEAR / CRAFTING GEAR ────────────────────────────────────────────────────────────────────
+                Only drawn when there is a second tab to go to. A one-tab tab strip is furniture, and the
+                members who cannot reach the Grove would be looking at exactly that. */}
+            {view !== "store" && toolCase ? (
+                <div className="equip-tabs" role="tablist" aria-label="Equipment">
+                    <button
+                        type="button" role="tab" aria-selected={tab === "gear"}
+                        className={`pill${tab === "gear" ? " is-active" : ""}`}
+                        onClick={() => setTab("gear")}
+                    >
+                        Gear
+                    </button>
+                    <button
+                        type="button" role="tab" aria-selected={tab === "tools"}
+                        className={`pill${tab === "tools" ? " is-active" : ""}`}
+                        onClick={() => setTab("tools")}
+                    >
+                        Crafting Gear <small>{toolCase.heldCount}/{toolCase.total}</small>
+                    </button>
+                </div>
+            ) : null}
+
+            {view !== "store" && tab === "tools" && toolCase ? <ToolCase toolCase={toolCase} /> : null}
+
+            {view !== "store" && tab === "gear" ? (<>
             <ChestOpener onLoot={load} />
             <div className="equip-doll" style={backdropUrl ? { backgroundImage: `linear-gradient(rgba(8,6,4,0.55), rgba(8,6,4,0.7)), url(${backdropUrl})` } : undefined}>
                 {EQUIP_SLOTS.map((s) => {

@@ -45,6 +45,26 @@ const PREVIEW_GUESTS = {
         // Luke, 2026-11-02: "Can u give aanw the grove". One n short of her alias, and the only member
         // on the roster it can mean.
         "cd8f4cd8-330a-4ead-ab34-b664fdd6dacf", // aannw (alyssa.craven@) — registered 2026-07-16
+        // ── THE BETA TESTERS, 2026-11-09 ────────────────────────────────────────────────────────────────
+        // Eric: "Can u make the grove available to all beta testers and ask for their feedback on it."
+        //
+        // "All beta testers" resolves to ONE population that already exists: the holders of the Tester
+        // role, which roles.js grants off the `bug_hunter` badge — five rewarded bug reports, counted by
+        // auto_rule 'bugs_rewarded'. They are also exactly the roster of the private `testing` channel
+        // (channelMemberIds('testing')), which is the room for talking about unshipped work. Six members
+        // hold it; Eric D was already here, so these are the other five.
+        //
+        // ⚠️ A SNAPSHOT OF A MOVING GROUP, AND THAT IS THE ONE THING WRONG WITH IT. The badge is earned
+        // continuously, so the seventh member to reach five reports will NOT appear here on their own.
+        // canPreview is synchronous and this file is dependency-free on purpose — groveOpen is called
+        // sync from the page and from eight verbs in grove.js — so it cannot ask the badge table without
+        // becoming async everywhere, which is a rewrite and a query on the Grove's hottest path. Until
+        // the Grove opens to everyone, a new tester gets added here by hand.
+        "0afc1091-38a8-4a03-ac20-15dc86f5b9c4", // GrayKitsune       — bug_hunter + bug_finder
+        "226a71e0-3969-45fc-b0f0-c762d6f5b355", // Kaishiern         — bug_hunter
+        "7b05a5ed-3913-4852-a680-b97a449488d9", // SoullessShiitake  — bug_hunter + bug_finder
+        "eaf1da90-eefc-4852-af7b-c988430cb77e", // Sunflower Jinxx   — bug_hunter + bug_finder
+        "7aaeff8b-821c-4ba2-a467-f5509e94c45a", // ValkyrieSylve     — bug_hunter + bug_finder
     ]),
     // Opening a mystery pack online + the Card Vault. Luke, 2026-10-26: "for now I would prefer it only show
     // up for me." Owners pass without being listed, so this stays empty until somebody is invited.

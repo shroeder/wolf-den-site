@@ -20,13 +20,21 @@ exactly why it is easy to miss — see §3.11.
 
 | switch | file | today | what it does |
 |---|---|---|---|
-| `canPreview("grove")` | `owner.js` | owners + 4 guests | who may enter the Grove at all |
+| `canPreview("grove")` | `owner.js` | owners + **9** guests | who may enter the Grove at all |
 | `GATING_LIVE` | `towns.js` | `false` | whether new signups are stamped `gated_at` |
 | the onboarding guide | `guide-chapters.js`, `/marketplace/guide` | live | a chapter-by-chapter ramp through a game that gating locks |
 
 ⚠️ **Nothing greps for the third row.** The first two are named constants a launch-day reader will find by
 searching; the guide is a whole feature with a gold payout attached, and the only reason it is written down
 here is that the doc which held it was deleted on 2026-11-04. Read §3.11 before step 4.
+
+**2026-11-09 — the beta-tester widening.** `PREVIEW_GUESTS.grove` went from 4 guests to 9: the five other
+holders of the **Tester role**, which `roles.js` grants off the `bug_hunter` badge (five rewarded bug
+reports) and which is also the roster of the private `testing` channel. That is step 2 done *narrowly* — a
+soft launch to the people who already report bugs, with `GATING_LIVE` still `false`, which is the safe half
+per the order rule below. ⚠️ **It is a snapshot of a moving group:** the badge keeps being earned and
+`canPreview` is synchronous with no database access, so the next member to reach five reports must be added
+by hand until the Grove opens to everyone.
 
 ### ⚠️ The order is not a preference — one order mints unplayable accounts
 
@@ -156,16 +164,133 @@ thing a new account could be handed.
 
 ---
 
+## 3b. The 2026-11-09 dead-feature audit
+
+Eric: *"Also maybe audit the grove we might have left a lot of dead features in there."* He was right. The
+2026-11-08 teardown (the bench, parts, quests, the tally, the wishlist) removed the **writers** and
+deliberately left the **readers** alone — which was the correct call that day, and is a launch problem now.
+
+Method: for every table and column the teardown orphaned, grep for a writer, then count the live rows.
+Everything below is a thing with a consumer and **no faucet**, or a faucet with no consumer.
+
+### ⚠️ 3.12 Two consumable systems are live, visible, and impossible to obtain
+
+Both read fine for the four preview players, who are sitting on legacy stock. Both are **permanently empty
+for all 218 members** the moment the Grove opens, and neither says so.
+
+| system | reader, still live | writer | live stock |
+|---|---|---|---|
+| **Charms** | `grove.js:443` — `UPDATE mkt_grove_charm SET qty = qty - 1` burns one at the door | **none anywhere** | 13 across 2 members |
+| **Food / the belt** | `groveBelt`, `armBeltIfEmpty`, the belt on the HUD | **none anywhere** | 1,660 across 4 members |
+
+`armBeltIfEmpty` is the sharp edge. It exists *because* Luke measured that nobody arms the belt by hand, so
+it arms the weakest food automatically — and for a new account it will run, find nothing, and return null
+forever. The belt is then a permanently empty slot on the screen, and the note above it in `grove.js` still
+explains at length why an empty belt is a bug.
+
+**Decide before launch**, and it is a design call, not a cleanup: give the bar a food/charm rung alongside
+the tool and chest rungs, or hide the belt and the charm door until something can fill them. Shipping as-is
+hands every new member two dead affordances.
+
+### ⚠️ 3.13 A tool is advertised at up to 1.9x what it actually pays
+
+The worst of the findings, because it is not a dead feature — it is a live, wrong number on the one screen
+a player checks to see whether the Grove was worth it.
+
+- `groveState.toolMeta` (grove.js:378) reports **`toolBonusFor(tier, quality)`** — the tier multiplied by
+  the quality band, up to **1.9x** at Masterwork. Its comment asserts this is *"what the tool actually
+  gives"*.
+- Every one of the **twelve live consumers** (arena, boss, cooking, crafting, delves, delve-floors, farm,
+  fishing, mining, pets, jeweller, sailing) reads **`groveToolPct`**, which is `toolBonusPct(tier)` plus the
+  act perk and **multiplies by the band nowhere**.
+
+`toolBonusFor` has exactly three call sites and all three are display: `GroveToolSheet`, that `toolMeta`
+line, and a comment. So the band has never affected a payout.
+
+Measured on Eric's account (every tool at tier III, so the base is +9%):
+
+| tool | band | Grove shelf says | game pays |
+|---|---|---|---|
+| Fishing Rod | Masterwork | **+17.1%** | +9% |
+| Shovel | Masterwork | **+17.1%** | +9% |
+| Sextant / Pickaxe / War Banner | Pristine | **+14.4%** | +9% |
+| Hunting Horn | Fine | **+12.2%** | +9% |
+| Pet Collar | Rough | +9% | +9% |
+
+**Two ways out and they are not equivalent.** Making `groveToolPct` honour the band is a straight **buff of
+up to 90%** to twelve reward systems at once — that is an economy change and wants
+[[economy-nerf-measure-daily-total]] treatment. Making the screens stop claiming it takes a number away
+from members who already rolled Masterwork. Luke's call; it should not be settled by whoever edits next.
+
+The new crafting-gear tab (§3.17) deliberately prints the **paid** number and shows the band beside it as
+its own fact, and it reads `groveToolCase`, which shares `sumToolPct` with the live accessor — so it follows
+whichever way this is settled without being edited.
+
+### 3.14 63,865 units of deleted monster parts are still in the table
+
+`mkt_grove_item` holds **161 rows / 63,865 qty across 5 members** of parts that no longer exist as a
+concept — `reed_blade` 3,452, `goblin_rivet` 3,380, `bristle_hide` 3,294, and so on. They are invisible
+only because `groveState` filters the table **by food identity** (`grove.js:305`) rather than by anything
+in the data.
+
+Harmless today and **do not write a migration on launch day** — same reasoning as §3.5. Worth knowing
+because the filter is the only thing hiding them: anything that later reads this table without copying that
+filter gets 63k units of ghost inventory.
+
+### 3.15 The quest tables are fully orphaned, and §3.3/§3.4 above are now stale
+
+The quest client went on 2026-11-08 (`GroveClient` has four `✂️` markers for it). `mkt_grove_quest` is now
+referenced in `src/` **only inside a comment** (`grove.js:530`); the one read is gone. 7 rows / 3 members
+remain, 4 with progress, 3 claimed.
+
+So, above in this file:
+
+- **§3.3** (quest progress was never written) describes a fixed bug in a system that no longer has a
+  client. Keep the `check:sql` instruction — it is general and it passes — but the quest framing is dead.
+- **§3.4** ("decide before launch: credit preview players' lost quest progress") **is answered by the
+  teardown.** There is nothing to credit; the feature is gone. It should come off §6.
+
+### ⚠️ 3.16 §4 tells you to run a script that does not exist
+
+`node --experimental-loader ./scripts/lib/app-loader.mjs scripts/grove-quest-audit.mjs` — **the file is not
+in the repo.** It went with the quest teardown. A launch-day checklist whose first command fails is how a
+checklist stops being trusted at 2am, so it is struck from §4 below. `qa-town-npcs.mjs` does still exist.
+
+### 3.17 Orphaned columns on `mkt_grove_player`, for the record
+
+Nothing to do — the standing rule here (§3.5, and the `groveEquipEmblem` note) is that dropping a column
+loses the record and buys nothing. Listed so the next reader does not have to work out which of 23 columns
+still mean something:
+
+`craft_xp` (nothing earns it), `taught` (the bench's gate), `charm_id` / `charm_band` (written per dive,
+read per dive — these two ARE live), `plots_built` (no writer), `packs_built` / `banks_built` / `bank_slots`
+(the bank went in October). `mkt_grove_craft_log` has no writer and is referenced only in `grove.js`.
+
+### 3.18 What is NOT dead, checked and confirmed live
+
+So the audit cannot be read as "the Grove is hollow":
+
+- **Tools** — the kill bar (`grove-bar.js`, 2026-11-08) is a real faucet. 2 members, 7 fills already.
+- **The Coliseum and its chests** — own system, own tiers (§3.6).
+- **Statues, emblems, class nodes, the boss, the bar's chest rung** — all have writers and readers.
+- `npm run check:grove`, `check:sql`, `check:gates`, `check:css`, `check:chrome`, `check:polls` and
+  `lint:undef` all pass as of 2026-11-09.
+
+---
+
 ## 4. Checks to run on the day
 
 ```
 npm run check:grove          every reference resolves, the scene's geometry holds
 npm run check:sql            no query is handed a parameter it never uses
 npm run check:css            no rule is hiding inside a comment
+npm run check:gates          every gated feature's page guards itself
 npm run lint:undef           no call to something that does not exist
-node --experimental-loader ./scripts/lib/app-loader.mjs scripts/grove-quest-audit.mjs
 node scripts/qa-town-npcs.mjs            (needs SHOT_COOKIE)
 ```
+
+⚠️ `scripts/grove-quest-audit.mjs` **was listed here and does not exist** — it went with the quest teardown
+on 2026-11-08. See §3.16. Do not re-add it without re-adding the script.
 
 And load both `/marketplace/grove` and `/marketplace/town` and look at them. Every one of the regressions
 above rendered perfectly while being broken.
@@ -198,7 +323,12 @@ five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `gro
 
 ## 6. Still open
 
-- **3.4** — credit preview players' lost quest progress, or accept it?
+- ~~**3.4** — credit preview players' lost quest progress, or accept it?~~ **Answered by the teardown** —
+  the quest client is gone, there is nothing to credit. See §3.15.
+- **⚠️ 3.12** — food and charms have no faucet. Give the kill bar a rung for them, or hide the belt and the
+  charm door until it has one? **Every new member sees two dead affordances until this is decided.**
+- **⚠️ 3.13** — does a tool's quality band pay, or stop being advertised? A buff of up to 90% across twelve
+  systems either way it goes. Luke's call.
 - **3.9** — is `sigil_road`'s carved sign a defect?
 - **3.10** — does the Grove need an elite-gear route at all?
 - The Grove-town **Tavern building** points at `/marketplace/friends`, not the tavern room. Under the City

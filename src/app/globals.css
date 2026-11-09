@@ -10483,6 +10483,52 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 .equip { display: flex; flex-direction: column; gap: 14px; }
 
+/* ── GEAR / CRAFTING GEAR ────────────────────────────────────────────────────────────────────────────────
+   The tab strip above the doll. Only rendered for members who can reach the Grove, so for everybody else
+   this costs nothing and the screen is unchanged. `is-active` follows the precedent set by
+   .bounty-filters .pill.is-active rather than inventing a second way to say "selected". */
+.equip-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.equip-tabs .pill { padding: 0.45rem 0.95rem; }
+.equip-tabs .pill small { margin-left: 6px; opacity: 0.7; font-weight: 700; }
+.equip-tabs .pill.is-active {
+    background: rgba(143, 216, 255, 0.16);
+    border-color: #8fd8ff;
+    color: #8fd8ff;
+}
+
+/* ── THE TOOL CASE ───────────────────────────────────────────────────────────────────────────────────────
+   Twelve read-only cards. Deliberately NOT styled like .equip-slot: a tool cannot be tapped, swapped or
+   taken off, and borrowing the doll's socket look would promise a picker that does not exist. */
+.toolcase-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.toolcase-head h3 { margin: 0; }
+.toolcase-count { font-size: 0.78rem; opacity: 0.75; font-weight: 700; }
+.toolcase-intro { margin: 6px 0 12px; font-size: 0.84rem; opacity: 0.85; }
+.toolcase-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 10px; }
+.toolcase-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--elevated);
+}
+/* An unearned tool is a thing to go and get, not a thing that is broken — dimmed, never struck through. */
+.toolcase-item.is-empty { opacity: 0.55; }
+.toolcase-item.is-empty .toolcase-art { filter: grayscale(1); }
+.toolcase-art { width: 40px; height: 40px; object-fit: contain; flex: 0 0 auto; }
+.toolcase-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.toolcase-name { font-size: 0.86rem; line-height: 1.2; }
+.toolcase-tier { opacity: 0.8; font-weight: 800; }
+.toolcase-band { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; }
+.toolcase-band i { font-weight: 600; opacity: 0.7; font-style: normal; }
+.toolcase-band.is-none { color: var(--ink); opacity: 0.6; font-weight: 700; }
+.toolcase-pct { font-size: 0.78rem; font-weight: 800; }
+.toolcase-pct span { font-weight: 600; opacity: 0.75; }
+.toolcase-pct.is-none { font-weight: 600; opacity: 0.7; }
+.toolcase-split { font-size: 0.68rem; opacity: 0.65; }
+.toolcase-foot { margin: 12px 0 0; font-size: 0.8rem; opacity: 0.8; }
+
 /* The paper-doll: 9 slots around the hero portrait. */
 .equip-doll {
     display: grid;

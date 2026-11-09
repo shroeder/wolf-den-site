@@ -5,6 +5,8 @@ import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
+import { groveOpen } from "@/lib/marketplace/owner.js";
+import { groveToolCase } from "@/lib/marketplace/grove-tools.js";
 import { spriteShelf } from "@/lib/marketplace/avatar-sprite.js";
 import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getSetting } from "@/lib/settings.js";
@@ -33,13 +35,20 @@ export default async function InventoryPage() {
     // nudge, it is a thing you find by looking for it. Fetching it client-side would also be a fourth
     // request on a page that already makes three — the family-A waste CLAUDE.md opens with. It rides the
     // same Promise.all, so it costs latency only if it is the slowest of the four.
-    const [profile, spriteRow, backdropUrl, heroShelf] = await Promise.all([
+    // ⚠️ THE CRAFTING-GEAR TAB IS LOADED ONLY FOR THE PEOPLE WHO CAN HAVE ANY. Eric: "Anyone who has the
+    // ability to get crafting gear in the game from the grove needs to have their equipment screen extended."
+    // groveOpen is the same allow-list the Grove's own door checks and it is a pure Set lookup — no query —
+    // so the other 212 members pay nothing for a tab they would have no rows behind. It rides the existing
+    // Promise.all rather than being awaited after it, so it costs latency only if it is the slowest of five.
+    const canCraft = groveOpen(buyer.id);
+    const [profile, spriteRow, backdropUrl, heroShelf, toolCase] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null),
         // The busiest path on the site reading a backdrop URL that changes when somebody uploads one.
         // TTL.ART is what this cache is for; the admin route drops the key when it writes a new one.
         shared("art:equipBackdrop", TTL.ART, () => getSetting("equip_backdrop_url").catch(() => null)),
         spriteShelf(buyer.id).catch(() => null),
+        canCraft ? groveToolCase(buyer.id).catch(() => null) : Promise.resolve(null),
     ]);
 
     return (
@@ -58,6 +67,7 @@ export default async function InventoryPage() {
                 level={profile?.level?.level || 1}
                 backdropUrl={backdropUrl || null}
                 heroShelf={heroShelf}
+                toolCase={toolCase}
             />
         </div>
     );
