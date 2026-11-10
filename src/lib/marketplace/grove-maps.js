@@ -1017,8 +1017,6 @@ export const MAP_EMBLEMS = Object.fromEntries(
 // So the spares are what you eat. Map one has four foods healing 25/40/60/100%, and the ladder cannot go
 // past 100, so a deeper map does not heal HARDER — it makes MORE per craft. Map seven's poultice is the
 // same mouthful; you simply come home with eleven of them instead of five.
-const FOOD_HEALS = [0.25, 0.40, 0.60, 1.00];
-const FOOD_NAMES = ["Poultice", "Flask", "Tonic", "Draught"];
 // ── ⚠️ AUTHORED CRAFTABLES: MAPS THAT DO NOT USE THE GENERATOR ──────────────────────────────────────────────
 // Luke, 2026-10-30, on what the maps 8-12 draft was actually for: "the uniqueness I was talking about and the
 // lack of variety was more about crafting... Just be thoughtful when making each maps craftables."
@@ -1049,17 +1047,6 @@ const AUTHORED_TOOLS = {
     ],
 };
 
-// Four foods a map, and the heal ladder cannot climb past 100% -- so a deeper map does not heal harder, it
-// makes more per craft. What is authored is which two materials each is pressed out of.
-const AUTHORED_FOODS = {
-    8: [
-        ["Sump Poultice", ["gasket_felt", "bellows_skin"], "Oil-black felt packed on and bound. It seals before it soothes."],
-        ["Boiler Flask", ["furnace_coal", "wire_wrap"], "Condensate off the boiler floor, still warm. Tastes of copper and keeps you upright."],
-        ["Filament Tonic", ["filament_coil", "dial_glass"], "Scraped glow in a measured glass. The dose is marked on the side; the mark is optimistic."],
-        ["Mainspring Draught", ["the_escapement", "furnace_coal"], "For an hour your heart keeps the machine's time. The hour is the part to plan around."],
-    ],
-};
-
 // The charm keeps its generated stat and potency -- the flavour cycle and the depth curve are the two things
 // that must stay on rails, or map 8 gets a charm map 9 cannot beat. Only the name, the two materials and the
 // line are authored.
@@ -1068,38 +1055,16 @@ const AUTHORED_CHARMS = {
         "One of forty thousand, and they are all still counted. Something down here keeps a tally; this is how you ask to see it."],
 };
 
-const USED_ROLES = new Set(Object.values(TOOL_ROLES).flat());
+// ⚠️ USED_ROLES IS NOT RESTORED WITH IT. Its only reader was foodRecipesForMap, which pressed the roles the
+// twelve tools did NOT claim into that map's four foods. No food, no spares calculation.
 
-/** The four food recipes for one generated map, built from the materials its tools do not want. */
-export function foodRecipesForMap(n) {
-    const map = groveMap(n);
-    if (!map?.parts) return [];
-    // ⚠️ SAME IDS, SAME MAKES, SAME HEALS as the generated shape would have produced -- only the name, the
-    // two materials and the line are authored. Keeping the id scheme keeps the art filename predictable
-    // (food-food_cogwork_1.webp) and keeps GROVE_FOODS, the belt and the bench naming one object once.
-    if (AUTHORED_FOODS[n]) {
-        return AUTHORED_FOODS[n].map(([name, parts, blurb], i) => ({
-            id: `food_${map.id}_${i + 1}`,
-            name, heals: FOOD_HEALS[i], makes: 5 + (n - 1),
-            tier: map.parts.find((p) => p.id === parts[0])?.tier ?? 1,
-            map: n,
-            parts: { [parts[0]]: 4 + Math.round((n - 1) * 0.5), [parts[1]]: 3 },
-            blurb,
-        }));
-    }
-    const spares = map.parts.filter((p, i) => map.parts.findIndex((q) => q.role === p.role) !== i || !USED_ROLES.has(p.role));
-    return spares.slice(0, 4).map((part, i) => ({
-        id: `food_${map.id}_${i + 1}`,
-        name: `${map.short} ${FOOD_NAMES[i]}`,
-        heals: FOOD_HEALS[i],
-        // Four more a craft every map, so the deep ones are worth carrying home rather than worth more.
-        makes: 5 + (n - 1),
-        tier: part.tier,
-        map: n,
-        parts: { [part.id]: 4 + Math.round((n - 1) * 0.5), [map.parts[(map.parts.indexOf(part) + 6) % map.parts.length].id]: 3 },
-        blurb: `${part.blurb.replace(/\.$/, "")}, pressed into something you can swallow.`,
-    }));
-}
+// ── ✂️ THE FOOD WAS HERE: AUTHORED_FOODS AND foodRecipesForMap ──────────────────────────────────────────────
+// Four foods a map, pressed out of the materials that map's twelve tools do not want -- which was the whole
+// point of them, a sink for the spares. Map eight's four were hand-authored; the rest were derived.
+//
+// They go with the belt on 2026-11-09. ⚠️ AND THE SPARES ARGUMENT GOES WITH THEM: every map still generates
+// parts its tools have no use for, and nothing presses them into anything now. That is not a bug today
+// because nothing drops parts either, but it is the hole to fill if parts ever return.
 
 // ── THE CHARMS: THE FIRST NEW KIND OF THING SINCE MAP ONE ────────────────────────────────────────────────────
 // Luke, on the whole system: "does it lack variety, excitement, engagement, suprise, wonder, fun,
@@ -1175,16 +1140,8 @@ export function charmForMap(n) {
 export const MAP_CHARMS = Object.fromEntries(
     GROVE_MAPS.filter((m) => m.parts).map((m) => charmForMap(m.n)).filter(Boolean).map((c) => [c.id, c]));
 
-/** Every generated map's food, flat, in GROVE_FOODS shape. */
-// ⚠️ THE PICTURE IS BORROWED, LIKE THE CHART SYMBOLS. A poultice is a poultice: moss and fat packed into a
-// leaf in map one, ash-glass and wire-root in map seven, and at thirty pixels on a belt the difference is
-// not visible. Forty-four more drawings to say something the name already says.
-const FOOD_ART = ["food_poultice", "food_flask", "food_tonic", "food_draught"];
-export const MAP_FOODS = Object.fromEntries(
-    GROVE_MAPS.filter((m) => m.parts).flatMap((m) => foodRecipesForMap(m.n).map((f, i) => [f.id, {
-        name: f.name, heals: f.heals, tier: f.tier, blurb: f.blurb, map: f.map,
-        art: `/images/grove/food-${FOOD_ART[i]}.webp`,
-    }])));
+// ✂️ MAP_FOODS AND FOOD_ART WERE HERE. Every generated map's four foods, flattened, each borrowing map
+// one's picture for its heal tier rather than paying for forty-four more drawings of a poultice.
 
 /**
  * The twelve tool recipes for one generated map.

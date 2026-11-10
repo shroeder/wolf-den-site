@@ -2151,16 +2151,12 @@ export const GROVE_CSS = `
    full-screen toggle present the pair straddled the row and the toggle sat dead centre, where it
    collided with the kill count the moment that was added. Pushing only the first one sends the whole
    group right and keeps working whether the toggle is rendered or not. */
-/* ── THE PUSH BELONGS TO THE BELT, NOT TO THE FIRST BUTTON ────────────────────────────────────
-   This was .gv-hud > button:first-of-type { margin-left: auto }, which was correct for exactly as long
-   as the belt was a passive <b>. The belt is a BUTTON when it is empty -- the one that says where more
-   food comes from -- and a type selector cannot tell the two apart, so the push landed on the BELT and
-   shoved it to the right where it collided with the kill count. The row would have laid out correctly
-   in every screenshot of a stocked belt and wrongly in every screenshot of an empty one.
+/* ── ✂️ THE PUSH BELONGED TO THE BELT, AND THE BELT IS GONE ───────────────────────────────────
+   It was .gv-belt { margin-right: auto }, which existed because the belt could be a <b> or a <button>
+   depending on whether it had food in it, and a type selector could not tell the two apart.
 
-   Pushing from the LEFT-hand item instead holds whether the belt is a b, a button, or absent: the row
-   is end-justified, so with no belt at all the group still sits right. */
-.gv-belt { margin-right: auto; }
+   ⚠️ NOTHING REPLACES IT, AND THE OLD NOTE SAID WHY: "the row is end-justified, so with no belt at all
+   the group still sits right." That case is now the only case. */
 .gv-leave { pointer-events: auto; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font: inherit; font-size: 0.78rem; font-weight: 700; color: #efe7d8;
     background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.22); }
@@ -2295,7 +2291,7 @@ export const GROVE_CSS = `
    scrolls; the panels themselves stack as plain blocks, where there is no shrinking and no stretching to
    a common height to go wrong in the first place. */
 .gv-sheet > * { flex: none; }
-.gv-bag { display: block; }
+/* ✂️ .gv-bag went with the Backpack panel on 2026-11-09. */
 
 /* ── ⚠️ NAMED .gv-sect, AND THAT IS THE SECOND VERSION OF THIS FILE'S .gv-area ────────────────
    The first cut of these panels was called .gv-area -- a class THIS STYLESHEET ALREADY USED, 200 lines
@@ -2559,54 +2555,14 @@ export const GROVE_CSS = `
 .gv-slot.is-on em { color: #9fe08a; }
 /* A tool not yet made: shown so the ladder is visible before you can climb it. */
 .gv-slot.is-dim { opacity: 0.55; }
-/* ⚠️ !important HERE ONLY BECAUSE IT IS ALREADY HERE. The base rule carries one, so a plain
-   .gv-belt.is-out colour would lose to it however specific it looks in the file -- the .btn-ghost
-   footgun, which is worth remembering every time one of these is written. Two importants, and the more
-   specific selector wins. */
-.gv-belt { color: #9fe08a !important; }
-/* The belt with nothing on it. Amber rather than green because it is a thing to go and do, and sized
-   and padded like the Leave button beside it because it is now the same kind of object. */
-.gv-belt.is-out { pointer-events: auto; cursor: pointer; font: inherit;
-    font-size: 0.78rem; font-weight: 700; padding: 6px 12px; border-radius: 999px;
-    color: #ffd166 !important; background: rgba(0,0,0,0.55);
-    border: 1px solid rgba(255,209,102,0.42);
-    text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
-.gv-belt.is-out:hover { border-color: rgba(255,209,102,0.8); }
-/* ── WHAT IS ON THE BELT, AS AN OBJECT ────────────────────────────────────────────────────────
-   The sprite is the same one the pop carries when it is eaten, which is the whole point: the thing that
-   leaves your belt and the thing that flies off your head are visibly one object. The count is its own
-   element so it can hold its weight next to a long name on a 320px phone. */
-.gv-belt { display: inline-flex; align-items: center; gap: 5px;
-    pointer-events: none; white-space: nowrap; }
-.gv-belt img { width: 18px; height: 18px; object-fit: contain; display: block;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
-.gv-belt i { font-style: normal; font-weight: 800; color: #fff6df;
-    padding: 1px 6px; border-radius: 999px; font-size: 0.72rem;
-    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.16); }
-/* ⚠️ THE FLASH IS ON MOUNT, AND THE ELEMENT IS REMOUNTED BY ITS KEY. No class is toggled and no timer
-   strips one, so the loop cannot race a render -- see the note by setBeltAte. The eye needs to be told
-   that something it owns was just spent; the count alone changes too quietly to notice in a fight. */
-.gv-belt.is-eat { animation: gvBeltAte 460ms ease-out both; }
-@keyframes gvBeltAte {
-    0% { transform: scale(1); }
-    22% { transform: scale(1.22); }
-    100% { transform: scale(1); }
-}
-/* ── ⚠️ THE NAME GIVES WAY FIRST ON A 320px PHONE ─────────────────────────────────────────────
-   Adding the sprite and the count pill took the chip from 89px to 122px, and the kill counter is
-   centred at the top of the same row: measured at 320x568 the two overlapped by 418 square pixels.
-   The NAME is what goes, because the sprite is already saying which food this is -- a picture and a
-   number is the whole readout, and the full name still arrives on the call-out every time one is drunk
-   and on the belt ladder in the backpack. Dropping the count instead would leave the thing the chip
-   exists to report. */
-@media (max-width: 400px) {
-    .gv-belt span { display: none; }
-}
-.gv-belt.is-eat i { animation: gvBeltAteN 460ms ease-out both; }
-@keyframes gvBeltAteN {
-    0% { background: rgba(159,224,138,0.85); color: #0c120d; }
-    100% { background: rgba(0,0,0,0.5); color: #fff6df; }
-}
+/* ── ✂️ EVERY .gv-belt RULE WAS HERE, AND THE TWO KEYFRAMES WITH THEM ────────────────────────
+   The chip itself, the amber empty state styled like the Leave button beside it, the food sprite and
+   its count pill, the flash on eat, and the 400px rule that dropped the NAME first because the sprite
+   was already saying which food it was. The belt went on 2026-11-09.
+
+   ⚠️ DELETED RATHER THAN LEFT, which is this file's own standing rule: a stale rule for a shape that
+   no longer exists is how a later element with a reused class name picks up styling nobody wrote for
+   it. "gv-belt" is a plausible enough name for somebody to reach for again. */
 
 /* ── YOUR CLASS, IN THE GROVE'S OWN NUMBERS ───────────────────────────────────────────────────
    The sigil is the Arena's own class emblem rather than a second drawing -- a Reaver should be the same

@@ -16,7 +16,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { coliseumState } from "@/lib/marketplace/grove-coliseum.js";
 import {
     GROVE_ZONES, GROVE_ENEMIES, GROVE_RARE, GROVE_EMBLEMS, GROVE_POP,
-    GROVE_FOODS, GROVE_CHARMS, HEAL_AT, emblemStars, groveZone,
+    GROVE_CHARMS, emblemStars, groveZone,
     GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveBoss as bossById, safeCredit,
 } from "@/lib/marketplace/grove-catalog.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -302,15 +302,11 @@ export async function groveState(buyerId) {
     ]);
 
     const killsBy = Object.fromEntries((zones || []).map((z) => [z.zone_id, z]));
-    // ⚠️ FOOD IS ALL THAT IS LEFT IN mkt_grove_item, BUT IT IS STILL FILTERED BY IDENTITY. The old part
-    // rows are deliberately not deleted (see the note where storeParts used to be), so this table still
-    // returns them and a reader that trusted the table to hold only food would put a Gnawed Root on the
-    // belt. GROVE_FOODS stays the gate.
-    const food = {};
-    for (const r of items || []) {
-        if (GROVE_FOODS[r.part_id]) food[r.part_id] = Number(r.qty);
-    }
-
+    // ✂️ THE FOOD TALLY WAS HERE. mkt_grove_item is no longer read at all: parts went on 2026-11-08 and
+    // food on 2026-11-09, so every row left in that table is history. ⚠️ THE ROWS STAY -- 63,865 units
+    // across five members -- for the same reason the emblem `slot` column stayed: deleting them loses the
+    // record and buys nothing. Anything that reads this table again must filter by identity, because it
+    // still holds both kinds.
     return {
         ok: true,
         ...look,
@@ -351,11 +347,10 @@ export async function groveState(buyerId) {
                 bossKills: Number(row?.boss_kills) || 0,
             };
         }),
-        food,
-        // What auto-eats, and the threshold it fires at. Luke: "if you get below 60 percent hp."
-        belt: p?.belt || null,
-        healAt: HEAL_AT,
-        foods: GROVE_FOODS,
+        // ✂️ food, belt, healAt AND foods WERE ALL HERE -- what you were carrying, what was armed, the
+        // 60% threshold and the whole ladder for the shelf to draw. The belt went on 2026-11-09.
+        // ⚠️ mkt_grove_player.belt IS NOT DROPPED and is no longer read; four members have a poultice
+        // still named in that column. It is a record of what they had armed, not a live setting.
         // One row per slot holding the best tier reached. Map two raises these; nothing here changes.
         tools: Object.fromEntries((tools || []).map((t) => [t.slot, Number(t.tier) || 0])),
         // Kept beside the tier rather than folded into it: the screen wants to SAY "Fine" and the bonus
@@ -459,12 +454,6 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
     p.charm_id = charmOn?.id || null;
     p.charm_band = charmOn?.band || null;
 
-    // ⚠️ ARMED AT THE DOOR, AND RETURNED, BECAUSE THE CLIENT'S STATE IS FROM BEFORE THE DOOR. groveState
-    // was fetched when the Grove was opened; nothing refetches it on entry, so a belt armed here would not
-    // reach the scene until the first settle forty-five seconds into the dive -- which is after the fight
-    // it was armed for. The response carries it and GroveClient folds it into st.
-    const beltArmed = await armBeltIfEmpty(buyerId, p).catch(() => null);
-
     // ⚠️ THE SEED IS THE SERVER'S. A client-chosen seed is a client that can shop for one that drops well.
     const seed = Math.floor(Math.random() * 0x7fffffff);
     await db.query(
@@ -553,8 +542,6 @@ export async function groveEnter(buyerId, zoneId, { charm = null } = {}) {
             bossReady: kills >= zone.toUnlock && wait <= 0,
         },
         pop: GROVE_POP,
-        // What ended up on the belt, which may be something the player never chose — see armBeltIfEmpty.
-        belt: beltArmed,
         bonuses: bonusesFrom(emblems, p),
         // What is burning on this run, so the scene can show it and the player can see what they paid for.
         charm: charmOn ? { ...charmOn, ...GROVE_CHARMS[charmOn.id], value: charmValue(charmOn.id, charmOn.band) } : null,
@@ -629,23 +616,10 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     const list = legal.slice(0, Math.max(0, ceiling - windowUsed));
     if (!list.length) return { ok: true, granted: null, parts: {}, capped: true, rejected };
 
-    // ── FOOD EATEN IN THE ZONE ──────────────────────────────────────────────────────────────────────
-    // ⚠️ DEBITED CONDITIONALLY, AND A SHORTFALL IS NOT AN ERROR. The scene eats when you drop below 60% and
-    // reports how many it got through; the server takes what is actually there. It cannot verify the eating
-    // — it does not track HP, because combat is the client's — so the honest guard is simply that you cannot
-    // eat food you do not own. Claiming more than you have takes what you have and stops, which is the same
-    // outcome as running out mid-fight.
-    const ate = {};
-    for (const [foodId, n] of Object.entries(eaten || {})) {
-        if (!GROVE_FOODS[foodId]) continue;
-        const want = Math.max(0, Math.round(Number(n) || 0));
-        if (!want) continue;
-        const row = await db.queryOne(
-            `UPDATE mkt_grove_item SET qty = GREATEST(0, qty - $3) WHERE buyer_id = $1 AND place = 'pack' AND part_id = $2
-             RETURNING qty`, [buyerId, foodId, want],
-        ).catch(() => null);
-        if (row) ate[foodId] = want;
-    }
+    // ✂️ THE FOOD DEBIT WAS HERE -- the scene reported what it ate on the way down and this took it off
+    // the row. It was the last writer of any kind to mkt_grove_item. The belt went on 2026-11-09, so
+    // nothing is eaten and nothing is spent; `eaten` is still accepted from the client below and ignored,
+    // because an old tab mid-dive will keep sending it.
 
     const emblemRows = await db.query(`SELECT emblem_id, count, slot FROM mkt_grove_emblem WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     // ⚠️ THE SAME ARGUMENTS THE SCENE PASSED, OR THE REPLAY LANDS SOMEWHERE ELSE. rollKill now takes the
@@ -799,7 +773,7 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     // ⚠️ AND IT IS KEYED ON THE ZONE'S MAP, not the zone. A tool's tier IS its map, so the bar has to
     // belong to the map or walking through a gate would reset it.
     //
-    // Failure-tolerant like the hunts and the belt: a bar that misses a tick is a reward that arrives a
+    // Failure-tolerant like the town hunts: a bar that misses a tick is a reward that arrives a
     // little later, while a throw here is a settle that fails and loses loot somebody watched drop.
     // ── ⚠️ CREATURES KILLED, NOT KILL-LOG ENTRIES ───────────────────────────────────────────────────
     // This was `list.length`, and that is not how many things died. A multi-kill pushes ONE entry carrying
@@ -813,17 +787,9 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
     const bar = await bumpBar(buyerId, Number(zone?.map) || Math.ceil(zoneN / 12) || 1, slainTotal)
         .catch(() => null);
 
-    // ⚠️ RE-ARMED AFTER THE FOOD IS DEBITED, NOT BEFORE. The belt empties mid-dive, and a player who
-    // crafted two kinds of poultice should carry on healing rather than discover at the bottom of a zone
-    // that the slot went empty forty kills ago. armBeltIfEmpty only fills an empty slot, so this is a
-    // no-op on every settle where there is still something to eat. The client picks it up on its refresh.
-    const beltNow = await armBeltIfEmpty(buyerId).catch(() => null);
-
     return {
         ok: true,
-        // ✂️ `parts` and `overflow` were here. The bag cannot overflow any more because the only thing
-        // that filled it was parts; food is capped per row, not per slot.
-        belt: beltNow,
+        // ✂️ `parts`, `overflow` and `belt` were here. Nothing fills a bag and nothing arms a belt.
         emblems: got.emblems,
         gold: got.gold,
         // Named in the response so the screen can say what arrived. The scene already celebrated it on the
@@ -846,7 +812,8 @@ export async function groveSettle(buyerId, { zoneId, kills = [], eaten = {} } = 
         // `bar.paid` is every reward this settle crossed, in order. A reward granted and not announced is
         // the bug that hid the Coliseum's dead gear for months — [[reward-with-no-screen-is-not-shipped]].
         bar,
-        ate,
+        // ✂️ `ate` was here -- what the belt got through on the way down, echoed back so the client could
+        // reconcile its own count. Nothing eats now.
         rejected,
         zoneKills: Number(z?.kills) || 0,
         // The zone is cleared; the boss is what opens the way now, so settle reports the right to FIGHT it
@@ -1045,64 +1012,32 @@ export async function groveBoss(buyerId, zoneId) {
 //   · mkt_grove_tool       — the twelve systems that read groveToolPct now see only what members already hold
 //   · mkt_grove_charm       · mkt_grove_craft_log       · the food rows in mkt_grove_item
 //   · plots_built           · the three source:"grove" decorations in decorations.js
-// Every one of those is an acquisition gap logged as item R in docs/grove-feedback-backlog.md. The reader
-// side of all of it is deliberately untouched: a tool a member owns still pays, a charm still burns on
-// entry, a food still rides the belt.
+// Every one of those is an acquisition gap logged as item R in docs/grove-feedback-backlog.md.
+//
+// ⚠️ THE READER SIDE WAS LEFT ALONE THAT DAY, AND THAT IS WHAT HAD TO BE FINISHED. Leaving a consumer
+// running against a faucet that no longer exists reads fine for the people holding stock and is a dead
+// affordance for everybody else. Tools got a faucet instead (the kill bar). Food got deleted outright on
+// 2026-11-09, belt and all. A charm still burns at the door, but nothing can grant one and nothing can
+// arm one any more -- that is the last of these still half-alive.
 //
 // ⚠️ DO NOT RESURRECT THIS FROM GIT TO "FIX" AN UNOBTAINABLE TOOL. Item R is a design question with three
 // candidate answers and Luke parked it; re-adding a bench is not one of them. The code is at HEAD~1.
 
-/**
- * Put a food on the belt, or take it off.
- *
- * Luke: "a way to equip food or potions that auto heal you if you get below 60 percent hp." One belt, one
- * food — choosing WHICH is the decision, and a belt that held all four would not be one.
- */
-/**
- * Put something on an empty belt, if there is anything to put on it.
- *
- * ⚠️ THE ONE-SLOT BELT MADE SENSE AND THE EMPTY BELT NEVER DID. Choosing WHICH food is a real decision;
- * choosing whether to carry any is not, and the game was asking players to make it by doing nothing.
- * Measured on the live owner account: thirty-five Moss Poultices in the bag and the belt empty, by the one
- * person who built the feature. If HE never armed it, nobody will -- and everything the belt is for (the
- * only craft that pays inside the Grove, the difference between walking out of a deep zone and being
- * carried out) was switched off for everybody by default.
- *
- * ⚠️ THE WEAKEST FOOD HELD, NEVER THE BEST. This spends an item without being asked, so it must never be
- * able to spend the good one: a Heartwood Draught heals 100% and a player saving it for a boss would come
- * back to find the game had drunk it on a rootrat. The weakest is the one you have most of and miss least,
- * and the player can still pick any of them by hand.
- *
- * ⚠️ AND IT ONLY EVER FILLS AN EMPTY SLOT. A belt the player chose -- including one they deliberately
- * emptied -- is a decision, and a convenience that overrides a decision is a bug. Taking it off stays
- * meaningful because nothing re-arms it until the thing on it runs out.
- */
-export async function armBeltIfEmpty(buyerId, player = null) {
-    const p = player || await playerRow(buyerId);
-    if (p?.belt && GROVE_FOODS[p.belt]) return p.belt;
-    const held = await db.query(
-        `SELECT part_id, qty FROM mkt_grove_item WHERE buyer_id = $1 AND place = 'pack' AND qty > 0`,
-        [buyerId],
-    ).catch(() => []);
-    const foods = (held || [])
-        .filter((r) => GROVE_FOODS[r.part_id])
-        .sort((a, b) => (Number(GROVE_FOODS[a.part_id].heals) || 0) - (Number(GROVE_FOODS[b.part_id].heals) || 0));
-    if (!foods.length) return null;
-    const pick = foods[0].part_id;
-    await db.query(`UPDATE mkt_grove_player SET belt = $2, updated_at = NOW() WHERE buyer_id = $1`,
-        [buyerId, pick]).catch(() => {});
-    if (p) p.belt = pick;
-    return pick;
-}
-
-export async function groveBelt(buyerId, foodId) {
-    if (!groveOpen(buyerId)) return { ok: false, error: "closed" };
-    if (foodId && !GROVE_FOODS[foodId]) return { ok: false, error: "no_food" };
-    await playerRow(buyerId);
-    await db.query(`UPDATE mkt_grove_player SET belt = $2, updated_at = NOW() WHERE buyer_id = $1`,
-        [buyerId, foodId || null]).catch(() => {});
-    return { ok: true, belt: foodId || null };
-}
+// ── ✂️ groveBelt AND armBeltIfEmpty ARE GONE ─────────────────────────────────────────────────
+// Eric, 2026-11-09: "the moss poultive and the idea of a belt woth potions".
+//
+// groveBelt put a food on the slot or took it off; armBeltIfEmpty filled an empty slot with the WEAKEST
+// food held, and existed because Luke measured that nobody armed it by hand -- thirty-five poultices in
+// the bag and an empty belt, on the account of the person who built the feature.
+//
+// ⚠️ THAT MEASUREMENT IS WHY THE WHOLE THING GOES RATHER THAN JUST THE SCREEN. A convenience written to
+// rescue a feature nobody engaged with, attached to an item nothing could make since the bench went on
+// 2026-11-08, pointing at a table with no writer left. For a new account it would have filled nothing,
+// for ever, under a slot the HUD kept drawing.
+//
+// ⚠️ THE belt COLUMN STAYS, holding whatever four members last armed. Same rule as the emblem `slot`
+// column above: dropping it loses the record and buys nothing, and a heal that comes back comes back as
+// a NEW idea rather than by restoring this.
 
 // ── ⚠️ groveEquipEmblem IS GONE ─────────────────────────────────────────────────────────────────────────────
 // It set a `slot` column that bonusesFrom stopped reading on 2026-10-30, when owning a card became wearing

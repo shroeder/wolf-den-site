@@ -8,7 +8,7 @@ import { GiSoundOff, GiSoundOn } from "react-icons/gi";
 import GroveMenu from "./GroveMenu.js";
 
 import {
-    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, HEAL_AT, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
+    GROVE_ENEMIES, GROVE_RARE, GROVE_POP, spawnGapMs, GROVE_HYPER, scaledFoe, scaledRare, killCredit, groveBoss, groveSize, grovePart,
     groveArt, groveEmblem, emblemArt, emblemFace, GROVE_ZONES, groveBiome, slabArt, slabSurface, hangArt, sitArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { rngFrom, rollKillTimes, rollRareSpawn } from "@/lib/marketplace/grove-roll.js";
@@ -139,26 +139,13 @@ const SETTLE_EVERY_MS = 45_000;
 // ⚠️ SAME KEYS AS BEFORE. openPanel is unchanged and still flushes the kill batch before anything opens --
 // see the note at the markup. The arrangement moved; the wiring did not.
 const ZONE_FAMILIES = [
-    // ── ⚠️ QUESTS IS A ZONE DOOR NOW, AND IT IS THE FIRST ONE ──────────────────────────────────
-    // Luke: "I wamt a question meni item and area first class please design it properly."
+    // ── ✂️ THE "Do" FAMILY AND ITS QUESTS ROW WERE HERE ─────────────────────────────────────────
+    // It outlived its panel by a day. The quest client went on 2026-11-08 and this row did not, so the
+    // zone dock kept a door that opened onto nothing -- a dead button in the live game, which is worse
+    // than the missing feature it pointed at. The hub's own menu had already dropped the row; only the
+    // zone copy was left, which is exactly the failure the two lists being hand-kept invites.
     //
-    // It was deliberately left out, and the note in GroveClient said why: "minus Quests, which has no
-    // meaning while you are standing inside a zone." That was TRUE of what the panel used to be -- a
-    // tracker whose whole job was naming the zone a giver stands in, which is a thing you read before
-    // you set off, not while you are fighting.
-    //
-    // It is not true of what the panel is now. The log carries live progress, the creature and the rooms
-    // it lives in, and a hand-in -- and every one of those is most useful IN a zone, mid-kill, when the
-    // question is "does any of this count for anything". Leaving it out meant the only way to look at a
-    // quest while doing it was to leave the zone, and leaving is not a free action.
-    //
-    // ⚠️ AND IT GOES ABOVE THE MAP. The menu's first row is what the game thinks you should do next;
-    // the map is where you go when you have decided. [[a-screen-with-no-door-is-not-shipped]].
-    {
-        title: "Do", rows: [
-            { k: "quests", label: "Quests", art: "/images/grove/ui-quests.webp" },
-        ],
-    },
+    // Eric, 2026-11-09: "remove the quests option".
     {
         title: "Go", rows: [
             { k: "map", label: "Map", art: "/images/grove/ui-map.webp" },
@@ -166,12 +153,10 @@ const ZONE_FAMILIES = [
     },
     {
         title: "Carry", rows: [
-            { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
-            // ⚠️ GEAR BELONGS IN THE ZONE, NOT ONLY ON THE HUB. It is the one panel whose contents change the
-            // fight you are standing in, and since creatures started dropping gear it is also where the thing
-            // you just picked up goes. Leaving it hub-only would mean walking out of a zone to put on the
-            // sword that fell in it -- and leaving is not a free action (see the panel note in GroveClient).
-            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
+            // ✂️ BACKPACK AND GEAR WERE HERE. The Backpack had become the belt and nothing else once
+            // parts went, and the belt went with the food on 2026-11-09; Gear went the same day. The
+            // fighting gear is on the equipment screen, where gear lives, and the Grove tools now have
+            // their own tab beside it.
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
         ],
     },
@@ -310,8 +295,10 @@ const QUAFF_STOP_MS = 110;
 //
 // ⚠️ THE HERO HAS CARRIED STUN POINTS FROM GEAR SINCE THE GROVE SHIPPED AND NOTHING READ THEM. This is not
 // only the two class nodes: every weapon and jewel that ever granted stun was inert in here too.
-// Below this share of maximum health the hero himself shows it. A quarter, because the belt eats at
-// 60% -- a band that starts above the thing that is meant to save you would be lit most of a fight.
+// Below this share of maximum health the hero himself shows it. A quarter, which was originally chosen
+// to sit UNDER the belt's 60% eat so the band was not lit for most of a fight. The belt is gone and
+// nothing heals mid-zone now, so the number is no longer pinned to anything -- it is simply the share at
+// which being in trouble should be visible, and it is free to be retuned on its own merits.
 const HERO_LOW_SHARE = 0.25;
 
 // ── ⚠️ THE DOCK STANDS IN THE BEST PART OF THE SCREEN ───────────────────────────────────────────────────────
@@ -319,7 +306,7 @@ const HERO_LOW_SHARE = 0.25;
 // take up primo real estate."
 //
 // Moving them is the obvious answer and it is the wrong one: every edge of a side-scroller is carrying
-// something already -- the belt and the way out at the top, the haul list on the left, the kill count in the
+// something already -- the way out at the top, the haul list on the left, the kill count in the
 // middle -- and the bottom centre is where a right thumb actually rests, which is why they went there.
 //
 // The real observation is that you never want the backpack DURING a fight. So the dock gets out of the way
@@ -508,7 +495,7 @@ export default function GroveScene({
     // full it is, or the meter would disagree with the rewards — so this is read-only and arrives from
     // groveEnter on the way in and from every settle response after that. See grove-bar.js.
     bar = null,
-    zone, seed, bonuses, stats, heroArt, petArt, belt, labScene, bagRoom = null, gearArt = null,
+    zone, seed, bonuses, stats, heroArt, petArt, labScene, bagRoom = null, gearArt = null,
     // ⚠️ ONE NUMBER, ALREADY MULTIPLIED OUT, AND NOT THE RARITY AND LEVEL IT CAME FROM. The share of a
     // hero swing this member's companion bites for, computed on the server in heroLook (grove.js) off the
     // equipped pet's rarity and its pet-XP level. Handing the scene the two inputs instead would have put
@@ -603,35 +590,14 @@ export default function GroveScene({
     // zone's biggest beat off screen entirely. Not a modal: nothing is dismissed and nothing is
     // blocked -- it says its piece and leaves.
     const heraldTimer = useRef(null);
-    const [beltLeft, setBeltLeft] = useState(Number(belt?.count) || 0);
-    // ── ⚠️ A CRAFT MID-DIVE HAS TO REACH THIS NUMBER ────────────────────────────────────────────────
-    // beltLeft was seeded once at mount and only ever written by the loop when something was eaten, so
-    // making poultices at the workbench and closing the panel left the HUD still saying x0. Harmless
-    // while the chip was a passive count; a lie the moment it became the control that says "go and make
-    // some", because it would still say so standing on a full belt.
-    //
-    // ⚠️ UPWARD ONLY. The server's count arrives on every settle and it is BEHIND the client -- the loop
-    // has been eating since the last one and sends `eaten` with the batch. Taking a lower number here
-    // would hand the player back food the simulation has already spent. A HIGHER number can only have
-    // come from crafting, which is the one case this exists for.
-    //
-    // ⚠️ COMPARED AGAINST w.foodLeft, WHICH IS THE SIMULATION'S OWN COUNT. That is the live truth -- the
-    // loop decrements it on every bite -- and reading it here keeps the effect pure, rather than writing
-    // a ref from inside a setState updater, which React is free to run twice.
-    const [beltAte, setBeltAte] = useState(0);
-    const beltCount = Number(belt?.count) || 0;
+    // ✂️ beltLeft, beltAte AND beltCount WERE HERE, with a long note about keeping the chip's count in
+    // step with a craft made mid-dive. The bench went on 2026-11-08 and the belt itself on 2026-11-09.
     // ⚠️ A REF, NOT THE PROP. The kill handler runs inside the animation loop's closure, which is created
     // once — reading `gearArt` directly there would capture whatever it was when the scene mounted and keep
     // using it after a zone change. Same reason every other live value in this file is a ref.
     const gearArtRef = useRef(gearArt || {});
     useEffect(() => { gearArtRef.current = gearArt || {}; }, [gearArt]);
 
-    useEffect(() => {
-        const w = worldRef.current;
-        if (!w || beltCount <= (Number(w.foodLeft) || 0)) return;
-        w.foodLeft = beltCount;
-        setBeltLeft(beltCount);
-    }, [beltCount, belt?.id]);
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
     // The first version pushed foes into world.foes imperatively and React was never told, so the zone
     // rendered with zero enemies in it while the simulation happily ran thirty of them. The split that
@@ -912,7 +878,6 @@ export default function GroveScene({
             endsAt: null,
             runOver: false,
             eaten: {},
-            foodLeft: Number(belt?.count) || 0,
             boss: null,
             bossClaimed: false,
             // One-shot: the settle that banks the clearing kills so groveBoss will accept the fight.
@@ -1538,11 +1503,11 @@ export default function GroveScene({
         // This is its own object: it rides at the hero rather than at the target, it punches in wide and
         // snaps, it carries a ring out from him, and it has its own colour per proc so two different
         // procs are two different events rather than two words.
-        // ⚠️ art IS OPTIONAL AND THE EAT IS WHY. Luke: "when it gets used it should be clear, and sexy,
-        // showing it happens and the effect." A poultice leaving the belt is a proc in every way that
-        // matters -- it rides at the hero, it is his own kit doing something, and it is rare enough to
-        // deserve the screen -- the only difference is that the player MADE this one, so the object has
-        // to be in the frame rather than a word standing in for it. Same pipeline, same ring, same shake;
+        // ⚠️ art IS OPTIONAL, AND THE BELT'S EAT IS WHY IT EVER WAS. A poultice leaving the belt was a
+        // proc in every way that mattered, except that the player had MADE that one -- so the object had
+        // to be in the frame rather than a word standing in for it. The eat went on 2026-11-09 and the
+        // optional art stays: it is how any proc that is an OBJECT rather than an effect gets drawn,
+        // and the next one will want it. Same pipeline, same ring, same shake;
         // one more child in the node. A second call-out function beside this one would drift from it.
         // ⚠️ atY IS OPTIONAL AND THE HEAL IS WHY. A proc fires on the player's own swing and has the air
         // over the hero to itself. The quaff does not: it is TRIGGERED by the blow that dropped him under
@@ -2552,8 +2517,9 @@ export default function GroveScene({
                         // sixty times a minute, competing with the damage number that actually matters.
                         // The health bar already says it, instantly and in the right place.
                         //
-                        // A heal still pops when it is an EVENT: eating off the belt, below, which happens
-                        // a few times a zone and is something you want to notice.
+                        // A heal would still pop if it were an EVENT rather than a trickle -- that was
+                        // the belt's eat, which went on 2026-11-09. Nothing produces one today; the rule
+                        // is kept because the distinction is about heals, not about the belt.
                     }
                     if (foe.big || foe.rare) w.bossBar = { hp: Math.max(0, foe.hp), maxHp: foe.maxHp };
                     if (foe.isBoss || foe.big || foe.rare) w.bossHurtAt = now;
@@ -3029,60 +2995,21 @@ export default function GroveScene({
 
                 playHurt();
 
-                // ── ⚠️ EATING IS DECIDED AGAINST THE HP THAT IS ACTUALLY COMMITTED ──────────────
-                // Luke: "equip food or potions that auto heal you if you get below 60 percent hp." This used
-                // to live inside a setState updater, because that was the only place the true current value
-                // could be read while hp was React state. With hp in a ref there is only one value and this
-                // is simply where it is read — two hits in one frame can no longer eat twice or eat nothing.
-                if (w.hp > 0 && w.hp < maxHp * HEAL_AT && w.foodLeft > 0 && belt?.id) {
-                    w.foodLeft -= 1;
-                    w.eaten[belt.id] = (w.eaten[belt.id] || 0) + 1;
-                    const healed = Math.round(maxHp * (Number(belt.heals) || 0));
-                    w.hp = Math.min(maxHp, w.hp + healed);
-                    // ── ⚠️ THE ONLY THING YOU CRAFT THAT SPENDS ITSELF, AND IT DID SO INVISIBLY ──
-                    // Luke: "we should see the poultice stuff we have and when it gets used and how many
-                    // left." Eating popped a bare green +84, which is indistinguishable from any other
-                    // heal in the game -- so the one object a player made with their own parts was
-                    // consumed with nothing naming it. The sprite goes on the pop, so what you SEE
-                    // leaving the belt is the thing you made, and the chip at the top flashes as its
-                    // count drops. Same picture in both places, which is how the two read as one object.
-                    // ── ⚠️ THE WHOLE BEAT, NOT A GREEN NUMBER ────────────────────────────────
-                    // Luke: "when it gets used it should be clear. And sexy, showing it happens and the
-                    // effect." Two separate things to show and it was showing neither: WHAT was spent
-                    // (an object the player made out of their own parts) and WHAT IT DID.
-                    //
-                    // So the object goes up on the proc call -- the sprite and its name, riding at the
-                    // hero, punching in and snapping, exactly like a haste proc, because that is what
-                    // this is. The ring comes out of his chest, green rather than electric. Motes rise
-                    // off him instead of sparks flying off a blow. And the number is thrown BIG, because
-                    // a 25% heal in a fight you are losing is the largest single swing in the feature.
-                    //
-                    // ⚠️ AND IT STOPS THE WORLD FOR A BEAT. Everything else that matters here does --
-                    // a crit, a kill, an emblem, a boss noticing you -- and an event with no stop
-                    // behind it reads as scenery however loud it is drawn. Short: this interrupts a
-                    // fight the player is in the middle of losing, and a long hold there is a stutter.
-                    // The stack, bottom to top: the blow that landed (red, at his chest), the thing he
-                    // drank, the health it gave back. Three separate facts about one moment, each in
-                    // its own band of the frame so none of them has to be read through another.
-                    procCall(belt.name, "heal", groveArt(belt.id), 1.32);
-
-
-                    // ⚠️ ABOVE THE CALL-OUT, NOT ON IT. Both ride at the hero and the proc sits at
-                    // 0.9 of his height, so at 1.1 the number landed across the middle of the word --
-                    // two things fighting for the same 40 pixels, which is the exact failure the proc
-                    // call was built to fix for HASTE. Stacked: the object he drank, the effect above it.
-                    addPop("heal", `+${healed}`, w.hero.x, w.hero.y + HERO_UNITS * 2.05,
-                        { scale: 1.35, big: true });
-                    playQuaff();
-                    w.clock.stop(now, QUAFF_STOP_MS);
-                    setBeltLeft(w.foodLeft);
-                    // ⚠️ A COUNTER REMOUNTS THE CHIP RATHER THAN A CLASS BEING TOGGLED BY HAND. The chip
-                    // is React's node, so adding a class from the loop and stripping it on a timer races
-                    // the next render; keying it restarts the animation with no imperative DOM at all,
-                    // and an eat is rare enough that a one-element remount costs nothing. Zero on mount
-                    // means arriving in a zone does not flash a belt nobody has touched.
-                    setBeltAte((n) => n + 1);
-                }
+                // ── ✂️ THE BELT'S AUTO-EAT WAS HERE ──────────────────────────────────────────
+                // "equip food or potions that auto heal you if you get below 60 percent hp" -- the eat
+                // at HEAL_AT, the proc call with the poultice's own sprite, the big thrown heal number
+                // and the hitstop behind it. It was the only thing you crafted that spent itself.
+                //
+                // It goes because the food does. Nothing has been able to MAKE a poultice since the
+                // bench was deleted on 2026-11-08, so the belt could only ever run down; the four
+                // members holding stock were the only ones who would see this fire again, and a new
+                // member would have met an empty belt and no way to fill it. Eric, 2026-11-09: remove
+                // the moss poultice and the idea of a belt with potions.
+                //
+                // ⚠️ SO THERE IS NO HEALING INSIDE A ZONE NOW, AND THAT IS THE REAL CHANGE. Not a UI
+                // cut -- the hero's only mid-dive recovery is gone, which makes a deep zone strictly
+                // harder than it was yesterday. If the Grove wants a heal again it wants a NEW one,
+                // designed against the curve as it stands, not this restored from git.
                 // ── ⚠️ DYING HAD NO MOMENT, ONLY A CONSEQUENCE ─────────────────────────────────
                 // Hitting zero flipped a flag and a dark panel appeared over a zone that was still
                 // cheerfully simulating underneath it. Every other beat in here — a crit, a kill, an
@@ -3692,7 +3619,7 @@ export default function GroveScene({
     // mounted here, never runs again. The zone came up with the backdrop painted, the hero standing in his
     // start position and absolutely nothing happening: no spawn, no simulation, no camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, belt?.id, belt?.heals, onBoss, rerender, worldAt]);
+    }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, onBoss, rerender, worldAt]);
 
     // ── WALKING THROUGH A DOOR ──────────────────────────────────────────────────────────────────────
     // ⚠️ SETTLE BEFORE TRAVELLING, AND AWAIT IT. The kills that open the right-hand door are the same ones
@@ -4213,7 +4140,7 @@ export default function GroveScene({
                 Luke: "You kill enemies in an area. A bar fills. It reaches full. You get a reward."
 
                 Stands where the haul list used to, which is the one part of the frame that is neither
-                the belt and boss bar at the top nor the dock and the note at the bottom.
+                the boss bar at the top nor the dock and the note at the bottom.
 
                 ⚠️ IT NAMES THE REWARD. `bar.next` is resolved server-side — the next tool in TOOL_SLOTS
                 order that this map still owes, or the chest ceiling once all twelve are held — so the
@@ -4350,34 +4277,9 @@ export default function GroveScene({
             </div>
 
             <div className="gv-hud" onPointerDown={(e) => e.stopPropagation()}>
-                {/* ── ⚠️ THE ONE CRAFT THAT PAYS IN THIS ROOM, AND ONLY WHEN IT IS STOCKED ──────────
-                    Every tool the workbench makes pays a DIFFERENT feature -- 3% to fishing, to mining,
-                    to the farm -- so nothing a player crafts makes the next half hour of killing here any
-                    better. The belt is the exception and the only one: food auto-eats at 60% and is the
-                    difference between walking out of a deep zone and being carried out of it.
-
-                    Which made the empty state the worst line on the screen. It read "Moss Poultice x0" --
-                    a true sentence that teaches nothing, on the feature most worth teaching, at the exact
-                    moment the player is about to find out why it mattered. Now the thing that ran out
-                    says where more come from and takes you there, and openPanel banks the kills on the
-                    way so the bench opens onto parts you actually own. Teaching by showing, at the one
-                    moment it is wanted. */}
-                {belt?.id && beltLeft > 0 ? (
-                    <b key={beltAte} className={`gv-belt${beltAte ? " is-eat" : ""}`}>
-                        {groveArt(belt.id)
-                            ? <img src={groveArt(belt.id)} alt="" width={18} height={18} />
-                            : null}
-                        <span>{belt.name}</span><i>{beltLeft}</i>
-                    </b>
-                ) : onPanel ? (
-                    <button type="button" className="gv-belt is-out"
-                        title={belt?.id
-                            ? "Nothing left to eat - the workbench makes more"
-                            : "Nothing on your belt - arm a poultice in your backpack"}
-                        onClick={() => openPanel(belt?.id ? "bench" : "bag")}>
-                        {belt?.id ? "Belt empty" : "No belt"}
-                    </button>
-                ) : null}
+                {/* ✂️ THE BELT CHIP WAS HERE -- the poultice's sprite, its name and the count left,
+                    flashing as it dropped, and an empty state that sent you to the bench for more.
+                    It went with the belt on 2026-11-09; there is no food to count. */}
                 {canNative ? (
                     <button type="button" className="gv-leave" onClick={toggleNative}
                         aria-label={isNative ? "Leave full screen" : "Full screen"}>
@@ -4718,12 +4620,10 @@ function setUpLabScene(w, scene, blow = 400) {
         // ⚠️ THE ONE MOMENT THAT CANNOT BE REACHED BY PLAYING WELL. Dying on the bench means standing a
         // hero with almost no health next to something already angry — and using a zone whose creatures
         // retaliate, because a passive rootrat will watch you stand there for ever.
-        // ⚠️ AND NO FOOD. The belt auto-eats below 60% of max, and the lab kit carries five poultices —
-        // so a hero dropped to 14 hit points healed himself back up on the very next frame and the scene
-        // filmed a man strolling away from three creatures. The one scene about dying has to be the one
-        // scene that cannot heal.
+        // ✂️ AND IT USED TO HAVE TO DISARM THE BELT TOO, or a hero dropped to 14 hit points healed
+        // himself back up on the next frame and the scene filmed a man strolling away from three
+        // creatures. Nothing heals mid-zone any more, so the staging is just the health.
         w.hp = 14;
-        w.foodLeft = 0;
         const biters = w.foes.filter((f) => !f.isBoss).slice(0, 3);
         biters.forEach((f, i) => {
             f.x = w.hero.x + (i % 2 ? 3.5 : -3.5);
@@ -4802,30 +4702,9 @@ function setUpLabScene(w, scene, blow = 400) {
             f.hp = 9000; f.maxHp = 9000;
         });
         if (two[0]) w.target = two[0];
-    } else if (scene === "eat") {
-        // ── ⚠️ THE ONE BEAT THE BENCH COULD NOT PRODUCE ────────────────────────────────────────
-        // The eat fires below 60% of max health with food on the belt, which in ordinary play means
-        // being in genuine trouble -- and the death scene, the only one that gets a hero into trouble
-        // on purpose, sets foodLeft to 0 precisely so he CANNOT heal. So the one moment the whole belt
-        // exists for had no scene, and the first attempt to film it photographed a man dying with five
-        // poultices he was never allowed to drink.
-        //
-        // Same staging as death and the opposite outcome: hurt, surrounded, and carrying food. The
-        // creatures are fat so the fight lasts longer than the swallow, and the hero is parked just
-        // under the line so the first bite triggers it rather than the fortieth.
-        // 200 against the bench kit's 600, so he is well under the 60% line and the first bite eats.
-        // A literal for the same reason the death scene's 14 is one: this function is handed the world,
-        // not the stats, and the bench kit is right there in GroveLab.
-        w.hp = 200;
-        w.foodLeft = 5;
-        const nibblers = w.foes.filter((f) => !f.isBoss).slice(0, 2);
-        nibblers.forEach((f, i) => {
-            f.x = w.hero.x + (i % 2 ? 3.6 : -3.6);
-            f.y = 0;
-            f.vx = 0; f.vy = 0; f.grounded = true;
-            f.hp = 9999; f.maxHp = 9999;
-            f.hit = true; f.passive = false;
-        });
+    // ✂️ THE "eat" LAB SCENE WAS HERE -- hurt, surrounded and carrying food, staged just under the
+    // 60% line so the first bite triggered the swallow. It was the one beat the bench could not
+    // produce on demand. It goes with the belt it existed to film.
     } else if (scene === "emblem") {
         // One creature at the hero's elbow, dying.
         //

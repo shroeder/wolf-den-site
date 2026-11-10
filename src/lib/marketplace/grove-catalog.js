@@ -25,7 +25,7 @@
 // exists somewhere. See check-existing-sprites-first.
 
 import {
-    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_FOODS, MAP_CHARMS, mapIsBuilt,
+    MAP_PARTS, MAP_ENEMIES, MAP_BOSSES, MAP_ZONES, MAP_EMBLEMS, MAP_CHARMS, mapIsBuilt,
     bossEmblemId,
     RARE_CHANCE, zoneUnlock,
 } from "@/lib/marketplace/grove-maps.js";
@@ -67,36 +67,20 @@ for (const p of Object.values(MAP_ONE_PARTS)) p.map = 1;
 /** Every part in the world: map one's sixteen, plus the twelve each generated map declares. */
 export const GROVE_PARTS = { ...MAP_ONE_PARTS, ...MAP_PARTS };
 
-// ── FOOD AND POTIONS ─────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "We need a way to equip food or potions that auto heal you if you get below 60 percent hp."
+// ── ✂️ FOOD, POTIONS, HEAL_AT AND GROVE_FOODS WERE ALL HERE ──────────────────────────────────────────────────
+// Four map-one foods (Moss Poultice, Gourd Flask, Mothlight Tonic, Heartwood Draught), four more pressed out
+// of every built map's spare drops, the 60% threshold they fired at, and groveFood -- which was exported and
+// called from nowhere for its whole life.
 //
-// ⚠️ NOTHING IN THIS GAME HEALS HP TODAY. The consumables shelf is XP, daily strikes, damage multipliers and
-// forge scrolls; the delves have potions but they are RUN-SCOPED charges, not items you own. So rather than
-// bolt a healing stat onto an existing consumable — which would make it heal in the arena and the boss fight
-// too, places nobody asked for — the Grove grows its own, crafted from its own parts.
+// Eric, 2026-11-09: "remove the moss poultive and the idea of a belt woth potions".
 //
-// That also gives the parts another sink, and makes the belt a real decision: food takes a BAG SLOT, and
-// slots are the scarcest thing a player has.
-export const HEAL_AT = 0.60;   // Luke's number: it fires below 60% of max HP
+// ⚠️ AND THE OPENING ARGUMENT FOR THEM IS STILL TRUE, WHICH IS WHY THIS NOTE STAYS. "Nothing in this game
+// heals HP today" -- the consumables shelf is XP, strikes, multipliers and scrolls, and the delves' potions
+// are run-scoped charges rather than items you own. That was the reason the Grove grew its own, and it is
+// the reason there is now NO mid-zone healing at all. The second half of the argument is what died: food was
+// crafted from parts, parts went on 2026-11-08, and a consumable with no source is a slot that empties once.
+// If healing comes back it needs a source first and a mechanic second, in that order.
 
-const MAP_ONE_FOODS = {
-    food_poultice: { name: "Moss Poultice", heals: 0.25, tier: 1,
-        blurb: "Chewed moss and grub fat, packed into a leaf. It works, which is the only nice thing about it." },
-    food_flask: { name: "Gourd Flask", heals: 0.40, tier: 3,
-        blurb: "A dried gourd of something cloudy. Tastes of the field it came out of." },
-    food_tonic: { name: "Mothlight Tonic", heals: 0.60, tier: 5,
-        blurb: "Faintly luminous. Drinking it feels like standing up too fast, and then being fine." },
-    food_draught: { name: "Heartwood Draught", heals: 1.00, tier: 6,
-        blurb: "Pressed from the middle of a very old tree. There is not much of it in the world." },
-};
-
-/** Every food in the world: map one's four, plus the four each built map presses out of its spare drops. */
-export const GROVE_FOODS = {
-    ...MAP_ONE_FOODS,
-    ...Object.fromEntries(Object.entries(MAP_FOODS).filter(([, f]) => mapIsBuilt(f.map))),
-};
-
-export const groveFood = (id) => GROVE_FOODS[id] || null;
 
 // ── CHARMS ───────────────────────────────────────────────────────────────────────────────────────────────────
 // One per map, consumed at the mouth of a zone, good for that run. The first kind of object the bench has
@@ -1369,8 +1353,6 @@ export const groveEmblem = (id) => GROVE_EMBLEMS[id] || null;
 export const groveArt = (id) => {
     if (GROVE_PARTS[id]) return `/images/grove/part-${id}.webp`;
     if (GROVE_EMBLEMS[id]) return `/images/grove/emblem-${id}.webp`;
-    // A generated map's food borrows map one's picture for its heal tier, so the path is on the food.
-    if (GROVE_FOODS[id]) return GROVE_FOODS[id].art || `/images/grove/food-${id}.webp`;
     return null;
 };
 

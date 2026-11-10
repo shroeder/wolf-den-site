@@ -1,5 +1,5 @@
 import { GROVE_CHARMS } from "@/lib/marketplace/grove-catalog.js";
-import { foodRecipesForMap, toolRecipesForMap, mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
+import { toolRecipesForMap, mapIsBuilt } from "@/lib/marketplace/grove-maps.js";
 
 // ── THE GROVE'S RECIPES — THE NEW CRAFTING SYSTEM ────────────────────────────────────────────────────────────
 // Luke: "It would be a new system accessible in its own area with upgrades badges and its own set
@@ -120,18 +120,9 @@ export const GROVE_RECIPES = [
     R("sextant_t1", "Mothlight Sextant", "tool", { mothlight_dust: 6, warren_silk: 5, crystal_shard: 1 },
         { slot: "sextant", tier: 1, blurb: "Reads a sky it has never been under." }),
 
-    // ── FOOD — the belt. Luke: "equip food or potions that auto heal you if you get below 60 percent hp" ─
-    // ⚠️ THESE MAKE A STACK, NOT ONE. A recipe that produced a single poultice would be a trip to the
-    // workbench every two minutes, which is not a system, it is an errand. `makes` is how many a craft
-    // yields; the heal fraction lives on the food in grove-catalog.js.
-    R("food_poultice", "Moss Poultice", "food", { damp_moss: 4, grub_fat: 3 },
-        { makes: 5, blurb: "Chewed moss and grub fat, packed into a leaf." }),
-    R("food_flask", "Gourd Flask", "food", { gourd_rind: 4, bound_straw: 4, grub_fat: 2 },
-        { makes: 5, blurb: "A dried gourd of something cloudy." }),
-    R("food_tonic", "Mothlight Tonic", "food", { mothlight_dust: 4, warren_silk: 3 },
-        { makes: 4, blurb: "Faintly luminous, and it works fast." }),
-    R("food_draught", "Heartwood Draught", "food", { elder_heartwood: 3, ash_ember: 4 },
-        { makes: 3, blurb: "There is not much of it in the world." }),
+    // ✂️ MAP ONE'S FOUR FOOD RECIPES WERE HERE -- the poultice, flask, tonic and draught, each making a
+    // stack rather than one so the bench was not an errand every two minutes. Removed with the belt on
+    // 2026-11-09.
 
     // ── BACKPACK — unique, one-time, Roman-numbered, each its own recipe ─────────────────────────────
 
@@ -179,15 +170,7 @@ export const GROVE_RECIPES = [
 // a design; the zones that drop them do not. mapIsBuilt() is the line, and everything player-facing filters
 // on it — see the note on MAPS_BUILT. The alternative, leaving the ladder undeclared until its map lands,
 // means the shape of the thing is invisible until it is too late to change cheaply.
-// Every generated map presses its four unused drops into food — see foodRecipesForMap. Registered as the
-// same `kind: "food"` map one uses, so the belt, the bench and the gate all treat them identically.
-for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
-    for (const f of foodRecipesForMap(n)) {
-        GROVE_RECIPES.push(R(f.id, f.name, "food", f.parts, {
-            makes: f.makes, map: n, blurb: f.blurb,
-        }));
-    }
-}
+// ✂️ AND THE GENERATED MAPS' FOOD REGISTRATION WAS HERE, four per map for eleven maps.
 
 for (let n = 2; n <= TOOL_TIER_CAP; n += 1) {
     for (const r of toolRecipesForMap(n)) {

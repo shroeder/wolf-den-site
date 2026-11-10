@@ -22,7 +22,7 @@ import {
     MAP_ENEMIES, MAP_BOSSES, MAP_PARTS, MAP_ZONES,
 } from "@/lib/marketplace/grove-maps.js";
 import {
-    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, emblemArt, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, GROVE_FOODS, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
+    GROVE_PARTS, GROVE_ENEMIES, GROVE_ZONES, GROVE_EMBLEMS, emblemArt, GROVE_RARE, emblemStars, scaledFoe, GROVE_POP, EMBLEM_STARS, GROVE_BOSSES, GROVE_HYPER, BOSS_COOLDOWN_MS, bossHyperChance, groveArt, GROVE_BIOMES, groveBiome, slabArt, hangArt, sitArt, SLAB_SURFACE, toolArt,
 } from "@/lib/marketplace/grove-catalog.js";
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, spotForDepth } from "@/lib/marketplace/grove-map.js";
@@ -136,8 +136,22 @@ for (const m of GROVE_MAPS) {
 // eight of them — the other four exist so a zone has something of its own to drop rather than every creature
 // on the map handing over the same eight things. They are not litter until a map SHIPS with them unused and
 // nothing else to want them, which is a map-one-style authoring question, so the rule applies to built maps.
+//
+// ── ⚠️ DORMANT, BECAUSE THE PREMISE IS FALSE: NOTHING DROPS A PART ──────────────────────────────────
+// The rule reads "a part you can GET has a use". Parts stopped being obtainable on 2026-11-08 when the
+// backpack and storeParts were deleted, so for a day it was asserting something about a bag that does not
+// exist — and it passed only because the food recipes still happened to name the four spares per map.
+// Deleting the food on 2026-11-09 took those names away and the rule failed on 24 parts that no player can
+// hold, in a 16-slot bag no player has.
+//
+// ⚠️ IT IS SWITCHED OFF RATHER THAN DELETED, AND THE SWITCH IS THE POINT. The invariant is still exactly
+// right and will matter again the moment anything grants a part; deleting it means re-deriving it then,
+// from nothing. Flip this to true as STEP ONE of restoring parts, before writing the grant — it will
+// immediately name every material that has no use, which is the question that work starts with.
+const PARTS_DROP = false;
 const wanted = new Set(GROVE_RECIPES.flatMap((r) => Object.keys(r.parts)));
 for (const [id, p] of Object.entries(GROVE_PARTS)) {
+    if (!PARTS_DROP) continue;
     if (!mapIsBuilt(p.map ?? 1)) continue;
     ok(wanted.has(id), `part "${id}" drops but no recipe asks for it — litter in a 16-slot bag`);
 }
@@ -298,7 +312,7 @@ for (const [id, e] of Object.entries(GROVE_EMBLEMS)) {
     }
     checkArt(`emblem ${id}`, groveArt(id));
 }
-for (const id of Object.keys(GROVE_FOODS)) checkArt(`food ${id}`, groveArt(id));
+// ✂️ THE FOOD ART CHECK WAS HERE. Food was deleted with the belt on 2026-11-09.
 // ── ⚠️ AND EVERY PLACE IS ON THE CHART ────────────────────────────────────────────────────────────
 // The map draws a symbol per zone at coordinates grove-map.js owns, so a zone added to the catalogue
 // without a spot simply does not appear on the map — no error, no gap, it is just missing, and the
@@ -441,6 +455,8 @@ const needArt = [
 console.log(`── THE GROVE ────────────────────────────────────────────────────────────────`);
 console.log(`  ${zones} zones (${twoTypes} with two enemy types)   ${Object.keys(GROVE_ENEMIES).length} enemies`);
 console.log(`  ${Object.keys(GROVE_PARTS).length} parts   ${GROVE_RECIPES.length} recipes   ${Object.keys(GROVE_EMBLEMS).length} emblems`);
+// Said out loud on every run, so a switched-off rule cannot quietly become a forgotten one.
+if (!PARTS_DROP) console.log("  ⚠️ \"every part is wanted\" is DORMANT — nothing grants a part since 2026-11-08 (see section 2)");
 console.log(`  ${TOOL_SLOTS.length} tool slots, tier ${tierDepth} of ${TOOL_TIER_CAP} built: ${TOOL_SLOTS.map((t) => `${t.name} (${t.system})`).join(", ")}`);
 console.log(`  population ${GROVE_POP.min}-${GROVE_POP.max}, full respawn every ${GROVE_POP.respawnMs / 1000}s`);
 console.log(`  rare spawn: ${GROVE_RARE.name} at ${(GROVE_RARE.spawnChance * 100).toFixed(2)}% per enemy`);

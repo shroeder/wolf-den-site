@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    groveState, groveEnter, groveSettle, groveBelt,
+    groveState, groveEnter, groveSettle,
     groveBoss } from "@/lib/marketplace/grove.js";
 import { turnInStatue } from "@/lib/marketplace/grove-statue-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -66,7 +66,8 @@ export async function POST(request) {
                 // first-prismatic moments -- the actual reward of the whole system -- inside a loop nobody
                 // sees. See turnInStatue.
                 case "statue": return noStore(await turnInStatue(buyer.id, String(b?.stat || ""), String(b?.rarity || "regular")));
-                case "belt": return noStore(await groveBelt(buyer.id, b.food ? String(b.food) : null));
+                // ✂️ case "belt" WAS HERE. The belt went on 2026-11-09; an old tab still sending
+                // this now falls through to the unknown-action branch, which is the right answer.
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

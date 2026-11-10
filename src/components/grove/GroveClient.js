@@ -12,7 +12,7 @@ import {
 
 import GroveScene from "@/components/grove/GroveScene.js";
 import {
-    GROVE_EMBLEMS, GROVE_FOODS, GROVE_ZONES, groveArt, toolArt, zonesOfMap,
+    GROVE_EMBLEMS, GROVE_ZONES, groveArt, toolArt, zonesOfMap,
 } from "@/lib/marketplace/grove-catalog.js";
 // ── THE ORDER OF THE SHELF ────────────────────────────────────────────────────────────────────────
 // Catalog order, which is the order you meet the creatures: map one's thirteen, then one per map going
@@ -39,7 +39,6 @@ const TownClient = dynamic(() => import("@/components/TownClient"), { ssr: false
 import SkillTree from "@/components/arena/SkillTree";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { qualityBand } from "@/lib/marketplace/grove-forge.js";
-import GroveGear from "@/components/grove/GroveGear.js";
 import { useColiseum } from "@/components/grove/useColiseum";
 import GroveMarshal from "@/components/grove/GroveMarshal";
 import { CHARM_STAT_LABEL, QUALITY_BANDS, bandTint } from "@/lib/marketplace/grove-forge.js";
@@ -145,8 +144,7 @@ const familiesFor = ({ statuesHeld = 0 } = {}) => [
     },
     {
         title: "Carry", rows: [
-            { k: "bag", label: "Backpack", art: "/images/grove/ui-bag.webp" },
-            { k: "gear", label: "Gear", art: "/images/grove/ui-gear.webp" },
+            // ✂️ BACKPACK AND GEAR WERE HERE, removed 2026-11-09 with the panels behind them.
             { k: "emblems", label: "Monster Cards", art: "/images/grove/ui-cards.webp" },
             // ⚠️ A SCREEN WITH NO DOOR IS NOT SHIPPED. The statue vendor is reachable from the menu the
             // moment it exists, not from a panel somebody has to already know about.
@@ -188,9 +186,8 @@ const bandWord = (id) => QUALITY_BANDS.find((b) => b.id === id)?.name || "";
 // ✂️ `emptyCells` was here. It drew the Backpack's unused slots so the void read as room rather than
 // as a mistake — "a lot of void in the area where we show the items." No grid, no capacity, no cells.
 
-// ⚠️ IT DRAWS FOOD NOW, NOT PARTS. groveArt resolves any Grove id, and the belt is the one shelf left
-// that needs a sprite beside a name. The name is kept because every caller already reads this way and
-// renaming it would be a diff across a file that has just had a lot taken out of it.
+// Draws any Grove object by id -- groveArt resolves them all. It drew parts, then food; both are gone,
+// and it is kept for the shelves that still name an object beside a sprite.
 const PartIcon = ({ id, size = 34 }) => {
     const art = groveArt(id);
     if (!art) return null;
@@ -413,11 +410,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         const d = await post({ action: "enter", zone: zone.id, charm: charmPick || undefined });
         if (!d?.ok) { setNote(d?.error === "locked" ? "That one is still closed." : "Couldn't go in."); return; }
         setCharmPick(null);
-        // ⚠️ FOLDED INTO st, BECAUSE st IS OLDER THAN THE DOOR. The server arms an empty belt on entry
-        // (armBeltIfEmpty) and this state was fetched before any of that happened, so without this line
-        // the scene dives with belt=null and the HUD offers to go and find some food the player is in
-        // fact already carrying. Merged rather than refetched: one request already answered this.
-        if (d.belt) setSt((prev) => (prev && prev.belt !== d.belt ? { ...prev, belt: d.belt } : prev));
         if (d.charm) setNote(`${d.charm.name} burning — ${CHARM_STAT_LABEL[d.charm.stat] || "bonus"} +${d.charm.value}%`);
         // ── ⚠️ THE SESSION IS THE ENTER RESPONSE, NOT FOUR FIELDS COPIED OUT OF IT ──────────────
         // This used to be { zone, seed, bonuses, charm } — hand-listed — while the scene below reads
@@ -640,11 +632,6 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         .reduce((a, l) => a + Object.values(l.held || {}).reduce((x, n) => x + n, 0), 0), [st?.statues]);
 
 
-    const beltNow = useMemo(() => {
-        const id = st?.belt;
-        if (!id || !GROVE_FOODS[id]) return null;
-        return { id, ...GROVE_FOODS[id], count: Number(st?.food?.[id]) || 0 };
-    }, [st?.belt, st?.food]);
 
     // ⚠️ OPENS WHERE YOU LEFT OFF, NOT AT ZONE ONE. Twelve panels is wider than any phone, so a
     // strip that always starts at the left shows a veteran the one place they finished weeks ago and
@@ -948,13 +935,17 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     </div>
                 ) : null}
 
-                {/* ── BAG AND BANK ─────────────────────────────────────────────────────────────────── */}
-                {/* ── YOUR GEAR ────────────────────────────────────────────────────────────────────
-                    Luke: "the grove is not doing a good job showing you your gear." It showed none of it —
-                    see the long note at the top of GroveGear for why that got worse the day creatures
-                    started dropping it. `refresh` is passed because equipping recomputes st.hero on the
-                    server, and st.hero is what the scene fights with. */}
-                {panel === "gear" ? <GroveGear st={st} onChanged={refresh} /> : null}
+                {/* ── ✂️ THE GEAR PANEL WAS HERE ─────────────────────────────────────────────────
+                    It answered "the grove is not doing a good job showing you your gear" by rendering
+                    the game's own loadout inside the Grove -- the same endpoint and the same equip call
+                    as the main screen, never a Grove-local copy.
+
+                    ⚠️ SO REMOVING IT REMOVES A VIEW, NOT ANY GEAR. Everything it showed is on
+                    /marketplace/inventory, which is where gear lives. What goes with it is the
+                    convenience it was built for: a sword that drops in a zone is now equipped by
+                    leaving the zone, and the note below is right that leaving is not a free action.
+                    Eric's call, 2026-11-09; worth re-reading that original complaint if drops start
+                    feeling like a chore. */}
                 {/* ── ✂️ THE QUESTS PANEL WAS HERE ───────────────────────────────────────────────────
                     The board, the Coliseum card inside it, a hand-in shortcut that went through the
                     same claimStep the giver used so a menu hand-in could not pay differently from one
@@ -964,173 +955,32 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     also a building standing in its own zone, which is how the marshal is reached.
                     That was checked before this came out. */}
 
-                {panel === "bag" ? (
-                    <div className="gv-bag">
-                        {/* ── ✂️ THE PARTS GRID AND THE BANK'S EPITAPH WERE BOTH HERE ───────────────
-                            The grid was the Backpack proper: every kind of part you were carrying,
-                            drawn into its painted capacity so the void read as room rather than as a
-                            mistake, each cell a button into the part's sheet. Parts were deleted on
-                            2026-11-08 and it would now draw an empty board for everybody.
+                {/* ── ✂️ THE BACKPACK PANEL WAS HERE, AND WITH IT THE BELT, THE CHARMS AND THE TOOL SHELF ──
+                    Eric, 2026-11-09: "we can remove the gear menu item and the backpack. And the moss
+                    poultive and the idea of a belt woth potions".
 
-                            The bank had already gone, and its note is worth carrying forward because
-                            it is the same judgement twice. Luke: "I think we get rid of the idea of a
-                            bank. And get rid of bag slot limits. And get rid of bank and backpack
-                            expansions. Its just a lame mechanic that is a meaningless tax on the
-                            player."
+                    The grid had already gone with parts on 2026-11-08, which left three shelves behind
+                    one door, and they leave for three different reasons:
 
-                            ⚠️ THE PANEL KEEPS ITS NAME. What is left under "Backpack" is the belt, the
-                            charms and the tools — three things you are carrying — so the door is still
-                            honest even though the grid behind it is gone. */}
-                        {/* ── THE BELT ────────────────────────────────────────────────────────────────
-                            Luke: "a way to equip food or potions that auto heal you if you get below 60
-                            percent hp." One slot: choosing which is the decision. */}
-                        <Area id="belt" icon="ui-belt" title="The Belt"
-                            count={`eats below ${Math.round((st.healAt || 0.6) * 100)}%`}>
-                            {/* The whole ladder, dim where you hold none. One poultice sitting in a row
-                                built for four was most of the void on this panel, and a list that shows
-                                only what you already have cannot show you what you are missing. */}
-                            <div className="gv-slots">
-                                {Object.entries(GROVE_FOODS).map(([id, f]) => {
-                                    const n = Number(st.food?.[id]) || 0;
-                                    const on = st.belt === id;
-                                    return (
-                                        <button key={id} type="button" disabled={!n}
-                                            className={`gv-slot${on ? " is-on" : ""}${n ? "" : " is-dim"}`}
-                                            onClick={async () => { await post({ action: "belt", food: on ? null : id }); refresh(); }}>
-                                            <PartIcon id={id} />
-                                            <b>{f?.name || id}</b>
-                                            <span>{n || "0"}</span>
-                                            <em>{on ? "on the belt" : `heals ${Math.round((f?.heals || 0) * 100)}%`}</em>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </Area>
+                      THE BELT    deleted outright. Nothing has been able to make a poultice since the
+                                  bench went, so it could only ever run down -- four members held stock
+                                  and a new member would have found an empty slot and no way to fill it.
+                                  The auto-eat in GroveScene went with it, which means NOTHING HEALS
+                                  mid-zone now. That is a real difficulty change, not a UI cut.
 
-                        {/* ── THE CHARMS ──────────────────────────────────────────────────────────────
-                            ⚠️ CHOSEN HERE, SPENT AT THE DOOR. Picking one does nothing but arm it; the
-                            charm is taken by the server when you walk into a zone, on the same request,
-                            so there is no state where a charm is "selected" and quietly lost. What you
-                            pick survives until you go in or pick something else.
+                      THE TOOLS   moved, not deleted. They are on the equipment screen under the
+                                  Crafting Gear tab, which is the better home: their bonuses pay into
+                                  fishing, mining, the farm and nine others, so a shelf inside the Grove
+                                  was the one place they did NOT apply.
 
-                            ⚠️ AND IT IS ONE ROW PER POTENCY, not per charm. A Rough and a Masterwork
-                            Rootwood Seeking are different objects and choosing between them is the
-                            decision — collapsing them into one row with a count would hide the only
-                            thing crafting a second one ever buys. */}
-                        <Area id="charms" icon="ui-emblems" title="Charms"
-                            count={charmPick ? "armed" : `${(st.charms || []).reduce((a, c) => a + c.qty, 0) || "none"}`}>
-                            {(st.charms || []).length ? (
-                                <div className="gv-slots">
-                                    {(st.charms || []).map((c) => {
-                                        const on = charmPick?.id === c.id && charmPick?.band === c.band;
-                                        return (
-                                            <button key={`${c.id}-${c.band}`} type="button"
-                                                className={`gv-slot is-${c.band}${on ? " is-on" : ""}`} style={{ "--band": bandTint(c.band) }}
-                                                onClick={() => setCharmPick(on ? null : { id: c.id, band: c.band })}>
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={`/images/grove/charm-${c.meta?.stat || "rarityFind"}.webp`}
-                                                    alt="" width={34} height={34} className="gv-ico" />
-                                                {/* ⚠️ THE BAND IS ON THE NAME, not hidden in the detail
-                                                    line. Two rows of the same charm differ only by how
-                                                    well they came out, so that word is the entire
-                                                    difference between them. */}
-                                                <b>{c.meta?.name || c.id} <i className={`gv-q is-${c.band}`} style={{ "--band": bandTint(c.band) }}>{bandWord(c.band)}</i></b>
-                                                <span>{c.qty}</span>
-                                                <em>{on ? "carried in next" : `${CHARM_STAT_LABEL[c.meta?.stat] || ""} +${c.value}%`}</em>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                // ⚠️ AN EMPTY SHELF HAS TO SAY WHERE THEY COME FROM. A panel that is blank
-                                // because you have none reads identically to one that is blank because the
-                                // feature is broken, and a charm recipe is the one thing on the bench a
-                                // player cannot find by looking for it.
-                                // ⚠️ IT NO LONGER NAMES A SOURCE, BECAUSE THERE IS NOT ONE. This used to
-                                // read "A map's last boss teaches its charm" — true until 2026-11-08,
-                                // when the bench that made them went and the boss stopped teaching. A
-                                // blank shelf still has to say SOMETHING or it reads as broken, but it
-                                // must not send somebody to go and do a thing that cannot be done:
-                                // [[migrating-a-category-strands-its-drop-paths]] is exactly this
-                                // failure, where an empty pool read to players as bad luck. See item R.
-                                <p className="gv-empty">None yet, and no way to get one at the
-                                    moment.</p>
-                            )}
-                        </Area>
-
-                        {/* ── THE TOOLS ───────────────────────────────────────────────────────────────
-                            A ladder, not six items: each map raises every tool by a tier. */}
-                        <Area id="tools" icon="ui-tools" title="Tools"
-                            count={`${(st.toolMeta || []).filter((t) => t.tier).length}/${(st.toolMeta || []).length}`}>
-                            <div className="gv-slots">
-                                {(st.toolMeta || []).map((t) => {
-                                    const Glyph = TOOL_GLYPH[t.slot] || GiStoneCrafting;
-                                    return (
-                                    // ⚠️ A BUTTON, BECAUSE THE SHELF COULD NEVER ANSWER THE QUESTION
-                                    // PEOPLE OPEN IT WITH. Luke: "you can't even like inspect the tools
-                                    // in your tools area." It says what the tool IS; what it could not
-                                    // say is whether it is finished and what the next rung would cost,
-                                    // which lived four taps away in a list of 129 rows. Dim slots are
-                                    // tappable too -- "I don't have one" is exactly when you want to
-                                    // know what making one takes.
-                                    <button key={t.slot} type="button"
-                                        className={`gv-slot${t.tier ? "" : " is-dim"}`}
-                                        onClick={() => setToolView(t)}>
-                                        {/* ── THE TOOL, DRAWN ─────────────────────────────────────────
-                                            Every one of these was a react-icons glyph until the sprites
-                                            existed: a generic pickaxe standing in for a pick knapped out
-                                            of a stag's antler. The glyph stays as the fallback because a
-                                            slot with a hole where its picture goes reads as broken, and
-                                            a new tool added before its art is drawn would do exactly
-                                            that. [[img-onerror-fires-before-hydration]] */}
-                                        <span className="gv-glyph">
-                                            <img
-                                                src={toolArt(t.slot, t.tier)} alt="" draggable={false}
-                                                onError={(e) => {
-                                                    e.currentTarget.style.display = "none";
-                                                    e.currentTarget.parentElement?.classList.add("is-noart");
-                                                }}
-                                            />
-                                            <Glyph aria-hidden="true" focusable="false" />
-                                        </span>
-                                        <b>{t.name}</b>
-                                        {/* Roman numerals, and the ceiling beside them: a tier means
-                                            nothing without knowing how many there are. One per map. */}
-                                        <span>{t.tier ? `Tier ${toolNumeral(t.tier)} of ${toolNumeral(TOOL_TIER_CAP)}` : "—"}</span>
-                                        {/* ── ⚠️ THE QUALITY WAS IN THE PAYLOAD AND ON NO SCREEN ──────
-                                            Luke: "you can't even like inspect the tools in your tools
-                                            area... we need to do a lot better job letting people inspect
-                                            things." And separately: "what kind of quality you have on the
-                                            existing item."
-
-                                            toolMeta has carried `quality` since it was written and this
-                                            shelf never printed it. So the one thing the whole crafting
-                                            minigame exists to decide — whether yours came out Rough or
-                                            Masterwork — was invisible on the tool it decided, and the
-                                            only way to find out was to open the bench and read the
-                                            rework button. It is on the tool now, in its own band colour.
-
-                                            ⚠️ THE BONUS ALREADY INCLUDES IT (see toolBonusFor), so this
-                                            is the NAME of a multiplier the player was already being
-                                            paid — not a second, separate number to reconcile. */}
-                                        {t.tier && t.quality != null ? (() => {
-                                            const band = qualityBand(t.quality);
-                                            return <u className="gv-slot-band" style={{ "--band": band.tint }}>{band.name}</u>;
-                                        })() : null}
-                                        <em>{t.tier ? `+${t.pct}% ${t.bonus}` : t.bonus}</em>
-                                    </button>
-                                    );
-                                })}
-                            </div>
-                        </Area>
-
-                        {/* ✂️ THE TABLET WAS HERE — "14 of 16 parts discovered", and a list of the
-                            bonuses that came with the breakpoints. Both halves died with parts, and
-                            the bonus half had never been real: tabletBonuses was read by the state
-                            payload and by nothing else, so every breakpoint it showed as earned never
-                            reached a roll. See the note in groveState. */}
-                    </div>
-                ) : null}
+                      ⚠️ THE CHARMS  lost their only door, and this is the one to look at again. They are
+                                  still spent at the mouth of a zone -- grove.js decrements
+                                  mkt_grove_charm on entry -- but arming one happened HERE and nowhere
+                                  else, so the thirteen charms two members still hold are now unreachable.
+                                  They were already unobtainable (no faucet since the bench), so this
+                                  does not strand a live loop; it finishes one that had already stopped.
+                                  If charms come back they need a source AND a door, not just this panel.
+                    */}
 
                 {/* ✂️ THE WORKBENCH PANEL WAS HERE. 905 lines of GroveBench, deleted 2026-11-08. */}
 
@@ -1319,12 +1169,12 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // still have shown it working. Declared but never mounted, in its purest form.
                     petBite={session.petBite ?? st?.petBite ?? 0}
                     bagRoom={bagRoom}
-                    belt={beltNow} onSettle={settle} onBoss={bossKill} onLeave={leave}
+                    onSettle={settle} onBoss={bossKill} onLeave={leave}
                     onTravel={travel}
                     // ⚠️ THE ZONE IS FROZEN WHILE A PANEL IS OPEN, AND IT HAS TO BE. Crafting in front of
-                    // a live fight means being eaten while reading a recipe, and the belt auto-eats below
-                    // 60% — so an unpaused sheet would quietly spend your food while you were not looking
-                    // at the screen. It also makes the scene's own clock honest: nothing ages, nothing
+                    // a live fight meant being eaten while reading a recipe. Both the bench and the belt
+                    // are gone, so the food argument went with them — what is left is the honest one, and
+                    // it was always the better half: the scene's own clock. Nothing ages, nothing
                     // respawns, and the fight you come back to is the fight you left.
                     // ⚠️ A CONVERSATION PAUSES THE ZONE TOO. The note on the giver explains it is not a
                     // zonePanel because it does not REPLACE the scene — but "does not replace" is not the

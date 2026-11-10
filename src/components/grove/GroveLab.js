@@ -42,14 +42,9 @@ const PET = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace
 // ⚠️ ONE OBJECT, NOT A FRESH LITERAL PER RENDER. It is a dependency of the scene's world useMemo, so an
 // inline {} rebuilds the entire zone on every render of this component.
 const NO_BONUSES = {};
-const LAB_BELT = { id: "food_poultice", name: "Moss Poultice", count: 5, heals: 0.25 };
-// ── ⚠️ THE TWO BELT STATES THE BENCH COULD NOT REACH ────────────────────────────────────────────────────────
-// The HUD chip is a count while there is food and a way to GET food when there is not, and the second half
-// was unfilmable: the lab hero carries five poultices and the only way to spend them is to stand in a zone
-// being bitten for long enough. A state that needs ten minutes of play to see is a state nobody checks, and
-// this one is the single place the whole crafting loop touches the fight.
-//   belt    armed and empty  -> "Belt empty", which opens the workbench
-//   nobelt  nothing armed    -> "No belt", which opens the backpack
+// ✂️ LAB_BELT AND ITS TWO SCENES WERE HERE -- the armed-and-empty chip and the nothing-armed one, which
+// were unfilmable in ordinary play because spending five poultices means being bitten for ten minutes.
+// The belt, the food and the eat all went on 2026-11-09, so there is no chip left to stage.
 // ⚠️ AND THE BAG'S CEILING, WHICH IS UNREACHABLE ON ANY HEALTHY ACCOUNT. The dock badge only appears at
 // three slots or fewer, and filling a real bag to get there means moving a real player's parts around. Two
 // scenes instead: the warning, and the state where loot is already being left on the floor.
@@ -68,9 +63,6 @@ const LAB_GEAR = {
 
 const bagRoomFor = (scene) => (scene === "bagfull" ? 0 : scene === "bagtight" ? 2 : null);
 
-const beltFor = (scene) => (scene === "nobelt" ? null
-    : scene === "belt" ? { ...LAB_BELT, count: 0 }
-    : LAB_BELT);
 
 export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
     // ── ⚠️ THE LOG IS A REF, AND EVERY HANDLER BELOW IS STABLE. THIS WAS TEARING THE LOOP DOWN ─────
@@ -239,9 +231,9 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
         // creature does to you, so the hero stood among three of them getting healthier. The one scene
         // about dying has to be the one scene that cannot win. These are POINTS, not a share.
         // ⚠️ NO LIFESTEAL IN THE EAT SCENE EITHER. Sixteen points of it out-heals a zone-three creature,
-        // so the hero climbs back over the 60% line on his own and never reaches for the belt -- the same
+        // so the hero climbs back over the 60% line on his own -- which used to also mean never reaching
         // reason the death scene has none, for the same beat one step earlier.
-        lifesteal: scene === "death" || scene === "eat" ? 0 : 16,
+        lifesteal: scene === "death" ? 0 : 16,
     }), [scene]);
 
     const onTravelLab = useCallback((n) => { say(`travel ${n}`); setTravelled(n); }, [say]);
@@ -303,7 +295,6 @@ export default function GroveLab({ scene = "wander", zoneN = 1, mapN = 1 }) {
                 // replaced. 0.39 is a maxed eternal -- the top of the table, because the scene exists to
                 // judge the loudest the pet ever gets, which is where "too noisy" would show up.
                 petBite={scene === "pet" ? 0.39 : 0.13}
-                belt={beltFor(scene)}
                 bagRoom={bagRoomFor(scene)}
                 // ── ⚠️ THE KILL BAR, SO THE BENCH CAN ACTUALLY SEE IT ────────────────────────────────
                 // GroveScene takes `bar` as a prop fed by GroveClient from the server, so mounting the

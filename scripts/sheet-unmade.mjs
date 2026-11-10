@@ -5,7 +5,6 @@
 // auditing art coverage with groveArt and getting 23 false positives: the audit was asking the
 // wrong function." Three families look missing on disk and are not missing at all --
 //   · boss emblem seals  emblemArt() returns null for `boss: true` and falls to the boss's sprite
-//   · generated foods    MAP_FOODS sets art to map one's picture for the heal tier
 //   · charms             keyed by stat, not by charm; all three exist
 // so this script reports those as BORROWED, not as holes.
 //
@@ -13,9 +12,9 @@
 import fs from "node:fs";
 
 import {
-    GROVE_BIOMES, GROVE_EMBLEMS, GROVE_FOODS, emblemArt, slabArt, groveBiome,
+    GROVE_BIOMES, GROVE_EMBLEMS, emblemArt, slabArt, groveBiome,
 } from "@/lib/marketplace/grove-catalog.js";
-import { GROVE_MAPS, MAPS_BUILT, MAP_ZONES, foodRecipesForMap } from "@/lib/marketplace/grove-maps.js";
+import { GROVE_MAPS, MAPS_BUILT, MAP_ZONES } from "@/lib/marketplace/grove-maps.js";
 
 const OUT = "docs/grove-unmade.html";
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -94,9 +93,7 @@ const rows = ROWS.map(([label, n, kind, why, state]) => {
 const BORROWED = [
     ["Boss emblem seals", 84, "<code>emblemArt()</code> returns null for a <code>boss</code> emblem and falls through to the boss's own sprite — claiming the path "
         + "<q>would hang a broken image in the corner of every boss card on the shelf.</q>"],
-    ["Generated foods", Object.values(GROVE_FOODS).filter((f) => f.art).length,
-        "<code>MAP_FOODS</code> sets <code>art</code> to map one's picture for the heal tier, so a deep map's draught wears the Heartwood Draught's face. "
-        + "That is the count LIVE on maps 2&ndash;7; the twenty for maps 8&ndash;12 borrow the same four and also cost nothing."],
+    // ✂️ "Generated foods" was a row here. Food was deleted with the belt on 2026-11-09.
     ["Charms", 3, "Art is keyed by the <i>stat</i> a charm bends, not by the charm. All three exist, so every charm maps 2&ndash;12 will ever add is already drawn."],
 ];
 const borrowedRows = BORROWED.map(([l, n, why]) => `<tr><td>${esc(l)}</td><td class="n">${n}</td><td class="say">${why}</td><td class="n">$0.00</td></tr>`).join("\n");
@@ -213,10 +210,11 @@ and no member can reach it.</p>
 </div>
 
 <div class="note">
-<h2 style="font-size:1.2rem">Three families are borrowed, not missing</h2>
+<h2 style="font-size:1.2rem">Two families are borrowed, not missing</h2>
 <p><code>GroveCraftAct</code> already carries this scar: <q>Found by auditing art coverage with
 groveArt and getting 23 false positives: the audit was asking the wrong function.</q> It happens
-again here, and the first pass of this very page reported 44 missing foods before checking.</p>
+again here, and the first pass of this very page reported 44 missing foods before checking &mdash; a
+family that has since been deleted outright.</p>
 <div class="scroll"><table>
 <tr><th>Family</th><th class="n">Count</th><th>Why it needs nothing</th><th class="n">Cost</th></tr>
 ${borrowedRows}
