@@ -745,9 +745,21 @@ export const POOL = {
     // at 3) and it is a rider there — so the only stat in the game that wins long fights by itself had no
     // card that was ABOUT it. Five ticks down to one is fifteen health, slower than Purest Magic's twenty
     // and cheaper, which is the trade. It has outlasted every system anyone ever brought in here.
-    outlasts: { id: "outlasts", pet: "jade_tortoise", name: "Outlasts It", cost: 1, kind: "skill", target: "self", tier: 3,
+    //
+    // ⚠️ THE UPGRADE MOVES THE COST, NOT THE NUMBER, AND REGENERATION IS WHY. Every other card in this file
+    // can be sharpened by raising its figure because its figures are linear — a Bite going 6 to 9 is worth
+    // three. Regeneration is not: it heals its number and then DROPS BY ONE (see the tick in endTurn), so
+    // the card is worth the triangle, n(n+1)/2. This shipped at regen 5 upgrading to 8, which reads like a
+    // three-point bump and is 15 health going to 36 — more than Purest Magic, for one energy, without
+    // exhausting. Eric, on the first draft: "when it sharpens, it's going to get broken."
+    //
+    // A cost upgrade cannot do that. It is the same fifteen health for one energy less, which is bounded by
+    // arithmetic rather than by my judgement — and it is a shape the file already has four of (Entrench,
+    // Barricade, Seeing Red, Body Slam), so the cost diamond on the face already says what changed.
+    // ⚠️ ANY FUTURE REGENERATION CARD HAS THIS PROBLEM. Raise its number and price the TRIANGLE.
+    outlasts: { id: "outlasts", pet: "jade_tortoise", name: "Outlasts It", cost: 2, kind: "skill", target: "self", tier: 3,
         regen: 5, text: "Gain {regen} Regeneration.",
-        upgrade: { regen: 8 } },
+        upgrade: { cost: 1 } },
     // Inflame and Footwork are both uncommons at one energy apiece; two energy buys both at once, which is
     // the only card in the game that gives Strength and Dexterity together. Flat, not per-turn — see the
     // warning at the top of this block about what a thousand dollars is allowed to buy. Only ever seen on

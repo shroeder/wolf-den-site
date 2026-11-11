@@ -53,6 +53,53 @@ const ART = {
     purr: "a small tabby kitten curled up purring against a warm hearthstone, eyes closed and utterly content, "
         + "soft golden firelight washing over its fur and a gentle haze of warmth rising around it, a cosy "
         + "fireside beyond",
+
+    // ── THE ELEVEN, HAND-WRITTEN, BECAUSE THE COMPOSER WOULD HAVE DRAWN NINE OF THEM WRONG ───────────
+    // These are the cards added for the patronage ladder, the casino Counter and the three starter animals,
+    // plus Pay It Back, which shipped unpainted. Run through `composed` first to see what the money would
+    // buy: FOUR identical "lunging straight at the viewer" pictures (Pay It Back, Tongue Lash, Quick Paws,
+    // Antlers Down — every one of them a 1-cost attack under ten damage) and FIVE generic "standing alert"
+    // portraits, because actionFor knew damage, block, draw, Strength and Dexterity and had never heard of
+    // Poison, Thorns, Regeneration, Frail or a Strength strip. A portrait is the sticker the top of this
+    // file exists to avoid, and four of one pose is worse than the fallback.
+    //
+    // actionFor has those five branches now (see below) so the NEXT card does not land there. These are
+    // still written by hand, because the note over `composed` is right: a hand-written entry always wins,
+    // and each of these eleven has a mechanic worth drawing rather than a pose worth reusing.
+    payitback: "a small black devil imp taking a blow head-on without flinching, hands still behind its back "
+        + "and looking pleased about it, the strike shattering into a burst of red sparks against it and "
+        + "rebounding outward, its horns and tail lit by the backlash, a dim stone stockade yard beyond",
+    tongue: "a bright green frog with its long pink tongue snapped out straight at the viewer and struck "
+        + "home, the tongue taut and glistening across the frame, the frog braced back hard on its haunches, "
+        + "a sunlit reed-bed and open water beyond",
+    quickpaws: "a small orange fox kit raking forward with one front paw, claws out, already twisting its "
+        + "weight onto its back feet to spring away again, bushy tail whipped round behind it and a scuff of "
+        + "dust where it pushed off, a golden dusk field of long grass beyond",
+    antlers: "a young stag cast in warm hammered copper charging head-down straight at the viewer, its "
+        + "beaten-wire antlers lowered into a shield in front of its face, sparks ringing off the copper "
+        + "where a blow has glanced away, a ruined stone courtyard with ivy over it beyond",
+    slate: "a lean tufted-ear lynx with parchment-coloured fur dragging one claw down a dark slate, the "
+        + "scored line glowing sickly green and the mark running and dripping off the bottom of the board, "
+        + "amber eyes fixed on the viewer, a shuttered shop counter in low lamplight beyond",
+    closedaccount: "a heavy-set silver ram at the instant of impact, great spiralled horns driven into the "
+        + "frame, the shock throwing a white ring of force and splintered debris outward, head down and "
+        + "forelegs off the ground, a snowfield under a pale winter sky beyond",
+    unwatched: "a magpie with dull brass-sheened wings lifting off fast with a bright brass token in its "
+        + "beak, wings snapped open, the tarnished bowl it took from toppling and spilling behind it, not "
+        + "one face in the frame turned towards it, a dim lamplit card room beyond",
+    doesnotmove: "a massive sabre-toothed cat lying across an iron-bound strongbox and not moving an inch, "
+        + "its dark gold fur bristling into a ridge of hard spines down its back, a blow breaking apart into "
+        + "sparks against its shoulder, ivory tusks and half-open eyes catching the light, a vault of stacked "
+        + "iron boxes beyond",
+    outlasts: "a small ancient tortoise with a polished carved jade shell veined in gold drawing slowly into "
+        + "itself, warm green light welling up from inside the shell and running along the gold veins, old "
+        + "scars across the jade sealing over as it goes, a green baize table in quiet lamplight beyond",
+    ahead: "a lean hare carved from glossy black onyx at full stretch mid-leap across the frame, violet light "
+        + "streaming from its eyes and trailing off its heels, polished stone fur catching one hard "
+        + "highlight, everything behind it smeared by the speed, a red canyon of wind-carved rock beyond",
+    introduction: "an enormous silver-black wolf with a frost-pale ruff, head thrown back mid-howl, the "
+        + "sound going out across the frame as a visible ring of frost, small shapes in the dark beyond it "
+        + "flinching back and lowering their heads, breath and snow streaming off it, moonlight down its spine",
 };
 
 // ── THE TWELVE THAT ARE NOT PETS ─────────────────────────────────────────────────────────────────────────
@@ -151,8 +198,29 @@ function actionFor(card) {
         + "the frame";
     if (card.vulnerable || card.weak) return "baring its teeth in a low snarl that makes the air in front of "
         + "it shimmer and warp";
+    // ── AND THE FIVE MECHANICS THIS HAD NEVER HEARD OF ───────────────────────────────────────────────
+    // Poison, a Strength strip and Frail all reached the generic "standing alert" portrait — the sticker
+    // the top of this file exists to avoid — and so did Thorns and Regeneration whenever they were the
+    // WHOLE card rather than a rider on a block card. Five of the eleven added for the patronage and
+    // casino ladders landed there at once, which is what made it visible. Exactly the Dexterity fault
+    // recorded above, and the lesson is the same: a mechanic with no branch is a card with no picture.
+    //
+    // ⚠️ ORDERED SO THAT NOT ONE EXISTING CARD CHANGES POSE. These three sit after the Weak/Vulnerable
+    // branch, so Screech and House Edge keep theirs; Thorns and Regeneration sit after `block` below, so
+    // Flame Barrier stays braced and Rooting stays braced. Only cards that were falling through to the
+    // portrait move, and every one of those is already painted and on disk.
+    if (card.poison) return "dragging a claw through the air and leaving a sick luminous green streak "
+        + "hanging where it passed, the colour already running and dripping";
+    if (card.foeStrength) return "drawn up to its full height and staring something down, the air in front "
+        + "of it going heavy and dim as whatever it faces sags under the look";
+    if (card.frail) return "slipping inside a raised guard and knocking it aside, the guard buckling open "
+        + "and its owner caught wrong-footed";
     if (card.block) return "braced low and side-on behind a raised guard, weathering a blow, the impact "
         + "throwing dust and sparks off in front of it";
+    if (card.thorns) return "hunched still and bristling into a ridge of hard spines, a blow breaking apart "
+        + "into sparks against it without moving it an inch";
+    if (card.regen) return "drawing into itself as warm light wells up from inside, old scars closing over "
+        + "and the glow running along them";
     return "standing alert and squared to the viewer, poised on the edge of moving";
 }
 
