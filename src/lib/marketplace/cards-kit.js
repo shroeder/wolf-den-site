@@ -101,23 +101,11 @@ export const CARDS = {
         damage: 8, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable.",
         upgrade: { damage: 10, vulnerable: 3 },
     },
-    // ── THE CARD THAT POINTS AT YOU ──────────────────────────────────────────────────────────────────────
-    // Everything above either hits a foe or quietly helps you; nothing yet TARGETS you, and targeting is the
-    // whole interaction this slice exists to prove. A heal is the clearest case of it — the only card so far
-    // where dragging onto the wrong body is a real mistake rather than a no-op — so it is here to make the
-    // self-target path exist before there are twenty cards that need it.
-    //
-    // Deliberately weak per energy: five back where a Bite deals six. Healing that competes with attacking on
-    // rate turns every fight into a stalemate, and Spire keeps it off the card pool almost entirely for that
-    // reason. It is here to be a decision on the turn you are about to be hit for sixteen.
-    purr: {
-        id: "purr", pet: "kitten", name: "Purr", cost: 1, kind: "skill", target: "self",
-        heal: 5, text: "Heal {heal}.", upgrade: { heal: 8 },
-    },
+    // ⚠️ PURR USED TO BE THE FOURTH ENTRY HERE AND THAT MADE IT UNREACHABLE. See its new home in POOL.
 };
 
 // ── THE POOL YOUR COLLECTION UNLOCKS ─────────────────────────────────────────────────────────────────────
-// Luke's call: "pets you own unlock cards." The four above are the starter deck and belong to everybody; every
+// Luke's call: "pets you own unlock cards." The three above are the starter deck and belong to everybody; every
 // card below is a PET, and it can only be offered to somebody who actually owns that pet. That is the whole
 // reason the cards were pets in the first place — 118 of them are already drawn and already collected, and
 // this turns the collection into a card pool instead of a wall of portraits.
@@ -143,7 +131,7 @@ export const CARDS = {
 //   Bite / Strike    1    Strike, 6                       the starter attack, identical
 //   Hop / Defend     1    Defend, 5 Block                 identical
 //   Pounce / Bash    2    Bash, 8 + 2 Vulnerable          identical
-//   Purr             1    (none)                          ours: a 5 heal in the starter deck, Spire has none
+//   Purr             1    (none)                          ours: a 5 heal, Spire has no healing card at all
 //   Swipe            1    Headbutt, 9                     9 for one is their top common attack
 //   Peck             0    Anger, 6 (adds a copy)          3 without the copy
 //   Scuttle          1    Defend+, 8 Block                a common defend one rung up
@@ -667,6 +655,113 @@ export const POOL = {
     gate_moth: { id: "gate_moth", pet: "gate_moth", name: "The Doorward", cost: 1, kind: "attack", target: "foe", tier: 3,
         damage: 6, all: true, vulnerable: 2, exhaust: true, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable. Exhaust.",
         upgrade: { damage: 9 } },
+
+    // ── AND THE ELEVEN ANIMALS THE POOL STILL HAD NOTHING FOR ────────────────────────────────────────
+    // A sweep of COLLECTIBLES against this file found eighteen pets with no card. Nine of them belong to
+    // Hallowe'en and are not obtainable while HALLOWEEN_PUBLIC is false, and one is a gift that was handed
+    // to one member by name; the rest are below, plus the three starter-deck animals, whose only card was
+    // one everybody already holds ten copies of.
+    //
+    // ⚠️ EIGHT OF THESE ELEVEN PETS ARE BOUGHT. The patronage ladder is lifetime DOLLARS across the shop
+    // counter ($50 to $1,000) and the casino rungs are 100k-250k chips wagered, which makes them the most
+    // dangerous animals in this file to hang a card on: the note above Demon Form says rarity buys reach and
+    // flavour and never "the difference between a deck that scales and one that cannot", and that argument
+    // is twice as sharp when the gate is a credit card. So not one card below is a per-turn engine — no
+    // strengthEach, no blockEach, no energyEach, no Barricade. The two that most want to be powers (Always
+    // Ahead, The Introduction) are a flat buff and a one-shot debuff, both priced against cards a free
+    // player is already offered. Somebody who has spent a thousand dollars gets ELEVEN THINGS NOBODY ELSE
+    // CAN DO, and no turn that a free player cannot also have.
+    //
+    // ⚠️ AND EVERY ONE IS THE ONLY CARD IN THE GAME THAT DOES ITS THING. Luke's rule — "there should always
+    // be a card for each pet. no two cards have the same effect" — checked field by field against all 115
+    // above, which is why none of these is a bigger Shell Up or a cheaper Flame Barrier: single-target
+    // Frail, an attack that buys Dexterity, an attack that grants Artifact, poison with no damage on it, an
+    // attack that strips Strength, Thorns with nothing attached, Regeneration as the whole card, Strength
+    // and Dexterity together, and Disarm aimed at the room. Eight axes that existed and had one home each.
+    //
+    // ⚠️ NO NEW ART, AND NO NEW ENGINE. Every field used below is one playCard already resolves, and every
+    // card with no file in /images/cards falls back to its pet's portrait — which is what Pay It Back and
+    // all eight UNLOCKS already do. A painted face for these is a separate, priced job and Luke's call.
+
+    // ── TIER 1 ──
+    // ⚠️ THE KITTEN'S CARD, BACK FROM THE DEAD. See the note on STARTER_DECK: this has been unreachable
+    // since the starting ten became the Ironclad's, because it lived in CARDS and the draft reads POOL.
+    // Unchanged — the numbers were argued once and the argument still holds: deliberately weak per energy,
+    // a decision on the turn you are about to be hit for sixteen, and Spire has no healing card at all.
+    purr: { id: "purr", pet: "kitten", name: "Purr", cost: 1, kind: "skill", target: "self", tier: 1,
+        heal: 5, text: "Heal {heal}.",
+        upgrade: { heal: 8 } },
+    // Sucker Punch is 7 and a Weak for one; this is the other half of that pair, and the only card in the
+    // game that applies Frail to ONE thing — Screech throws it at the room and charges for the privilege.
+    // Frail is the frog's because a tongue is sticky: whatever it touches cannot get its guard back up.
+    tongue: { id: "tongue", pet: "frog", name: "Tongue Lash", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 5, frail: 2, text: "Deal {damage} damage. Apply {frail} Frail.",
+        upgrade: { damage: 7, frail: 3 } },
+    // Quills mirrored: that one is Block with the attacking stat bolted on, this is damage with the
+    // defending stat. No attack in the pool has ever granted Dexterity, and the file already records that
+    // the stat had almost no on-ramp — Chalk Tally is behind a card rank, so this is the one a new member
+    // can actually be dealt.
+    quickpaws: { id: "quickpaws", pet: "fox_kit", name: "Quick Paws", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 5, dexterity: 1, text: "Deal {damage} damage. Gain {dexterity} Dexterity.",
+        upgrade: { damage: 7, dexterity: 2 } },
+    // Iron Wave's band — damage with a defensive rider for one — except the rider is Artifact, which until
+    // now had exactly one home in 115 cards (Shell Up, and that is two energy). A stag with its antlers
+    // down is coming at you AND behind cover, which is the card.
+    antlers: { id: "antlers", pet: "copper_stag", name: "Antlers Down", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 6, artifact: 1, text: "Deal {damage} damage. Gain {artifact} Artifact.",
+        upgrade: { damage: 8, artifact: 2 } },
+
+    // ── TIER 2 ──
+    // Deadly Poison: 5 Poison for one energy, no damage attached. Poison had two homes and both were tier 3
+    // (The Ivory Bite, Ink Cloud), so an axis that only pays off over a long fight could not be started
+    // until the fight was nearly over. The lynx keeps the tally; what you took goes on the slate and comes
+    // due whether or not you are still looking at it.
+    slate: { id: "slate", pet: "ledger_lynx", name: "On the Slate", cost: 1, kind: "skill", target: "foe", tier: 2,
+        poison: 5, text: "Apply {poison} Poison.",
+        upgrade: { poison: 8 } },
+    // Clothesline's band — 12 and a debuff for two — paying in permanent Strength instead of Weak. Disarm
+    // and House Edge are both skills, so nothing in the game has ever taken Strength off something WHILE
+    // hitting it. Horns like a closed account: the fight does not get that back.
+    closedaccount: { id: "closedaccount", pet: "silver_ram", name: "Closed Account", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 15, foeStrength: 1, text: "Deal {damage} damage. The enemy loses {foeStrength} Strength for good.",
+        upgrade: { damage: 19, foeStrength: 2 } },
+    // Raucous Call owns "Weak, for free"; this owns "Frail, for free", and the two never overlap because
+    // Weak is what they deal and Frail is what they keep. Free and single-target against Screech's one
+    // energy and the whole room — the cheap, narrow version, which is what a second card in a role should
+    // be. It took the brass one because nobody was watching: the guard was down.
+    unwatched: { id: "unwatched", pet: "brass_magpie", name: "Nobody Watching", cost: 0, kind: "skill", target: "foe", tier: 2,
+        frail: 3, text: "Apply {frail} Frail.",
+        upgrade: { frail: 4 } },
+
+    // ── TIER 3 ──
+    // Flame Barrier with the Block taken off and the price halved. Five cards carry Thorns and every one of
+    // them bundles it with Block or damage, so the stat has never been a card you take FOR the stat. It
+    // sleeps across the strongbox and does not move for anybody: you come to it, and that is the whole
+    // transaction.
+    doesnotmove: { id: "doesnotmove", pet: "vault_sabrecat", name: "Does Not Move", cost: 1, kind: "skill", target: "self", tier: 3,
+        thorns: 5, text: "Gain {thorns} Thorns.",
+        upgrade: { thorns: 8 } },
+    // Their Regeneration potion, as a card. Regeneration appears on exactly one card in the pool (Rooting,
+    // at 3) and it is a rider there — so the only stat in the game that wins long fights by itself had no
+    // card that was ABOUT it. Five ticks down to one is fifteen health, slower than Purest Magic's twenty
+    // and cheaper, which is the trade. It has outlasted every system anyone ever brought in here.
+    outlasts: { id: "outlasts", pet: "jade_tortoise", name: "Outlasts It", cost: 1, kind: "skill", target: "self", tier: 3,
+        regen: 5, text: "Gain {regen} Regeneration.",
+        upgrade: { regen: 8 } },
+    // Inflame and Footwork are both uncommons at one energy apiece; two energy buys both at once, which is
+    // the only card in the game that gives Strength and Dexterity together. Flat, not per-turn — see the
+    // warning at the top of this block about what a thousand dollars is allowed to buy. Only ever seen on
+    // the way out, and always ahead.
+    ahead: { id: "ahead", pet: "onyx_hare", name: "Always Ahead", cost: 2, kind: "power", target: "self", tier: 3,
+        strength: 2, dexterity: 2, text: "Gain {strength} Strength and {dexterity} Dexterity.",
+        upgrade: { strength: 3, dexterity: 3 } },
+    // Disarm, aimed at the room instead of at one thing: double the energy, one tier up, and it still
+    // exhausts, so it is an answer you get once rather than an engine. Nothing else in the game applies
+    // foeStrength with `all`. There is exactly one way to be introduced, and the Exhaust is the joke.
+    introduction: { id: "introduction", pet: "den_warden", name: "The Introduction", cost: 2, kind: "skill", target: "foe", tier: 3,
+        all: true, foeStrength: 2, exhaust: true,
+        text: "Every enemy loses {foeStrength} Strength for good. Exhaust.",
+        upgrade: { foeStrength: 3 } },
 };
 
 // The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
@@ -2284,8 +2379,15 @@ export function drawOffer(pool, maxTier, rng, weightOf = null) {
 // hitting you is a blank turn, and a blank turn in a room of two is fifteen health. Ours was one Defend short
 // AND carrying the blank.
 //
-// It is the Ironclad's deck now, to the card. Purr is still in the game — it is a Bear, and it is a fine
-// find at a merchant — it just is not something a run is handed before it has met anything.
+// It is the Ironclad's deck now, to the card.
+//
+// ⚠️ AND TAKING PURR OUT OF HERE TOOK IT OUT OF THE GAME. This note used to promise it was "still in the
+// game, a fine find at a merchant", and it was not: eligibleCards draws from POOL and UNLOCKS, and Purr was
+// in neither — it sat in CARDS, which nothing but the starting deck and the cabinet has ever read. So from
+// the day this deck became the Ironclad's, the card existed, had art, was listed in the cabinet as OWNED,
+// and could not be dealt by a reward screen, a merchant or a transform. Luke, who has played more runs than
+// anybody: "I have never seen the kitten card come up." Nobody had.
+// It is a pet card in POOL now, gated on the Kitten like every other pet card. See its entry there.
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",
     "hop", "hop", "hop", "hop",
@@ -3358,8 +3460,12 @@ export const cardById = (id) => {
 //     Ethereal      2 cards
 // All three are rules you have to know to plan a turn, and all three were ordinary black text. They are
 // gold and pressable now, from the same one list the rest come off.
+// ⚠️ "Thorns" WAS THE TWELFTH WORD OF THIS KIND AND WAS NOT ON THE LIST. Pay It Back has printed "Gain 3
+// Thorns." since it was written, in plain black, with no definition behind it — the exact fault the sweep
+// above was run to find, missed because that card was added after the sweep. Does Not Move makes it the
+// whole sentence, so it is on the list now and both cards light.
 export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity",
-    "Poison", "Artifact", "Regeneration", "Intangible", "Curse",
+    "Poison", "Artifact", "Regeneration", "Intangible", "Thorns", "Curse",
     "Exhaust", "Unplayable", "Ethereal"];
 
 // ── AND WHAT EACH OF THEM ACTUALLY DOES ──────────────────────────────────────────────────────────────────
@@ -3383,6 +3489,9 @@ export const KEYWORD_TEXT = {
     Poison: "At the top of its carrier's turn it deals its number straight to health — Block does not stop it — and then drops by one. It kills things that were going to run out of turns.",
     Artifact: "Eats the next debuff aimed at it instead of letting it land. One charge is spent per debuff, however big that debuff was.",
     Regeneration: "Heals its number at the end of the turn, then drops by one.",
+    // Read off playCard and the swing loop: it is added to the hero and never ticked down, and it is paid
+    // out per HIT rather than per attack — so a creature that strikes three times pays it three times.
+    Thorns: "Anything that hits you takes this much damage back, every separate hit, for the rest of the fight. It does not wear off.",
     Intangible: "While it lasts, every hit that lands is cut to 1 damage, however hard it was thrown.",
     Curse: "A card that cannot be played and does nothing good. The harm is the slot it takes up in the hand you drew.",
     Exhaust: "The card is gone for the rest of this fight once it is played — not into the discard, out of the deck entirely. It comes back for the next fight.",

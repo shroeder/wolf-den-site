@@ -260,7 +260,17 @@ const worth = (c, need = null) => {
     // reading a debuff on the foe as a buff on itself. Anchor it to the words that mean you gained it.
     if (!/(enem|foe|it|they)\w*\s+loses/i.test(t)) v += num(t, /(?:Gain|and)\s+(\d+) Strength/i) * 5;
     // Taking Strength OFF the thing hitting you is real, and worth about what a debuff is worth.
-    v += num(t, /loses (\d+) Strength/i) * 3;
+    // ⚠ AND TAKING IT OFF EVERY ENEMY IS WORTH MORE THAN TAKING IT OFF ONE. The Introduction strips 2
+    // Strength from the whole room and scored exactly what Disarm scores for stripping it from one thing,
+    // so the bot priced a two-energy tier-3 card below the one-energy tier-2 card it is built from and
+    // would never have drafted it. Same ALL multiplier Poison already carries, for the same reason.
+    v += num(t, /loses (\d+) Strength/i) * 3 * (/Every enemy|ALL enemies/i.test(t) ? 1.6 : 1);
+    // ⚠ FRAIL WAS WORTH NOTHING TO THIS FUNCTION. Screech has carried it since it was written and got away
+    // with it because its Weak was scored instead; Nobody Watching is Frail and NOTHING else, so it scored
+    // zero — a card the bot would refuse at every reward screen, which reads in a transcript as a card
+    // nobody wants rather than a scorer that cannot see it (the same fault Ghostly Armour had). Priced a
+    // little under Weak: both take a quarter off something, and what Frail takes it off is rarer.
+    v += num(t, /(\d+) Frail/i) * 2.5 * (/ALL enemies/i.test(t) ? 1.6 : 1);
     v += num(t, /(\d+) Vulnerable/i) * 3;
     v += num(t, /(\d+) Weak/i) * 3;
     v += num(t, /(\d+) Thorns/i) * 2;
