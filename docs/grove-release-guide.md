@@ -192,10 +192,23 @@ explains at length why an empty belt is a bug.
 the tool and chest rungs, or hide the belt and the charm door until something can fill them. Shipping as-is
 hands every new member two dead affordances.
 
-### ⚠️ 3.13 A tool is advertised at up to 1.9x what it actually pays
+### ⚠️ 3.13 A tool is advertised at up to 1.9x what it actually pays — **NO LONGER SHOWN, 2026-11-12**
 
-The worst of the findings, because it is not a dead feature — it is a live, wrong number on the one screen
-a player checks to see whether the Grove was worth it.
+> **Re-checked 2026-11-12 and the live half is gone.** `toolBonusFor` now has exactly **one** renderer,
+> `GroveToolSheet`, and that sheet is **unreachable**: `setToolView` is called in `GroveClient` only to
+> reset it to `null` (line 1107) — nothing ever opens it, because every door it had led to the bench. And
+> `groveState.toolMeta`, the other half of the complaint, **has no renderer at all** any more; the tool
+> shelf moved to the equipment screen's Crafting Gear tab, which reads `groveToolCase` and prints the
+> **paid** number.
+>
+> So the inflated figure is not on a screen a player can reach. **This is no longer a launch blocker** — it
+> is dead code (`toolMeta`, `GroveToolSheet`, and `toolLadder`/`toolRecipeFor` in `grove-recipes.js`, which
+> also have zero call sites). The DESIGN question below is still unanswered and still Luke's, but it can be
+> answered after launch without anybody being lied to in the meantime. ⚠️ **Do not resolve it by deleting
+> the band** without reading §3.13's own argument: four preview members already rolled Masterwork.
+
+The finding as first written, 2026-11-09 — it was a live, wrong number on the one screen a player checks
+to see whether the Grove was worth it.
 
 - `groveState.toolMeta` (grove.js:378) reports **`toolBonusFor(tier, quality)`** — the tier multiplied by
   the quality band, up to **1.9x** at Masterwork. Its comment asserts this is *"what the tool actually
@@ -325,10 +338,19 @@ five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `gro
 
 - ~~**3.4** — credit preview players' lost quest progress, or accept it?~~ **Answered by the teardown** —
   the quest client is gone, there is nothing to credit. See §3.15.
-- **⚠️ 3.12** — food and charms have no faucet. Give the kill bar a rung for them, or hide the belt and the
-  charm door until it has one? **Every new member sees two dead affordances until this is decided.**
-- **⚠️ 3.13** — does a tool's quality band pay, or stop being advertised? A buff of up to 90% across twelve
-  systems either way it goes. Luke's call.
+- ~~**3.12** — food and charms have no faucet; every new member sees two dead affordances.~~ **Answered by
+  deletion, re-checked 2026-11-12.** The belt went on 2026-11-09 (`grove.js:620`, `GroveClient`'s own note)
+  and the charm door went with the bench — `charmPick` state survives in `GroveClient` but nothing sets it,
+  so neither is on screen. ⚠️ **The difficulty consequence is real and is NOT a UI cut:** nothing heals
+  mid-zone from an item any more. Gear `regen` and on-hit healing still work, so there IS healing — it is
+  just all passive now. Worth looking at once real players are on map 5+.
+- **3.13** — does a tool's quality band pay, or stop being advertised? Still Luke's call, but **no longer a
+  blocker**: as of 2026-11-12 the inflated number has no reachable renderer. See §3.13.
+- **⚠️ The Coliseum chest still tells you nothing when it opens** — `useColiseum` sets `result`, and
+  `col.result` has **zero readers** in `GroveClient` (re-grepped 2026-11-12). A member opens a chest and is
+  told nothing about what was in it; it is why the dead-gear bug in item T went unnoticed for so long. A
+  result screen is a thing to build — the boss kill card is the obvious model — and it wants Luke's eye.
+  This is the largest remaining player-facing hole in the Grove.
 - **3.9** — is `sigil_road`'s carved sign a defect?
 - **3.10** — does the Grove need an elite-gear route at all?
 - The Grove-town **Tavern building** points at `/marketplace/friends`, not the tavern room. Under the City

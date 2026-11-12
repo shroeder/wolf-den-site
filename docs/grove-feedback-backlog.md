@@ -538,13 +538,37 @@ deleted is shut — charms and foods are still open, see the bottom of this item
 a tool's tier *is* its map ("that zone tier") and walking through a gate between two zones of one map must not
 reset your progress. It ticks on **settle**, off the clamped kill count, never the count the client claimed.
 
-- **While the map owes tools:** the next slot in `TOOL_SLOTS` order, granted at that map's tier with a rolled
-  quality band. Twelve slots, so twelve fills kits out a tier.
-- **Once all twelve are held:** a chest, promoted up from wooden while the roll keeps succeeding.
+- **While the map owes tools:** the tool sitting at the **lowest tier**, raised by **one rung**, with a
+  rolled quality band. Twelve slots at a rung each, so twelve fills take a current set from tier n-1 to n.
+- **Once all twelve are at the map's tier:** a chest, promoted up from wooden while the roll keeps succeeding.
 
 ⚠️ **"Missing" means `tier < map`, not "no tool".** A rod at tier V is better than anything map three can
 hand over, so an early map owes nothing for that slot. Without that rule, walking back to map one would offer
 to **downgrade every tool you own**.
+
+### ⚠️ A FILL IS ONE RUNG, NOT THE MAP'S TIER — CORRECTED 2026-11-12
+
+> Luke: *"Its kinda weird that I can unlock a later tier of tool before having the one before it."*
+
+As first built, the grant wrote `tier = map`. Two consequences, and the second is the serious one:
+
+1. Arrive at map seven having never earned a Hunting Horn and the first one you ever hold reads **"Tier VII
+   of XII"**, with tiers I–VI that never existed for you. That is the report.
+2. **Every earlier bar was worthless.** A tool stores one number, so twelve fills on map two and twelve
+   fills on map seven ended in the identical place — twelve tools at tier VII. Six maps of farming were
+   strictly dominated by skipping them, and nothing in the game said so.
+
+So a fill now raises one tool by **one tier**, capped at the map: the map is the ceiling on what a bar can
+teach, not the thing it hands over. The slot chosen is the **lowest tier held** rather than the first one
+behind the map — `TOOL_SLOTS` order alone would have walked the rod I→XII before the pickaxe had one at
+all. Lowest-first keeps the twelve within a rung of each other, which is how it already behaved at the
+frontier. The quality band rolls against the **tier** now for the same reason: a tier-I rod earned while
+farming map seven was rolling on map seven's curve.
+
+⚠️ **It is also a faucet change.** The full ladder is 144 rungs ≈ 15 hours of farming spread across twelve
+maps, and a member with gaps spends fills filling them instead of opening chests — so this **slows** the
+Grove's chest income rather than speeding it. Unchanged at the frontier. `check:grove-bar` prints the
+number. Nothing to migrate: tiers already held only go up, and the `GREATEST` guards are untouched.
 
 ### ⚠️ The ceiling stops at mythic, and that reverses the obvious reading
 
