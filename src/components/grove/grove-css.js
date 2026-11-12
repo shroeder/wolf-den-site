@@ -2278,6 +2278,22 @@ export const GROVE_CSS = `
    border on the span and the sprite inside it; sizing only the img would leave the plate at its
    grid default and the sprite floating inside a box the wrong size. */
 .gv-pop-item { display: block; width: 88px; height: 88px; margin: 10px auto 4px; }
+/* The rarity in its own colour, the way every other gear surface in the game states it. --rar comes from
+   the rar-<rarity> class on the same element; the fallback is the ordinary sub colour so an unknown
+   rarity degrades to readable rather than to invisible. */
+.gv-pop-rar { color: var(--rar, #c7bda9); text-transform: capitalize; font-weight: 700;
+    letter-spacing: .04em; }
+/* -- ⚠️ THE SCENE'S MONSTER CARD MUST NOT GHOST THROUGH A RESULT CARD ---------------------------
+   Found by playing it, 2026-11-12: an emblem dropped in the last seconds of a Coliseum run, and the
+   bell's card came up ON TOP of the scene's own Monster Card reveal -- which is z-index 46 inside the
+   scene while .gv-pop is 200 in the fullscreen host, so the creature and its "+2 might" were legible
+   THROUGH the scrim behind the waves count. Two cards at once reads as a glitch at the exact moment
+   the game is trying to hand you something.
+
+   The trophy clears itself after 2100ms and is pointer-events: none, so it is the one to yield. :has()
+   rather than a prop because the two live in different trees -- the scene owns one, a portal owns the
+   other -- and there is no component that renders both. */
+body:has(.gv-pop) .gv-mc { opacity: 0; transition: opacity 180ms ease-out; }
 .gv-pop-item .item-art-img { width: 100%; height: 100%; object-fit: contain; }
 .gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
     text-transform: uppercase; color: #9b9487; }

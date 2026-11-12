@@ -80,7 +80,14 @@ export function useColiseum({ onChanged, onResult } = {}) {
         const j = await post({ action: "settle", map: run.map, wavesCleared, cleared });
         setRun(null);
         if (j?.ok) {
-            onResult?.({ wavesCleared: j.wavesCleared, totalWaves: j.totalWaves, cleared: j.cleared });
+            // ⚠️ THE CHEST COUNT RIDES ALONG, because the card has to say something TRUE about them.
+            // Played for real on 2026-11-12 the card read "The chests you earned are on the sand" after a
+            // two-wave run that earned none — chestsFor pays nothing under a quarter of the waves. A
+            // reward line that is wrong in the ordinary case is worse than no line.
+            onResult?.({
+                wavesCleared: j.wavesCleared, totalWaves: j.totalWaves, cleared: j.cleared,
+                chests: Array.isArray(j.chests) ? j.chests.length : 0,
+            });
             // Fetch the chests back rather than trusting the settle's own list — the ids are what the
             // open needs, and only the server knows them.
             const r = await fetch(`/api/marketplace/grove/coliseum?map=${run.map}`).then((x) => x.json()).catch(() => null);

@@ -427,12 +427,18 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             return;
         }
         if (typeof r.wavesCleared === "number") {
+            // ⚠️ THE LINE FOLLOWS THE CHEST COUNT, NOT THE OUTCOME. A run that falls short of a quarter
+            // of the waves earns nothing (chestsFor), and the first cut of this said "the chests you
+            // earned are on the sand" to a player standing on empty sand — found by playing it, not by
+            // reading it. The empty case also names the threshold, because a player who does not know
+            // where the line is cannot aim at it. [[teach-by-showing-not-telling]]
+            const got = Number(r.chests) || 0;
             setCard({
                 kicker: r.cleared ? "Coliseum cleared" : "The bell rang",
                 name: `${r.wavesCleared} of ${r.totalWaves} waves`,
-                lines: [r.cleared
-                    ? "Every wave down. The chests are on the sand."
-                    : "The chests you earned are on the sand."],
+                lines: [got > 0
+                    ? `${got === 1 ? "A chest is" : `${got} chests are`} on the sand.`
+                    : "Not far enough for a chest — a quarter of the waves pays the first."],
             });
         }
     }, []);
@@ -616,7 +622,11 @@ export default function GroveClient({ initial, initialView = null, initialTown =
             name: d.boss?.name || "The boss",
             art: d.boss?.art || null,
             lines: [
-                emblem ? `${emblem.name} — Monster Card` : null,
+                // ⚠️ NOT "<name> — Monster Card" WHEN THE CARD IS NAMED AFTER THE BOSS, which for a boss
+                // emblem it always is. Played on 2026-11-12 the card read "The Mossmother" in the title
+                // and "The Mossmother — Monster Card" directly under it: the same four words twice, which
+                // reads as a bug rather than as a reward. Named only when it differs from the headline.
+                emblem ? (emblem.name === (d.boss?.name || "") ? "Monster Card" : `${emblem.name} — Monster Card`) : null,
                 d.hyper ? d.hyper.name : null,
                 d.xp > 0 ? `+${d.xp} xp` : null,
                 // Only on repeats: on a first clear the number is 1 and saying so is noise.
@@ -884,7 +894,11 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                                 every piece without a sprite yet. Same reveal, same card, right art
                                 source for each. [[sprites-never-icons]] */}
                             {w.kind === "gear" ? (
-                                <ItemArt id={w.id} icon={w.icon} className="gv-pop-item" alt="" />
+                                /* ⚠️ rar-<rarity> IS THE APP'S OWN CLASS, not a new one. It sets --rar,
+                                   which is what paints the plate behind an item everywhere else; without
+                                   it this piece would be the only gear in the game shown without its
+                                   rarity colour. [[grep-the-class-name-before-taking-it]] */
+                                <ItemArt id={w.id} icon={w.icon} className={`gv-pop-item rar-${w.rarity || "common"}`} alt="" />
                             ) : w.art ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img className="gv-pop-tool" src={w.art} alt="" width={88} height={88} />
@@ -896,7 +910,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                                 another, and the bag shows it — so the reveal has to as well, or the
                                 card is quieter than the screen the player checks next. */}
                             {w.kind === "gear" && w.rarity ? (
-                                <span className="gv-pop-sub">{w.rarity}</span>
+                                <span className={`gv-pop-sub gv-pop-rar rar-${w.rarity}`}>{w.rarity}</span>
                             ) : null}
                         </span>
                     ))}
