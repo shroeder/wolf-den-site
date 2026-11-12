@@ -101,13 +101,38 @@ export function rollBarChest(mapN, rand = Math.random) {
  * the whole of how this game teaches: a number moving toward a named thing. A random pick among the missing
  * would be marginally more exciting once and unreadable for the other eleven fills.
  * [[teach-by-showing-not-telling]]
+ *
+ * ── ⚠️ IT PAYS THE NEXT RUNG, NOT THE MAP'S RUNG ─────────────────────────────────────────────────────────────
+ * Luke, 2026-11-12: "Its kinda weird that I can unlock a later tier of tool before having the one before it."
+ * He is right, and it was not a display bug — the grant itself wrote `tier = map`. Arrive at map seven having
+ * never earned a Hunting Horn and the first one you ever hold is tier VII. "Tier VII of XII" on a tool whose
+ * tiers I-VI never existed for you is a ladder with no rungs in it.
+ *
+ * Worse than weird, it made every earlier bar WORTHLESS. A tool only ever stores one number, so twelve fills
+ * on map two and twelve fills on map seven ended in exactly the same place: twelve tools at tier VII. Six
+ * maps of farming were strictly dominated by skipping them, and the game never said so.
+ *
+ * So one fill raises one tool by ONE tier, capped at the map — the map is the ceiling on what it can teach,
+ * not the thing it hands over. Reaching tier VII now means seven fills for that slot, wherever they were
+ * earned, and a tool's numeral is a true count of the rewards behind it.
+ *
+ * ⚠️ AND THE PICK IS THE LOWEST TIER HELD, not the first slot behind the map. TOOL_SLOTS order alone would
+ * walk the rod from I to XII before the pick had one at all — twelve rungs on one tool and eleven empty
+ * shelves. Lowest-first (ties broken by TOOL_SLOTS order, so the strip can still name what is coming) climbs
+ * the set together and keeps the twelve within one rung of each other, which is the behaviour at the frontier
+ * that this already had: twelve fills take everything from tier n-1 to tier n.
+ *
+ * Returns the slot's own row plus the `tier` the fill owes, so the caller never re-derives it.
  */
 export function nextToolFor(mapN, tools = {}) {
     const m = Math.max(1, Math.floor(Number(mapN) || 1));
+    let owed = null;
     for (const t of TOOL_SLOTS) {
-        if ((Number(tools[t.slot]) || 0) < m) return t;
+        const held = Number(tools[t.slot]) || 0;
+        if (held >= m) continue;
+        if (!owed || held < owed.held) owed = { ...t, held, tier: held + 1 };
     }
-    return null;
+    return owed;
 }
 
 /** Everything the panels need about one map's bar, without writing anything. */
@@ -137,9 +162,11 @@ export async function barState(buyerId, mapN) {
         //
         // `next` is still computed and still sent, because the reveal has to know what to open INTO and
         // the client cannot work that out. It is just not drawn on the strip any more.
+        // ⚠️ next.tier, NOT the map. The fill pays one rung up from what this member holds — see the long
+        // note on nextToolFor. Sending the map here would open the chest onto a tool the grant never wrote.
         next: next
-            ? { kind: "tool", slot: next.slot, name: next.name, tier: m,
-                numeral: toolNumeral(m), art: toolArt(next.slot, m) }
+            ? { kind: "tool", slot: next.slot, name: next.name, tier: next.tier,
+                numeral: toolNumeral(next.tier), art: toolArt(next.slot, next.tier) }
             : { kind: "chest", ceiling: barCeiling(m) },
         // ⚠️ A REAL SPRITE, NOT A GLYPH. [[no-icons-or-glyphs-in-the-game]] — every destination gets drawn
         // art, and a chest emoji here would hide the gap rather than fill it. These are the same painted
@@ -213,27 +240,32 @@ export async function bumpBar(buyerId, mapN, kills) {
     for (let i = 0; i < earned; i += 1) {
         const next = nextToolFor(m, tools);
         if (next) {
-            // ── ⚠️ THE BAND IS STILL ROLLED, AND THE LEVEL INPUT IS THE MAP ─────────────────────────────
+            // ── ⚠️ THE BAND IS STILL ROLLED, AND THE LEVEL INPUT IS THE TIER ────────────────────────────
             // A tool carries a quality as well as a tier, and toolBonusFor multiplies the two — the band is
             // half of what a tool is worth. Crafting rolled it against the crafting level, which no longer
-            // exists, so the map stands in: a tier VII pickaxe rolls on a deeper curve than a tier I.
+            // exists, so the rung stands in: a tier VII pickaxe rolls on a deeper curve than a tier I.
+            //
+            // ⚠️ THE TIER, NOT THE MAP, AND THAT IS THE SAME FIX AS THE RUNG. The map used to be both, which
+            // meant a tier-I rod earned while farming map seven rolled on map seven's curve — a Masterwork
+            // starter tool out of a bar that was paying its first rung. The rung is what is being made, so
+            // the rung is what it rolls against; at the frontier the two are equal and nothing changes.
             //
             // ⚠️ GREATEST ON BOTH COLUMNS. Walking back to an early map must never lower a tool you hold,
             // and nextToolFor already refuses to offer one — this is the second guard, in the statement
             // itself, because a downgrade written by a race is not recoverable from.
-            const quality = rollQuality(m, Math.random);
+            const quality = rollQuality(next.tier, Math.random);
             await db.query(
                 `INSERT INTO mkt_grove_tool (buyer_id, slot, tier, quality) VALUES ($1, $2, $3, $4)
                  ON CONFLICT (buyer_id, slot) DO UPDATE
                     SET tier = GREATEST(mkt_grove_tool.tier, $3),
                         quality = CASE WHEN $3 > mkt_grove_tool.tier THEN $4
                                        ELSE GREATEST(mkt_grove_tool.quality, $4) END`,
-                [buyerId, next.slot, m, quality],
+                [buyerId, next.slot, next.tier, quality],
             ).catch(() => {});
-            tools[next.slot] = m;
+            tools[next.slot] = next.tier;
             paid.push({
-                kind: "tool", slot: next.slot, name: next.name, tier: m,
-                numeral: toolNumeral(m), quality, art: toolArt(next.slot, m),
+                kind: "tool", slot: next.slot, name: next.name, tier: next.tier,
+                numeral: toolNumeral(next.tier), quality, art: toolArt(next.slot, next.tier),
             });
             continue;
         }
