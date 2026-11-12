@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
+import { IMAGE_MODEL } from "./lib/image-model.mjs";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
 import { CURSE_CARDS, POOL, STATUS_CARDS } from "../src/lib/marketplace/cards-kit.js";
 import "./lib/ai-trace.mjs";
@@ -265,7 +266,7 @@ for (const [id, subject] of JOBS) {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: SIZE, output_format: "png", quality: "medium", n: 1 }),
+        body: JSON.stringify({ model: IMAGE_MODEL, prompt, size: SIZE, output_format: "png", quality: "medium", n: 1 }),
     });
     if (!resp.ok) { console.log(`  ${id}: OpenAI ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
     const b64 = (await resp.json())?.data?.[0]?.b64_json;

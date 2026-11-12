@@ -13,6 +13,8 @@
 // The run groups under the script's own filename, so `node scripts/gen-foe-sprites.mjs` shows up as one
 // "gen-foe-sprites" batch in the AI Costs history.
 import { basename } from "node:path";
+
+import { IMAGE_MODEL, imagePricePerMtok } from "./image-model.mjs";
 import { readFileSync } from "node:fs";
 
 function dbUrl() {
@@ -105,7 +107,7 @@ globalThis.fetch = async function tracedFetch(input, init) {
             const clone = res.clone();
             const text = await clone.text().catch(() => "");
             await record({
-                kind: isImage ? "image" : "text", model: body?.model || "gpt-image-1",
+                kind: isImage ? "image" : "text", model: body?.model || IMAGE_MODEL,
                 size: body?.size, quality: body?.quality, source: `script/${scriptName}`,
                 label: `${scriptName} (failed)`, prompt: body?.prompt,
                 ok: false, error: text.slice(0, 300),
@@ -114,7 +116,7 @@ globalThis.fetch = async function tracedFetch(input, init) {
                 // low-quality render of the same size — that's the honest floor, and it is marked `estimated`
                 // rather than dressed up as measured.
                 cost: isImage
-                    ? Math.round(((IMG_TOKENS[body?.size || "1024x1024"] || IMG_TOKENS["1024x1024"]).low) * (40 / 1e6) * 1e5) / 1e5
+                    ? Math.round(((IMG_TOKENS[body?.size || "1024x1024"] || IMG_TOKENS["1024x1024"]).low) * (imagePricePerMtok(body?.model) / 1e6) * 1e5) / 1e5
                     : 0,
                 basis: "estimated",
             });
@@ -129,9 +131,9 @@ globalThis.fetch = async function tracedFetch(input, init) {
             // across a 216-image run.
             const refTokens = body?.edit ? (IMG_TOKENS[size] || IMG_TOKENS["1024x1024"]).low : 0;
             await record({
-                kind: "image", model: body?.model || "gpt-image-1", size, quality,
+                kind: "image", model: body?.model || IMAGE_MODEL, size, quality,
                 source: `script/${scriptName}`, label: scriptName, prompt: body?.prompt,
-                ok: true, cost: Math.round((tokens + refTokens) * (40 / 1e6) * 1e5) / 1e5,
+                ok: true, cost: Math.round((tokens + refTokens) * (imagePricePerMtok(body?.model) / 1e6) * 1e5) / 1e5,
             });
         } else {
             // Text/vision: OpenAI reports exact token counts, so this is measured rather than inferred.
