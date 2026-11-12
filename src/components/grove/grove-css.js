@@ -2260,6 +2260,25 @@ export const GROVE_CSS = `
 .gv-pop-card { max-height: 86vh; overflow-y: auto;
     scrollbar-width: none; -ms-overflow-style: none; }
 .gv-pop-card::-webkit-scrollbar { width: 0; height: 0; display: none; }
+/* -- THE CARD'S SUPPORTING LINES ---------------------------------------------------------------
+   What a boss paid (the Monster Card, the hyper sliver, the xp) and a gear piece's rarity. Quieter
+   than gv-pop-name on purpose: the name is the thing that happened and these are the detail under
+   it, so they sit between the headline and the dismiss hint in weight as well as in order.
+
+   ⚠️ NOT no-black-text. #c7bda9 on the card's near-black plate, same family as gv-pop-go. */
+.gv-pop-sub { display: block; margin-top: 4px; font-size: 0.86rem; color: #c7bda9; }
+.gv-pop-name + .gv-pop-sub { margin-top: 0; }
+/* -- GEAR IN THE REVEAL ------------------------------------------------------------------------
+   A Coliseum chest pays arena gear, and gear art is an ItemArt box (a die-cut sprite, or the item's
+   glyph while the sprite map is still in flight) rather than a path this component knows. It is
+   centred and given the same 88px footprint the tool sprite beside it has, so a chest that paid a
+   tool and a chest that paid a sword read as the same kind of card.
+
+   ⚠️ THE SIZE IS ON THE WRAPPER, NOT ON THE IMG. ItemArt renders its own rarity backplate and
+   border on the span and the sprite inside it; sizing only the img would leave the plate at its
+   grid default and the sprite floating inside a box the wrong size. */
+.gv-pop-item { display: block; width: 88px; height: 88px; margin: 10px auto 4px; }
+.gv-pop-item .item-art-img { width: 100%; height: 100%; object-fit: contain; }
 .gv-pop-go { display: block; margin-top: 16px; font-size: 0.72rem; letter-spacing: .16em;
     text-transform: uppercase; color: #9b9487; }
 @keyframes gvPopIn { from { opacity: 0; } to { opacity: 1; } }

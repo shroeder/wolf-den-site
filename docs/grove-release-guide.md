@@ -346,11 +346,21 @@ five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `gro
   just all passive now. Worth looking at once real players are on map 5+.
 - **3.13** — does a tool's quality band pay, or stop being advertised? Still Luke's call, but **no longer a
   blocker**: as of 2026-11-12 the inflated number has no reachable renderer. See §3.13.
-- **⚠️ The Coliseum chest still tells you nothing when it opens** — `useColiseum` sets `result`, and
-  `col.result` has **zero readers** in `GroveClient` (re-grepped 2026-11-12). A member opens a chest and is
-  told nothing about what was in it; it is why the dead-gear bug in item T went unnoticed for so long. A
-  result screen is a thing to build — the boss kill card is the obvious model — and it wants Luke's eye.
-  This is the largest remaining player-facing hole in the Grove.
+- ~~**The Coliseum chest tells you nothing when it opens**~~ — **DONE 2026-11-12, and it was four silent
+  moments, not one.** `col.result` had zero readers, so the key refusal, the run summary AND the chest
+  contents all went nowhere; `bossWon` was the same shape in the same file, set three times and read never,
+  so the **boss kill** announced nothing either — no emblem, no hyper sliver, no xp, despite two comments in
+  `groveBoss` describing the card that was meant to show them.
+  - `useColiseum` reports through an `onResult` callback now instead of parking answers in state nobody
+    reads. ⚠️ **That shape is the lesson**: a mailbox fails silently at every call site at once, while a
+    missing handler is visible where it is missing.
+  - The key refusal goes to the **note**, the run summary and the boss kill to one shared **result card**,
+    and an opened chest to the **kill bar's own rattle-then-open sequence** (all four tier sprites were
+    already drawn). Gear is drawn with `ItemArt`, so a piece with no sprite yet still renders.
+  - ⚠️ The card **queues behind** the new-area pop rather than stacking on it — both are `.gv-pop`, a fixed
+    full-screen layer, and a first clear sets both.
+  - ⚠️ **Still unplayed by Luke.** The wiring is verified by reading and the build is clean; nobody has run
+    a Coliseum end to end. That is the one thing left on it.
 - **3.9** — is `sigil_road`'s carved sign a defect?
 - **3.10** — does the Grove need an elite-gear route at all?
 - The Grove-town **Tavern building** points at `/marketplace/friends`, not the tavern room. Under the City

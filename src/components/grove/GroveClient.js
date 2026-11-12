@@ -30,6 +30,11 @@ import Area from "@/components/grove/GroveArea.js";
 import dynamic from "next/dynamic";
 
 import GroveToolSheet from "@/components/grove/GroveToolSheet.js";
+// ⚠️ THE APP'S OWN GEAR ART, NOT AN <img> OF MY OWN. Every gear icon in the game funnels through
+// ItemArt — it fetches the {id → sprite} map once per page and falls back to the item's glyph while that
+// is in flight, so a piece with no sprite yet renders as something rather than as a hole. A bespoke
+// <img src={icon}> here would be blank for exactly the items that have no sprite.
+import ItemArt from "@/components/ItemArt";
 
 // ⚠️ LOADED ONLY WHEN SOMEBODY WALKS TO IT. TownClient is 5,500 lines with its own camera, polling
 // and stylesheet; statically imported it would ride in the Grove's bundle for every player who never
@@ -303,7 +308,24 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // note instead. [[no-pity-progress-bars]] is the same judgement from the other end.
     // `{ phase: "shaking"|"open", art, won: [...] }` — the chest the bar paid, and what came out of it.
     const [toolWon, setToolWon] = useState(null);
-    const [bossWon, setBossWon] = useState(null);
+    // ── ⚠️ ONE RESULT CARD, FOUR MOMENTS — AND `bossWon` WAS NEVER RENDERED ──────────────────────────
+    // This replaces `bossWon`, which was set in three places and read in NONE. So the boss kill — the
+    // loudest thing in a map, the only source of an emblem, and the thing that opens the next zone —
+    // announced nothing at all. The comments in grove.js describe a "kill card" that announces the
+    // emblem and the hyper sliver; there was no such card anywhere in the file.
+    //
+    // The Coliseum was the same defect three more times over: useColiseum parked the key refusal, the
+    // run summary and an opened chest's contents in a `result` that had ZERO readers. A player with no
+    // key tapped the gate and NOTHING happened on screen, the bell rang with no score, and an opened
+    // chest vanished while its gear landed silently in the bag. That hook reports through a callback
+    // now — see onColiseumResult below, and the note at the top of useColiseum.js for why a mailbox
+    // nobody opens is a shape that can fail silently at every call site at once.
+    //
+    // ⚠️ SO IT IS ONE SURFACE, NOT FOUR. Four bespoke cards would be four answers to "what does a
+    // reward look like" and the first thing to drift — the same argument the chest sequence below is
+    // built on, which borrows the Den's own .chest-stage rather than rolling its own rattle.
+    // `{ kicker, name, art, lines: [...] }`.
+    const [card, setCard] = useState(null);
     // The charm armed for the next dive, or null. ⚠️ NOT PERSISTED AND DELIBERATELY SO — arming is a
     // choice about the run you are about to take, and a choice that survived a reload would be spent on
     // a dive the player had forgotten they armed it for.
@@ -369,7 +391,53 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // it did, because the IMPORT had landed. Every use of `col` below then referenced an undefined
     // binding: "col is not defined", on the live Grove, for a real member. Checking that a name appears
     // is not checking that it is DEFINED; the build cannot catch it and neither did I.
-    const col = useColiseum({ onChanged: refresh });
+    // ── ⚠️ THE COLISEUM'S THREE ANSWERS, EACH ROUTED TO THE SURFACE IT DESERVES ─────────────────────
+    // useColiseum reports the key refusal, the run summary and an opened chest's contents. They are not
+    // the same weight, so they do not get the same screen:
+    //
+    //   the key refusal  → the NOTE. Information, not a celebration. A full-screen card for "you need a
+    //                      key" is a modal standing in front of the thing the player was trying to do.
+    //   the run summary  → the CARD. Twelve waves against a two-minute clock; the score is the point.
+    //   an opened chest  → the CHEST SEQUENCE, because it IS a chest. The kill bar's rattle-then-open rig
+    //                      is already tuned on Luke's own note ("it should spend more time hyping uo thr
+    //                      chest opeming") and all four tier sprites are drawn. A second reveal built
+    //                      here would be the one that drifts.
+    //
+    // ⚠️ `useCallback` WITH AN EMPTY DEP LIST, which is only honest because every call below is a
+    // setState setter and React guarantees those are stable. It matters: this is a dependency of three
+    // callbacks inside useColiseum, so an inline arrow would rebuild all of them on every render.
+    const onColiseumResult = useCallback((r) => {
+        if (!r) return;
+        if (r.error) { setNote(r.error); return; }
+        if (r.opened) {
+            const gear = Array.isArray(r.opened.gear) ? r.opened.gear : [];
+            setToolWon({
+                // No sprite, no shake — the same rule the bar's reveal states: a rattle phase with
+                // nothing in it is dead screen between the player and their reward.
+                phase: r.opened.tier ? "shaking" : "open",
+                art: r.opened.tier ? `/images/grove/chest-${r.opened.tier}.webp` : null,
+                // ⚠️ AN EMPTY CHEST IS A SENTENCE, NOT A BLANK CARD. openColiseumChest returns
+                // `gear: []` when the map has no gear table, and the row is already spent by then — so
+                // the player still has to be told something.
+                won: gear.length
+                    ? gear.map((g) => ({ kind: "gear", id: g.id, name: g.name, icon: g.icon, rarity: g.rarity }))
+                    : [{ kind: "empty", name: "Nothing but dust" }],
+                key: `col-${r.opened.map}-${gear.map((g) => g.id).join("-")}`,
+            });
+            return;
+        }
+        if (typeof r.wavesCleared === "number") {
+            setCard({
+                kicker: r.cleared ? "Coliseum cleared" : "The bell rang",
+                name: `${r.wavesCleared} of ${r.totalWaves} waves`,
+                lines: [r.cleared
+                    ? "Every wave down. The chests are on the sand."
+                    : "The chests you earned are on the sand."],
+            });
+        }
+    }, []);
+
+    const col = useColiseum({ onChanged: refresh, onResult: onColiseumResult });
 
     // ── ✂️ THE QUEST MACHINERY WAS ALL HERE ─────────────────────────────────────────────────────────
     // Luke, 2026-11-08: "Remove all quest givers and quests." Five things went:
@@ -434,7 +502,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // standing was still standing in the next place. Cleared HERE rather than in the door handler
         // because the map panel enters a zone too (see the note below travel): a reset that lives on one
         // of the two ways in is a reset that is missing from the other.
-        setBossWon(null);
+        setCard(null);
         setUnlockedNow(null);
         // ⚠️ AND THE SHEET COMES DOWN WITH IT. The map is one of the panels openable from inside a zone,
         // so tapping a place on it is now a way to travel WITHOUT leaving — and leaving the panel up over
@@ -534,7 +602,27 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 : "The kill did not land.");
             return;
         }
-        setBossWon(d);
+        // ── ⚠️ THE KILL CARD, WHICH grove.js HAS CLAIMED EXISTS FOR WEEKS ───────────────────────────
+        // Two comments in groveBoss say the emblem and the hyper sliver are "reported back so the kill
+        // card can show them rather than the player discovering a chest in their bag later and not
+        // knowing what dropped it". The response carried all of it; nothing read it. This is that card.
+        //
+        // ⚠️ THE EMBLEM'S NAME COMES FROM THE CATALOGUE, NOT FROM st.emblems. The refresh below has not
+        // landed yet when this is built, so reading the member's own shelf would miss the card they just
+        // earned — the one time it matters. GROVE_EMBLEMS is already imported for the shelf's total.
+        const emblem = d.emblem ? GROVE_EMBLEMS[d.emblem] || null : null;
+        setCard({
+            kicker: d.first ? "First clear" : "Boss down",
+            name: d.boss?.name || "The boss",
+            art: d.boss?.art || null,
+            lines: [
+                emblem ? `${emblem.name} — Monster Card` : null,
+                d.hyper ? d.hyper.name : null,
+                d.xp > 0 ? `+${d.xp} xp` : null,
+                // Only on repeats: on a first clear the number is 1 and saying so is noise.
+                d.kills > 1 ? `${d.kills} kills here` : null,
+            ].filter(Boolean),
+        });
         // ⚠️ THE POP IS DRIVEN FROM HERE NOW, NOT FROM SETTLE. The boss kill is what moves unlocked_n
         // (see openTheWay in grove.js), so it is the only response that can carry the new zone.
         if (d.unlocked) setUnlockedNow(d.unlocked);
@@ -544,7 +632,8 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         // and there are no recipes; the kill card owns the celebration on its own now.
     }, [session, refresh]);
 
-    const leave = useCallback(() => { setSession(null); setView("map"); setBossWon(null); refresh(); }, [refresh]);
+
+    const leave = useCallback(() => { setSession(null); setView("map"); setCard(null); refresh(); }, [refresh]);
 
     // ── ✂️ `goToArea` WAS HERE ──────────────────────────────────────────────────────────────────────
     // Luke: "we also need the ability to go see where to go look at the item, because people have no idea
@@ -695,6 +784,16 @@ export default function GroveClient({ initial, initialView = null, initialTown =
         return () => clearTimeout(t);
     }, [note]);
 
+    // ⚠️ THE CARD SELF-CLEARS, AND IT WAITS LONGER THAN THE NOTE. It carries several lines (an emblem, a
+    // hyper sliver, an xp number) and a player who has just killed a boss is reading them, not tapping
+    // through them. Eight seconds, dismissible on tap from the first frame — unlike the chest, which
+    // refuses taps while it rattles because the rattle is the whole point of the chest.
+    useEffect(() => {
+        if (!card) return undefined;
+        const t = setTimeout(() => setCard(null), 8000);
+        return () => clearTimeout(t);
+    }, [card]);
+
     // ⚠️ RENDERED IN EVERY VIEW, NOT JUST INSIDE THE ZONE. The unlock usually arrives on the settle
     // that fires when you LEAVE a zone - which is the exact moment the zone view unmounts. Declared here and
     // dropped into both returns so the celebration cannot be destroyed by the thing that triggered it.
@@ -705,6 +804,37 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                 <span className="gv-pop-kicker">New area unlocked</span>
                 <b className="gv-pop-name">{unlockedNow.name}</b>
                 <span className="gv-pop-art" style={{ backgroundImage: `url(${unlockedNow.bg})` }} />
+                <span className="gv-pop-go">Tap to continue</span>
+            </div>
+        </div>
+    ) : null;
+
+    // ── THE RESULT CARD ─────────────────────────────────────────────────────────────────────────────
+    // ⚠️ IT QUEUES BEHIND THE UNLOCK POP RATHER THAN STACKING ON IT. A boss kill sets both — the card
+    // and, on a first clear, the new-area celebration — and both are `.gv-pop`, a fixed full-screen
+    // layer. Rendering them together puts two cards on top of each other, with the taller one's text
+    // showing through. The unlock self-clears after five seconds (see its effect above), so gating on
+    // `!unlockedNow` turns a collision into a sequence: the area you opened, then what the boss paid.
+    // No new timer, and nothing to keep in step.
+    //
+    // ⚠️ AND IT IS IN BOTH RETURNS, same reason as popNode. The Coliseum's run summary arrives at the
+    // bell, which is inside the zone; the boss card can outlive a settle that pulls you out of one.
+    const cardNode = card && !unlockedNow ? (
+        <div className="gv-pop" onClick={() => setCard(null)}>
+            <div className="gv-pop-card">
+                <span className="gv-pop-rays" aria-hidden="true" />
+                <span className="gv-pop-kicker">{card.kicker}</span>
+                <b className="gv-pop-name">{card.name}</b>
+                {/* The boss's own sprite, which is the thing that was just standing there. gv-pop-tool
+                    is the 96px die-cut plate the tool reveal uses — NOT gv-pop-art, which is a 16/10
+                    cover-fitted backdrop plate and would crop a creature's head off. */}
+                {card.art ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img className="gv-pop-tool" src={card.art} alt="" width={96} height={96} />
+                ) : null}
+                {(card.lines || []).map((l) => (
+                    <span className="gv-pop-sub" key={l}>{l}</span>
+                ))}
                 <span className="gv-pop-go">Tap to continue</span>
             </div>
         </div>
@@ -746,14 +876,28 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                         several fills at once, and a card that showed one of four would be the summary
                         quietly under-reporting — the same rule the bulk chest reveal is built on. */}
                     {toolWon.won.map((w, i) => (
-                        <span className="gv-pop-won" key={`${w.kind}-${w.slot || w.tier}-${i}`}>
-                            {w.art ? (
+                        <span className="gv-pop-won" key={`${w.kind}-${w.slot || w.id || w.tier}-${i}`}>
+                            {/* ── ⚠️ THREE KINDS OF REWARD COME THROUGH HERE NOW ──────────────────
+                                A tool and a chest carry their own painted `art` path. Coliseum gear does
+                                NOT — a gear sprite is keyed by item id in a map ItemArt fetches once per
+                                page — so it gets ItemArt rather than an <img> that would be blank for
+                                every piece without a sprite yet. Same reveal, same card, right art
+                                source for each. [[sprites-never-icons]] */}
+                            {w.kind === "gear" ? (
+                                <ItemArt id={w.id} icon={w.icon} className="gv-pop-item" alt="" />
+                            ) : w.art ? (
                                 /* eslint-disable-next-line @next/next/no-img-element */
                                 <img className="gv-pop-tool" src={w.art} alt="" width={88} height={88} />
                             ) : null}
                             <b className="gv-pop-name">
-                                {w.kind === "tool" ? `${w.name} ${w.numeral || ""}`.trim() : (w.label || "A chest")}
+                                {w.kind === "tool" ? `${w.name} ${w.numeral || ""}`.trim() : (w.name || w.label || "A chest")}
                             </b>
+                            {/* The rarity is the whole of what makes one arena piece better than
+                                another, and the bag shows it — so the reveal has to as well, or the
+                                card is quieter than the screen the player checks next. */}
+                            {w.kind === "gear" && w.rarity ? (
+                                <span className="gv-pop-sub">{w.rarity}</span>
+                            ) : null}
                         </span>
                     ))}
                     <span className="gv-pop-go">Tap to continue</span>
@@ -1281,6 +1425,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     browser in native full screen paints only the full-screen element's subtree, so a
                     card sent to the body is a sibling of the scene and never drawn. */}
                 {toolNode && mounted ? createPortal(toolNode, fsHost || document.body) : null}
+                {cardNode && mounted ? createPortal(cardNode, fsHost || document.body) : null}
                 <style>{GROVE_CSS}</style>
             </div>
         );
@@ -1309,6 +1454,7 @@ export default function GroveClient({ initial, initialView = null, initialTown =
 
             {popNode}
             {toolNode}
+            {cardNode}
             {note ? <p className="gv-note">{note}</p> : null}
 
             {townNode}

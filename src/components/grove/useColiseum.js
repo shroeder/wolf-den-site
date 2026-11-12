@@ -10,11 +10,21 @@ import { useCallback, useState } from "react";
 // on the frame the clock expires, and both are correct — but two settles means two sets of chests for one
 // key. The guard is here rather than in the scene because the scene is re-entered on every zone and would
 // lose it.
-export function useColiseum({ onChanged } = {}) {
+// ── ⚠️ IT CALLS BACK. IT DOES NOT PARK ANSWERS IN STATE ─────────────────────────────────────────────────────
+// This used to hold `result`, and three separate things were written into it: the key error, the run summary
+// and an opened chest's contents. `col.result` had ZERO readers in GroveClient for the whole life of the
+// Coliseum — so a player with no key tapped the gate and nothing happened on screen, the bell rang with no
+// score, and an opened chest vanished while its gear landed silently in the bag. The server was correct
+// every time; the answers went into a mailbox nobody opened. [[declared-but-never-read]]
+//
+// A callback cannot fail that way. `onResult` not being passed is visible at the call site, where the
+// handler would plainly be missing — state that nobody reads is invisible at every site at once. It also
+// takes the routing out of an effect: setState inside an effect body is a cascading render and the lint
+// says so, which is the same complaint from the other end.
+export function useColiseum({ onChanged, onResult } = {}) {
     const [run, setRun] = useState(null);        // { map, plan } while a run is live
     const [chests, setChests] = useState([]);
     const [busy, setBusy] = useState(false);
-    const [result, setResult] = useState(null);
     const [settled, setSettled] = useState(false);
 
     const post = useCallback(async (body) => {
@@ -47,7 +57,6 @@ export function useColiseum({ onChanged } = {}) {
     const start = useCallback(async (map) => {
         if (busy || run) return;
         setBusy(true);
-        setResult(null);
         try {
             const j = await post({ action: "start", map });
             if (j?.ok) {
@@ -55,12 +64,15 @@ export function useColiseum({ onChanged } = {}) {
                 setRun({ map, plan: j.plan });
                 onChanged?.();
             } else {
-                setResult({ error: j?.error === "no_key" ? "You need a key. The marshal hands one out daily." : (j?.error || "Could not start.") });
+                // ⚠️ THE REFUSAL IS A RESULT TOO, and it is the one that was costing the most: "no_key" is
+                // the ordinary state of the gate for most of every day, so the silent version of this made
+                // the Coliseum look broken rather than closed.
+                onResult?.({ error: j?.error === "no_key" ? "You need a key. The marshal hands one out daily." : (j?.error || "Could not start.") });
             }
         } finally {
             setBusy(false);
         }
-    }, [busy, run, post, onChanged]);
+    }, [busy, run, post, onChanged, onResult]);
 
     const finish = useCallback(async ({ wavesCleared, cleared }) => {
         if (settled || !run) return;
@@ -68,14 +80,14 @@ export function useColiseum({ onChanged } = {}) {
         const j = await post({ action: "settle", map: run.map, wavesCleared, cleared });
         setRun(null);
         if (j?.ok) {
-            setResult({ wavesCleared: j.wavesCleared, totalWaves: j.totalWaves, cleared: j.cleared });
+            onResult?.({ wavesCleared: j.wavesCleared, totalWaves: j.totalWaves, cleared: j.cleared });
             // Fetch the chests back rather than trusting the settle's own list — the ids are what the
             // open needs, and only the server knows them.
             const r = await fetch(`/api/marketplace/grove/coliseum?map=${run.map}`).then((x) => x.json()).catch(() => null);
             setChests(r?.chests || []);
         }
         onChanged?.();
-    }, [settled, run, post, onChanged]);
+    }, [settled, run, post, onChanged, onResult]);
 
     const open = useCallback(async (chestId) => {
         // Marked opening immediately: the round trip is long enough that a chest still looking shut is a
@@ -83,9 +95,9 @@ export function useColiseum({ onChanged } = {}) {
         setChests((cs) => cs.map((c) => (c.id === chestId ? { ...c, opening: true } : c)));
         const j = await post({ action: "open", chestId });
         setChests((cs) => cs.filter((c) => c.id !== chestId));
-        if (j?.ok) { setResult({ opened: j }); onChanged?.(); }
+        if (j?.ok) { onResult?.({ opened: j }); onChanged?.(); }
         return j;
-    }, [post, onChanged]);
+    }, [post, onChanged, onResult]);
 
-    return { run, chests, busy, result, start, finish, open, takeKey, clearResult: () => setResult(null) };
+    return { run, chests, busy, start, finish, open, takeKey };
 }

@@ -135,13 +135,20 @@ const COLISEUM_TIERS = ["mossbound", "barrowed", "warrenspun", "heartwrought"];
         ok: true,
         tier: row.tier,
         map: Number(row.map_n),
-        // ⚠️ AN ARRAY, AND `parts`/`overflow` ARE GONE FROM THE SHAPE — WHICH BREAKS NO SCREEN, BECAUSE
-        // THERE IS NO SCREEN. useColiseum puts this into `result` via setResult({ opened: j }) and
-        // nothing reads `col.result` anywhere in GroveClient: grepped, zero call sites. So a member
-        // opens a chest and is told nothing at all about what was in it — the same
-        // [[declared-but-never-read]] as the marker above, one layer up, and the reason the dead gear
-        // went unnoticed for so long. Not fixed here: a result screen is a thing to BUILD, not a line
-        // to change, and it wants Luke's eye. Logged in docs/grove-feedback-backlog.md.
+        // ── ⚠️ AND IT IS ON A SCREEN NOW, 2026-11-12 ────────────────────────────────────────────
+        // For the whole life of the Coliseum this array went into useColiseum's `result` and nothing
+        // read `col.result` anywhere in GroveClient — zero call sites. A member opened a chest and was
+        // told nothing at all about what was in it, which is the same [[declared-but-never-read]] as
+        // the dead gear marker above, one layer up, and the reason that bug survived so long.
+        //
+        // The hook reports through an `onResult` callback now and the Grove feeds this straight into
+        // the kill bar's own chest sequence: the tier's painted sprite rattles, loses the fight, and
+        // opens onto these pieces drawn with ItemArt. So the shape below is READ, and changing it is a
+        // change to something visible — which is the state it should have been in all along.
+        //
+        // ⚠️ `gear: []` IS A REAL CASE AND THE SCREEN HANDLES IT. An unbuilt map has no gear table and
+        // the row above is already spent by the time we know, so the card says "Nothing but dust"
+        // rather than opening onto a blank.
         gear,
     };
 }
