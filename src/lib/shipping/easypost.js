@@ -17,7 +17,7 @@ import { createServerLogger } from "@/lib/server-logger";
 // Optional:
 //   SHOP_SHIP_FROM_STREET2, SHOP_SHIP_FROM_PHONE
 //   EASYPOST_PARCEL_BASE_OZ     packaging weight (default 3)
-//   EASYPOST_PARCEL_PER_ITEM_OZ per-item weight (default 1)
+//   EASYPOST_PARCEL_SAFETY      over-declare multiplier on contents weight (default 1.25, min 1)
 
 const EASYPOST_API_BASE = "https://api.easypost.com/v2";
 const easyPostLogger = createServerLogger({ source: "api", subsystem: "easypost" });
@@ -103,64 +103,197 @@ async function easyPostFetch(path, init = {}) {
     return payload;
 }
 
-// Estimate parcel weight from what's in the cart. This is intentionally a rough heuristic — most
-// card orders are light (a mailer + a few singles). Owner can tune it via env without a code change.
-export function estimateParcelWeightOz(items) {
-    const baseOz = Number(process.env.EASYPOST_PARCEL_BASE_OZ);
-    const perItemOz = Number(process.env.EASYPOST_PARCEL_PER_ITEM_OZ);
-    const base = Number.isFinite(baseOz) && baseOz > 0 ? baseOz : 3;
-    const perItem = Number.isFinite(perItemOz) && perItemOz >= 0 ? perItemOz : 1;
-
-    const itemCount = (items || []).reduce((sum, item) => sum + Math.max(1, Number(item?.quantity || 1)), 0);
-    const estimate = base + perItem * itemCount;
-
-    // Keep within sane bounds so a bad input can't produce absurd postage.
-    return Math.min(1120, Math.max(1, Math.round(estimate)));
-}
-
-// ── WHAT WE ACTUALLY PUT IN THE BOX ──────────────────────────────────────────────────────────────────────────
-// Every order used to be quoted as the same 9x6x1 mailer at 3oz + 1oz an item, and the LABEL is bought against
-// that same shipment — so a plush or a sealed box went out on postage priced for a flat envelope and the
-// carrier billed the difference back to the shop. Shipping is supposed to be cost-neutral; under-declaring
-// made it a quiet loss on exactly the biggest orders.
+// ── ⚠️ SIZING A PARCEL WHEN NOTHING ANYWHERE KNOWS HOW BIG ANYTHING IS ───────────────────────────────────────
+// Eric, 2026-11-12, after a $56 label on an order that charged $12: "we need to find a way to intelligently
+// predict shipping cost so that we don't end up eating shipping costs in the future."
 //
-// There is no weight or dimension data anywhere in the catalogue, so the only honest signal is the Square
-// CATEGORY, which every cart line already carries. Profiles below are keyed off the real category names in
-// stock (744 Pokemon Single Card, 43 Pokemon Sealed, 20 Accessories, 4 Plush, and so on).
+// ⚠️ THERE IS NO SOURCE OF DIMENSIONS, AND ALL THREE CANDIDATES WERE CHECKED BEFORE THIS WAS WRITTEN:
+//   · Square item variations carry name, sku and price. No weight, no dimensions, no measurement unit.
+//   · tcg_cards carries name, number, rarity, image, market price and a upc. No weight, no dimensions.
+//   · tcgcsv.com, which is where tcg_cards comes from, publishes exactly these extendedData fields:
+//     Attack 1, Attack 2, Card Type, CardText, HP, Number, Rarity, Resistance, RetreatCost, Stage, UPC,
+//     Weakness. Every one is a gameplay attribute. ("HP" is hit points. It is not a weight.)
+// So this cannot be made accurate. Do not go looking again; the answer is written down here.
 //
-// The parcel is the LARGEST profile in the cart, and the weight is the sum of the lines — a mailer of singles
-// stays a mailer, and one plush in with them makes it a box.
-const PROFILES = [
-    { key: "mailer", match: /single|^magic |^pokemon card|comic/i, oz: 1, l: 9, w: 6, h: 1, rank: 0 },
-    { key: "rigid", match: /art|painting|playmat/i, oz: 6, l: 12, w: 10, h: 1.5, rank: 1 },
-    { key: "small_box", match: /accessor|pack|drink|food/i, oz: 4, l: 9, w: 7, h: 3, rank: 2 },
-    { key: "box", match: /sealed|box|bundle|tin|figure|plush/i, oz: 12, l: 12, w: 9, h: 5, rank: 3 },
+// ⚠️ WHICH MAKES THE GOAL "NEVER UNDER-DECLARE", NOT "BE RIGHT". The shop buys the label against this exact
+// parcel, so an under-declaration is not a bad guess — it is a bill from USPS weeks later that nobody
+// connects to the order. Over-declaring costs the buyer a little at checkout and costs the shop nothing.
+// Every constant below is deliberately at the generous end, and every choice resolves upward.
+//
+// ── WHAT THE OLD ONE GOT WRONG, BECAUSE IT IS THE WHOLE BUG ──────────────────────────────────────────────────
+// It took the LARGEST profile in the cart and used its length/width/height as the box, full stop. Weight
+// summed; size did not. One booster display and three booster displays declared the same 12x9x5 — and every
+// shipping order the shop has ever taken but one declared that identical box. Three $400 Collector Booster
+// Displays went out declared at 39oz. They are nearer seven pounds.
+
+// How much the packaging itself weighs, before anything goes in it.
+const PACKAGING_OZ = 3;
+
+// Air, bubble wrap and the fact that nothing stacks perfectly. Contents never fill a box.
+const PACKING_FACTOR = 1.3;
+
+// ── ESTIMATOR 1: THE PRODUCT TYPE, READ OFF ITS NAME ─────────────────────────────────────────────────────────
+// TCGplayer names are rigidly structured, which is the one piece of luck in this whole problem: "Collector
+// Booster Display", "Elite Trainer Box", "Booster Bundle", "Commander Deck". Twenty-odd patterns written once
+// cover nearly all sealed product, now and in future, with nothing to maintain as stock changes.
+//
+// ⚠️ THE NUMBERS ARE THE PRODUCT, NOT THE PARCEL, AND THE MARGIN IS APPLIED SEPARATELY. The first draft of
+// this table had the padding baked into every constant AND then multiplied by PACKING_FACTOR and the safety
+// factor on top — one booster box came out wanting a 14x12x8 at 58oz, which is about three times the truth
+// and the kind of quote that loses a sale rather than saving one. These are the item as it sits on a shelf;
+// over-declaring is PACKING_FACTOR and EASYPOST_PARCEL_SAFETY's job, so the margin stays visible and tunable
+// in one place instead of being spread invisibly across thirteen rows.
+//
+// ⚠️ ORDER MATTERS: FIRST MATCH WINS, SO THE BIG THINGS ARE LISTED FIRST. "Booster Display Case" contains
+// "Booster Display", and a case is an order of magnitude bigger than a display. Anything that reads as both
+// must resolve as the larger.
+const TYPES = [
+    { re: /master case|display case|case/i,                         oz: 300, in3: 2600 },
+    { re: /collector booster display|booster display|booster box/i,     oz: 34,  in3: 250 },
+    { re: /elite trainer box|etb|ultra premium|premium collection/i, oz: 28,  in3: 250 },
+    { re: /booster bundle|bundle|gift box|holiday calendar/i,       oz: 20,  in3: 170 },
+    { re: /poster collection|poster/i,                              oz: 12,  in3: 130 },
+    { re: /binder|portfolio|album/i,                                    oz: 20,  in3: 150 },
+    { re: /tin|collection box|figure/i,                             oz: 14,  in3: 95 },
+    { re: /commander deck|starter deck|theme deck|battle deck|deck/i, oz: 12, in3: 80 },
+    { re: /playmat|mat/i,                                           oz: 10,  in3: 110 },
+    { re: /plush|squish|needoh|stress ball|squeezy/i,               oz: 5,   in3: 70 },
+    { re: /sleeve|deck box|toploader|card saver/i,                      oz: 6,   in3: 55 },
+    { re: /sleeved booster|blister|booster pack|pack/i,             oz: 3,   in3: 12 },
+    { re: /bulk/i,                                                      oz: 14,  in3: 45 },
 ];
-const DEFAULT_PROFILE = PROFILES[0];
-
-function profileFor(item) {
-    const label = `${item?.categoryName || ""} ${item?.name || ""}`;
-    // Biggest match wins for a single line too — "Pokemon Sealed" contains "sealed" and must not read as a single.
-    let best = null;
-    for (const p of PROFILES) if (p.match.test(label) && (!best || p.rank > best.rank)) best = p;
-    return best || DEFAULT_PROFILE;
+// ── ESTIMATOR 2: THE PRICE ───────────────────────────────────────────────────────────────────────────────────
+// The scalable one, and the only estimator that covers a product nobody has described to this file. For
+// SEALED product, price tracks physical bulk closely — a $400 line is a display, a $5 line is a pack — and it
+// keeps working for the 500 manually-SKU'd items that are in no catalogue at all.
+//
+// ⚠️ NEVER APPLIED TO SINGLES. An $800 Charizard is one card in a toploader. Price is a bulk signal only once
+// something is known not to be a single, which the Square category already says.
+function byPrice(unitCents) {
+    const dollars = Math.max(0, Number(unitCents) || 0) / 100;
+    return {
+        oz: Math.min(300, Math.max(3, dollars * 0.09)),
+        in3: Math.min(2600, Math.max(12, dollars * 0.7)),
+    };
 }
 
-export function buildParcel(items) {
-    const lines = items || [];
-    let biggest = DEFAULT_PROFILE;
-    let oz = Number(process.env.EASYPOST_PARCEL_BASE_OZ);
-    oz = Number.isFinite(oz) && oz > 0 ? oz : 3;   // packaging itself
-    for (const it of lines) {
-        const p = profileFor(it);
-        if (p.rank > biggest.rank) biggest = p;
-        oz += p.oz * Math.max(1, Number(it?.quantity || 1));
+// ── ESTIMATOR 3: THE SQUARE CATEGORY ─────────────────────────────────────────────────────────────────────────
+// What this file used to do on its own, kept as the floor so nothing can estimate BELOW what today already
+// declares. A line that matches no name pattern and has no useful price still lands here.
+const CATEGORIES = [
+    { re: /single|^magic |^pokemon card|comic/i, oz: 1,  in3: 2 },
+    { re: /art|painting|playmat/i,               oz: 6,  in3: 110 },
+    { re: /accessor|pack|drink|food/i,           oz: 4,  in3: 55 },
+    { re: /sealed|box|bundle|tin|figure|plush/i, oz: 12, in3: 160 },
+];
+const isSingle = (categoryName) => /single/i.test(String(categoryName || ""));
+
+/**
+ * The per-unit estimate for one cart line: the HIGHEST of everything that has an opinion.
+ *
+ * ⚠️ max(), NOT a priority order, AND THAT IS THE SAFETY PROPERTY. Any one estimator reading low cannot cost
+ * the shop money, because another has to agree before the number comes down. The Unova Poster Collection is
+ * the worked example: $28 makes the price curve guess small, and the name pattern knows a poster collection
+ * is bulky. The bulky answer wins.
+ */
+export function estimateUnit(item) {
+    const name = String(item?.name || "");
+    const category = String(item?.categoryName || "");
+    const label = category + " " + name;
+    let oz = 0;
+    let in3 = 0;
+
+    const type = TYPES.find((t) => t.re.test(label));
+    if (type) { oz = Math.max(oz, type.oz); in3 = Math.max(in3, type.in3); }
+
+    const cat = CATEGORIES.find((c) => c.re.test(label));
+    if (cat) { oz = Math.max(oz, cat.oz); in3 = Math.max(in3, cat.in3); }
+
+    if (!isSingle(category)) {
+        const unitCents = Number(item?.priceCents ?? item?.unitPriceCents ?? 0);
+        const priced = byPrice(unitCents);
+        oz = Math.max(oz, priced.oz);
+        in3 = Math.max(in3, priced.in3);
     }
+
+    // Nothing matched at all: treat it as a small boxed item rather than as a card, because a thing this file
+    // has never heard of is far more likely to be merchandise than a single.
+    if (!oz) { oz = 6; in3 = 80; }
+    return { oz, in3 };
+}
+
+// ── THE BOXES THE SHOP ACTUALLY HAS ──────────────────────────────────────────────────────────────────────────
+// Smallest that fits wins. `in3` is USABLE capacity, already short of length x width x height, because the
+// declared dimensions have to be the real outside of the box regardless of how well it was packed.
+const BOXES = [
+    { l: 9, w: 6, h: 1, in3: 50 },
+    { l: 9, w: 7, h: 3, in3: 170 },
+    { l: 12, w: 9, h: 5, in3: 480 },
+    { l: 14, w: 12, h: 8, in3: 1200 },
+    { l: 18, w: 14, h: 12, in3: 2700 },
+    { l: 20, w: 16, h: 14, in3: 4400 },
+];
+
+/** Everything the shop would put in the box, before packaging and before the safety factor. */
+export function estimateContents(items) {
+    let oz = 0;
+    let in3 = 0;
+    for (const item of items || []) {
+        const qty = Math.max(1, Number(item?.quantity || 1));
+        const unit = estimateUnit(item);
+        // ⚠️ BOTH MULTIPLY BY QUANTITY. The old code multiplied weight and not size, which is the entire
+        // defect this rewrite exists to fix.
+        oz += unit.oz * qty;
+        in3 += unit.in3 * qty;
+    }
+    return { oz, in3 };
+}
+
+function safetyFactor() {
+    const raw = Number(process.env.EASYPOST_PARCEL_SAFETY);
+    // Deliberately >= 1: this knob may make the shop safer, never less safe.
+    return Number.isFinite(raw) && raw >= 1 ? raw : 1.25;
+}
+
+/** The full picture, so a caller can show its working rather than just a box. */
+export function parcelEstimate(items) {
+    const base = Number(process.env.EASYPOST_PARCEL_BASE_OZ);
+    const packaging = Number.isFinite(base) && base > 0 ? base : PACKAGING_OZ;
+    const contents = estimateContents(items);
+    const safety = safetyFactor();
+
+    const weight = (contents.oz * safety) + packaging;
+    const needed = contents.in3 * PACKING_FACTOR;
+    // Smallest box that fits; the biggest one if nothing does, because there is no "too big to post" branch
+    // and a clamped size is still better than a 9x6x1 envelope.
+    const box = BOXES.find((b) => b.in3 >= needed) || BOXES[BOXES.length - 1];
+    return { weight, box, contentsOz: contents.oz, contentsIn3: contents.in3, neededIn3: needed, safety };
+}
+
+/**
+ * Weight only, for anywhere that wants a number without a box.
+ *
+ * Kept as an export because it always was one; it now answers off the same estimators as the parcel, so the
+ * two can never disagree.
+ */
+export function estimateParcelWeightOz(items) {
+    return Math.min(1120, Math.max(1, Math.round(parcelEstimate(items).weight)));
+}
+
+/**
+ * The parcel handed to EasyPost, and the one the label is later bought against.
+ *
+ * ⚠️ THE ENV OVERRIDES PIN THE BOX AND DEFEAT ALL OF THE ABOVE. They predate this and are kept so a bad
+ * estimate can be forced to a known box without a deploy — but setting them turns a three-item order and a
+ * thirty-item order back into the same parcel, which is what caused the problem. Prefer EASYPOST_PARCEL_SAFETY.
+ */
+export function buildParcel(items) {
+    const { weight, box } = parcelEstimate(items);
     return {
-        weight: Math.min(1120, Math.max(1, Math.round(oz))),
-        length: Number(process.env.EASYPOST_PARCEL_LENGTH_IN) || biggest.l,
-        width: Number(process.env.EASYPOST_PARCEL_WIDTH_IN) || biggest.w,
-        height: Number(process.env.EASYPOST_PARCEL_HEIGHT_IN) || biggest.h,
+        weight: Math.min(1120, Math.max(1, Math.round(weight))),
+        length: Number(process.env.EASYPOST_PARCEL_LENGTH_IN) || box.l,
+        width: Number(process.env.EASYPOST_PARCEL_WIDTH_IN) || box.w,
+        height: Number(process.env.EASYPOST_PARCEL_HEIGHT_IN) || box.h,
     };
 }
 

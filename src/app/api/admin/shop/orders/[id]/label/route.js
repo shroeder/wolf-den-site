@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getShopOrderById, setShopOrderShippingLabel } from "@/lib/shop-orders";
 import { sendOrderStatusEmail } from "@/lib/shop-order-email.js";
-import { buyShippingLabel, getShipment, isEasyPostEnabled } from "@/lib/shipping/easypost";
+import { buildParcel, buyShippingLabel, getShipment, isEasyPostEnabled } from "@/lib/shipping/easypost";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -166,6 +166,33 @@ export async function POST(request, { params }) {
                     insuranceCents: Number(order.insurance_cents) || 0,
                 });
             }
+
+            // ── ⚠️ WHAT WE GUESSED, AGAINST WHAT IT ACTUALLY COST ────────────────────────────────────
+            // Nothing anywhere knows how big a booster box is (see the header of shipping/easypost.js), so
+            // the parcel handed to EasyPost is an estimate with a deliberate safety margin on it. The only
+            // way that margin ever gets tuned is by someone being able to see whether it is winning, and
+            // the moment the truth exists is right here: the label has a real price on it.
+            //
+            // Logged rather than stored, deliberately — a column would need a migration and this answers the
+            // question ("am I still eating postage?") from logs the admin already reads. If it turns out to
+            // be asked weekly, THEN it earns a column.
+            try {
+                const chargedCents = Number(order.shipping_cents) || 0;
+                const paidCents = Number(label.amountCents) || 0;
+                const parcel = buildParcel(order.items_json || []);
+                logger.info("admin.shop.order.label.margin", {
+                    orderId: id,
+                    chargedCents,
+                    paidCents,
+                    marginCents: chargedCents - paidCents,
+                    // Negative means the shop ate the difference, which is the thing being hunted.
+                    shopAteIt: paidCents > chargedCents,
+                    declaredWeightOz: parcel.weight,
+                    declaredBox: `${parcel.length}x${parcel.width}x${parcel.height}`,
+                    carrier: label.carrier,
+                    service: label.service,
+                });
+            } catch { /* a log that breaks a bought label is worse than no log */ }
 
             // ⚠️ IF THIS WRITE FAILS THE LABEL IS STILL BOUGHT. It must not take the response down with
             // it: the URL is returned either way, and the recovery path above means the next attempt finds
