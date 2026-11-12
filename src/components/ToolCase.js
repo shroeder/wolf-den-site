@@ -104,13 +104,13 @@ export default function ToolCase({ toolCase }) {
                 expected to be retuned. */}
             {held < total ? (
                 <p className="toolcase-foot">
-                    Earn the rest by clearing enemies in the Grove — a bar fills as you fight, and each time it
-                    fills you get the next tool for that map&apos;s tier.
+                    Earn the rest by clearing enemies in the Grove — a bar fills as you fight, and each time
+                    it fills one tool goes up a tier. The map you are in sets how high they can go.
                 </p>
             ) : (
                 <p className="toolcase-foot">
-                    Every tool for your depth is earned. Going deeper raises their tiers; a full bar now pays a
-                    chest instead.
+                    Every tool is up to this map&apos;s tier. Going deeper raises the ceiling and the bar
+                    starts climbing them again; until then a full bar pays a chest instead.
                 </p>
             )}
         </div>
