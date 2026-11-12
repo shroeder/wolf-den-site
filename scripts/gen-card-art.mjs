@@ -25,7 +25,7 @@
 import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
-import { IMAGE_MODEL } from "./lib/image-model.mjs";
+import { IMAGE_MODEL, imagePricePerMtok } from "./lib/image-model.mjs";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
 import { CURSE_CARDS, POOL, STATUS_CARDS } from "../src/lib/marketplace/cards-kit.js";
 import "./lib/ai-trace.mjs";
@@ -277,7 +277,12 @@ for (const [id, subject] of JOBS) {
         .resize(512, 341, { fit: "cover", position: "attention" })
         .webp({ quality: 86 }).toBuffer();
     fs.writeFileSync(dest, buf);
-    made += 1; spent += 0.063;
+    // ⚠️ OFF THE MODEL, NOT A LITERAL. This was 0.063 -- gpt-image-1's rate -- so the first run on
+    // gpt-image-1.5 printed $0.19 for three images that cost $0.15. A second hardcoded price in a
+    // second file is exactly the fault image-model.mjs was written to end; 1568 is the token count
+    // for this size and quality (ai-trace's IMG_TOKENS), which is the only reason it reads as a
+    // literal here.
+    made += 1; spent += 1568 * (imagePricePerMtok(IMAGE_MODEL) / 1e6);
     console.log(`  ${id.padEnd(10)} ${(buf.length / 1024).toFixed(0)}kb`);
 }
 console.log(`\ndrew ${made}, skipped ${skipped} (already on disk; --force to redraw) — about $${spent.toFixed(2)}`);
