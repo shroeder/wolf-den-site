@@ -29073,6 +29073,40 @@ body.cas-seated .social-fab { display: none; }
     color: #1A1403;
 }
 
+/* -- AND WHAT IT LOOKS LIKE WHILE THE OTHER STOREFRONT IS BEING FETCHED ----------------------------------
+   Switching to Browse re-renders a page holding all 1,798 in-stock items -- 863 KB of HTML, measured in
+   shop/page.js, whose own note says the stall is the browser hydrating them and that it lands hardest on a
+   phone. So the wait is real and it is seconds, and this control used to acknowledge it with NOTHING: it
+   set a busy flag that no part of its own markup ever read. Eric, on the storefront: "it lags and has no
+   loader when switching between swipe and browse."
+
+   WARNING: THE LABEL FADES, IT DOES NOT LEAVE. Swapping the word out for a spinner changes the pill's
+   width mid-tap, which moves the OTHER half out from under a thumb already on its way to it. The spinner
+   is absolutely positioned over a dimmed label instead, so nothing reflows and the word stays readable. */
+.sms-opt { position: relative; }
+
+.sms-opt[aria-busy="true"] .sms-label { opacity: 0.25; }
+
+.sms-spin {
+    position: absolute;
+    inset: 0;
+    width: 18px;
+    height: 18px;
+    margin: auto;
+    border-radius: 50%;
+    /* Dark ink on gold: the spinning half is always the lit one, so it carries the filled treatment above. */
+    border: 2px solid rgba(26, 20, 3, 0.25);
+    border-top-color: #1A1403;
+    animation: smsSpin 620ms linear infinite;
+}
+
+@keyframes smsSpin { to { transform: rotate(360deg); } }
+
+/* The half you did NOT tap, while the switch is working. Dimmed rather than hidden -- a two-position
+   switch with one position missing stops reading as a switch. */
+.sms-opt:disabled { cursor: default; }
+.sms-opt:disabled:not(.sms-on) { opacity: 0.4; }
+
 .shop-try-new {
     display: flex;
     flex-direction: column;
