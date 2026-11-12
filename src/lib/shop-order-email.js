@@ -522,6 +522,59 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
     });
 }
 
+/**
+ * One line of an order could not be filled, so it was refunded and the rest shipped anyway.
+ *
+ * ⚠️ NOT sendOrderCancelledEmail, WHICH IS THE ONE THAT WAS ALREADY HERE AND IS WRONG FOR THIS. That one
+ * says "your order was cancelled" and lists the whole basket. Sent to somebody whose parcel is already in
+ * the post with eleven of twelve items in it, that reads as "your parcel is not coming" — the opposite of
+ * what happened, to a customer who is already mildly let down. Eric, 2026-11-12, on the first one of these:
+ * "an email to the customer apologizing for the inconvenience and noting that we're refunding the item we
+ * did not have in stock."
+ *
+ * ⚠️ IT NAMES THE ONE ITEM AND NOT THE BASKET. The whole point is that everything else is fine, so listing
+ * everything invites a re-read of an order that no longer needs checking.
+ *
+ * ⚠️ AND IT DOES NOT PROMISE A RESHIP. We did not have it; whether it comes back into stock is not a thing
+ * this email can know, and "we'll send it when it arrives" is a promise nobody is tracking.
+ *
+ * The refund amount is passed in rather than read off the order, because a PARTIAL refund has nowhere to
+ * live on shop_orders yet — refund_id and refund_amount_cents are read by the cancel flow as "this order was
+ * cancelled". Until that path exists the number comes from whoever issued the refund in Square.
+ */
+export async function sendOrderItemRefundedEmail(order, { itemName, refundAmountCents } = {}) {
+    const resend = getResendClient();
+    const to = recipientEmail(order);
+    if (!resend || !to || !itemName) {
+        return false;
+    }
+    const name = buyerName(order);
+    const shipped = String(order?.fulfillment_status || "") === "shipped";
+    const html = shellHtml(`
+        <h1>One item in your order was out of stock</h1>
+        <p>${name ? `Hi ${escapeHtml(name.split(" ")[0])},` : "Hi,"}</p>
+        <p>We&rsquo;re sorry &mdash; when we went to pack order <strong>#${shortId(order.id)}</strong> we could not
+           find one of the cards on it:</p>
+        <ul><li><strong>${escapeHtml(itemName)}</strong></li></ul>
+        <p>Our stock count was wrong, and that is our mistake rather than anything to do with your order.
+           We&rsquo;ve refunded <strong>${money(refundAmountCents)}</strong> for it &mdash; the item plus the
+           sales tax charged on it &mdash; to your original payment method. Refunds usually take a few
+           business days to show up on a card statement.</p>
+        <p>${shipped
+            ? "Everything else on the order has already shipped, and the tracking number is in the shipping email we sent you."
+            : "Everything else on the order is unaffected and is on its way."}</p>
+        <p>Sorry again for the inconvenience.</p>
+        <p style="color:#777;font-size:13px;">Questions? Just reply to this email and it comes straight to us.</p>
+    `);
+    return deliver({
+        kind: "item_refunded",
+        orderId: order?.id || null,
+        to,
+        subject: `An item on your Wolf Den order #${shortId(order.id)} was out of stock — refunded`,
+        html,
+    });
+}
+
 /** Owner alert: a customer requested to cancel an order (owner decides whether to honor it). */
 // ⚠️ THE TWO OWNER ALERTS BELOW ARE DELIBERATELY NOT SHELLED. They go to Luke, not to a customer: a
 // logo and a gold footer on an internal alert is a slower read and a taller phone notification, and there is
