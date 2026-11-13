@@ -151,6 +151,10 @@
     {
       "path": "/api/jobs/vault-expiry",
       "schedule": "25 * * * *"
+    },
+    {
+      "path": "/api/jobs/outreach?apply=1",
+      "schedule": "0 16 * * *"
     }
   ]
 }
