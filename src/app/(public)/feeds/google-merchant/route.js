@@ -1,3 +1,4 @@
+import { parcelEstimate } from "@/lib/shipping/easypost";
 import { listShopFeedItems } from "@/lib/inventory-feed/feed";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 import { SITE_URL } from "@/lib/site";
@@ -15,6 +16,36 @@ function esc(value) {
 }
 
 const GOOGLE_CARD_CATEGORY = "Toys &amp; Games &gt; Games &gt; Card Games";
+
+// ── ⚠️ SHIPPING WEIGHT, FROM THE SAME ESTIMATOR THAT QUOTES THE REAL LABEL ──────────────────────────────────
+// Google Merchant Center, 2026-11-12: 1,820 products — 92.7% of the feed — blocked from showing in the US
+// for a missing [shipping_weight]. Every one of them is a product that could not appear in a search result.
+//
+// ⚠️ IT IS NOT A NEW GUESS. src/lib/shipping/easypost.js already estimates what a parcel weighs, per item,
+// from the item's name, its Square category and its price — and that estimate is the one the shop BILLS
+// against: it is what EasyPost is handed when a customer buys. A second table of weights invented here
+// would be a second answer to "what does this weigh", and the two would drift the first time either was
+// tuned. [[balance-constants-never-copied]]
+//
+// ⚠️ ONE UNIT, IN A BOX, WHICH IS WHAT THE ATTRIBUTE MEANS. parcelEstimate takes a basket, so it is handed
+// a basket of one. That includes the packaging weight and the safety factor, because a shipping weight that
+// excludes the box is a number nobody can post anything at — and Google uses this to quote the shopper.
+//
+// ⚠️ AND IT IS DECLARED IN OUNCES. The estimator works in oz throughout; converting to pounds here would
+// round a 3 oz single to 0.19 lb and hand Google a figure with more precision than the estimate has.
+function shippingWeightOz(item) {
+    const estimate = parcelEstimate([{
+        name: item.name,
+        // estimateUnit matches on category + name as one string; the feed carries a list.
+        categoryName: (item.categoryNames || []).join(" "),
+        // Price is the fallback signal for anything the name and category do not recognise, and it is the
+        // one that catches sealed product. The feed stores dollars.
+        priceCents: Math.round(Number(item.price || 0) * 100),
+        quantity: 1,
+    }]);
+    // A whole ounce. The estimate is not precise enough to pretend otherwise, and Google is happy with it.
+    return Math.max(1, Math.round(estimate.weight));
+}
 
 // Loose singles are second-hand (no original packaging) -> "used"; everything else -> "new".
 function conditionFor(categoryNames) {
@@ -53,6 +84,7 @@ export async function GET() {
                 `      <g:image_link>${esc(item.imageUrl)}</g:image_link>`,
                 "      <g:availability>in_stock</g:availability>",
                 `      <g:price>${item.price.toFixed(2)} USD</g:price>`,
+                `      <g:shipping_weight>${shippingWeightOz(item)} oz</g:shipping_weight>`,
                 `      <g:condition>${conditionFor(item.categoryNames)}</g:condition>`,
                 "      <g:identifier_exists>no</g:identifier_exists>",
                 brand ? `      <g:brand>${esc(brand)}</g:brand>` : "",
