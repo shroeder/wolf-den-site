@@ -349,7 +349,8 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
     // hasUnavailableItems the way the limit above does.
     const preorderArrivesOn = cartPreorderDate(items, itemRules);
     const preorderNote = preorderSentence(preorderArrivesOn, effectiveMode);
-    const shippingCents = shopShippingCents(subtotalCents, effectiveMode);
+    // ⚠️ ITEMS, NOT JUST THE SUBTOTAL — postage is priced on weight. See shopShippingCents.
+    const shippingCents = shopShippingCents(subtotalCents, effectiveMode, items);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
 
     return {

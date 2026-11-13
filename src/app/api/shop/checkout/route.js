@@ -10,6 +10,7 @@ import {
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
+import { OWN_SHIPPING } from "@/lib/shipping/own-shipping";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { awardPurchaseXp, resolveBuyerId } from "@/lib/marketplace/xp.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
@@ -350,7 +351,11 @@ export async function POST(request) {
             let shippingCarrier = null;
             let shippingService = null;
 
-            if (fulfillment.fulfillmentMode === "shipping" && isEasyPostEnabled()) {
+            // ⚠️ BOTH SWITCHES, OR CHECKOUT REFUSES EVERY SHIPPED ORDER. The rates endpoint stops offering
+            // options under OWN_SHIPPING, so a checkout that still required `shippingRateId` would reject
+            // the whole basket with "Please select a shipping option" against a screen that no longer has
+            // one. The door and the thing behind it have to agree. [[feature-gates-come-in-pairs]]
+            if (fulfillment.fulfillmentMode === "shipping" && isEasyPostEnabled() && !OWN_SHIPPING) {
                 const shipmentId = String(body?.easyPostShipmentId || "").trim();
                 const rateId = String(body?.shippingRateId || "").trim();
 

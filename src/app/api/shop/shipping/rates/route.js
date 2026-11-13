@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { getCartSummary, resolveActiveCartId } from "@/lib/shop-carts";
 import { getShippingRates, isEasyPostEnabled } from "@/lib/shipping/easypost";
+import { OWN_SHIPPING } from "@/lib/shipping/own-shipping";
 import { isTrustedWriteRequest } from "@/lib/request-security";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -20,8 +21,9 @@ function jsonNoStore(body, init = {}) {
     });
 }
 
-// Live USPS rates for the buyer's address + current cart. Returns { enabled, rates, shipmentId }.
-// When EasyPost isn't configured we return enabled:false so the client keeps its flat-rate flow.
+// Live carrier rates for the buyer's address + current cart. Returns { enabled, rates, shipmentId }.
+// enabled:false means the client keeps the cart's own shipping figure — which is now the normal case, see
+// OWN_SHIPPING in shipping/own-shipping.js.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/shop/shipping/rates", async ({ internalError }) => {
         if (!isTrustedWriteRequest(request)) {
@@ -32,7 +34,14 @@ export async function POST(request) {
             return jsonNoStore({ error: "Payments are currently disabled." }, { status: 403 });
         }
 
-        if (!isEasyPostEnabled()) {
+        // ── ⚠️ THE SHOP PRICES ITS OWN POSTAGE NOW ──────────────────────────────────────────────────────
+        // `enabled: false` is the same answer the client already handles for "EasyPost is not configured",
+        // and it is the right one here: the cart's own banded figure stands, no option list is drawn, and
+        // nobody is asked to choose a service the shop was not going to buy. 1 label of 13 orders.
+        //
+        // It also returns BEFORE the EasyPost call, so a rate nobody will see is not paid for in latency on
+        // the one screen a buyer is waiting on.
+        if (OWN_SHIPPING || !isEasyPostEnabled()) {
             return jsonNoStore({ enabled: false, rates: [], shipmentId: null });
         }
 
