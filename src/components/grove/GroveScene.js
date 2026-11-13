@@ -574,6 +574,19 @@ export default function GroveScene({
     // this file is built to avoid — the same rule as .gv-status and .gv-ehp on the bodies.
     const [waveNow, setWaveNow] = useState(0);
     const clockRef = useRef(null);
+    // ── ⚠️ LEAVING MID-RUN USED TO THROW THE WHOLE RUN AWAY, SILENTLY ──────────────────────────────
+    // Luke, 2026-11-12: "If you leave early it should try and let you know."
+    //
+    // It was worse than no warning. `leave()` tears the session down, the scene unmounts, and onRunEnd —
+    // the ONLY thing that settles a Coliseum run — never fires. So the key was spent, the waves already
+    // cleared paid nothing, no card appeared, and `col.run` stayed set in useColiseum: `start()` begins
+    // with `if (busy || run) return`, so the member could not start another run until they reloaded the
+    // page. One tap on Leave and the Coliseum was shut for the session, with no message of any kind.
+    //
+    // So the ask does two jobs: it tells them, and confirming SETTLES rather than abandons. The settle
+    // goes through onRunEnd, the same call the bell makes, because a second way to end a run is a second
+    // set of rules about what it pays. [[atomic-split-into-steps-drops-lines]]
+    const [leaveAsk, setLeaveAsk] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
     // ⚠️ KEYED ON THE TROPHY ITSELF so a second emblem during the first one's hold restarts the moment
     // rather than being swallowed — rare twice in a row is the best thing that can happen and must not
@@ -4351,6 +4364,47 @@ export default function GroveScene({
                 )}
             </div>
 
+            {/* ── ⚠️ THE ASK, AND IT PAYS RATHER THAN PUNISHES ──────────────────────────────────
+                Luke: "If you leave early it should try and let you know."
+
+                It states the thing the member cannot see — the key is already spent, and the chests
+                ride on waves CLEARED, not on finishing — and then does the decent thing with it:
+                confirming settles the run at whatever is cleared, so walking out with three waves
+                down pays the same chest that standing still until the bell would have paid.
+
+                ⚠️ IT STOPS ITS OWN POINTERDOWN. The scene root is a walk order; an overlay that does
+                not swallow its taps sends the hero off toward the bottom of the screen behind it.
+                That has bitten the HUD and the dock already. */}
+            {leaveAsk ? (
+                <div className="gv-ask" onPointerDown={(e) => e.stopPropagation()}>
+                    <div className="gv-ask-card">
+                        <b>The clock is still running</b>
+                        <p>
+                            {leaveAsk.cleared > 0
+                                ? `You have cleared ${leaveAsk.cleared} of ${leaveAsk.total} waves. Leave now and the run ends there — you keep what those waves earned.`
+                                : `You have not finished a wave yet. Leave now and the key is spent for nothing.`}
+                        </p>
+                        <div className="gv-ask-row">
+                            <button type="button" className="gv-ask-go" onClick={() => setLeaveAsk(null)}>
+                                Keep fighting
+                            </button>
+                            <button type="button" className="gv-ask-out" onClick={() => {
+                                const w = worldRef.current;
+                                // ⚠️ MARK IT OVER FIRST. The loop's own end-of-run test runs every frame and
+                                // would fire onRunEnd a second time between this call and the unmount — two
+                                // settles for one key, which is two sets of chests.
+                                if (w) w.runOver = true;
+                                onRunEnd?.({ wavesCleared: leaveAsk.cleared, cleared: false });
+                                setLeaveAsk(null);
+                                onLeave?.();
+                            }}>
+                                {leaveAsk.cleared > 0 ? "Leave and settle" : "Leave anyway"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             <div className="gv-hud" onPointerDown={(e) => e.stopPropagation()}>
                 {/* ✂️ THE BELT CHIP WAS HERE -- the poultice's sprite, its name and the count left,
                     flashing as it dropped, and an empty state that sent you to the bench for more.
@@ -4361,7 +4415,17 @@ export default function GroveScene({
                         {isNative ? "⇲" : "⇱"}
                     </button>
                 ) : null}
-                <button type="button" className="gv-leave" onClick={onLeave}>Leave</button>
+                {/* ⚠️ THE ASK IS ONLY FOR A LIVE RUN. Leaving an ordinary zone costs nothing and is
+                    the most common thing a player does; a confirm on it would be a toll booth. */}
+                <button type="button" className="gv-leave" onClick={() => {
+                    const w = worldRef.current;
+                    if (arena && waves && w && !w.runOver) {
+                        const standing = w.foes.filter((f) => !f.dying).length;
+                        setLeaveAsk({ cleared: Math.max(0, w.waveAt - (standing > 0 ? 1 : 0)), total: waves.length });
+                        return;
+                    }
+                    onLeave?.();
+                }}>Leave</button>
             </div>
 
             {/* ── ⚠️ THE MENU, AND IT BANKS THE KILLS BEFORE IT OPENS ANYTHING ───────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 // ── RUNNING A COLISEUM, FROM THE CLIENT'S SIDE ───────────────────────────────────────────────────────────────
 // The scene owns the fight; this owns the run around it — spending the key, holding the plan while it plays,
@@ -25,7 +25,16 @@ export function useColiseum({ onChanged, onResult } = {}) {
     const [run, setRun] = useState(null);        // { map, plan } while a run is live
     const [chests, setChests] = useState([]);
     const [busy, setBusy] = useState(false);
-    const [settled, setSettled] = useState(false);
+    // ── ⚠️ A REF, NOT STATE, AND THE DIFFERENCE IS A CHEST PRINTER ────────────────────────────────────
+    // This guard stops one run settling twice. It was `useState`, and state does not update until the next
+    // render — so two settles fired in the SAME tick both read `false` and both went through. That is not
+    // hypothetical: the leave-early ask settles the run, and GroveClient's `leave()` backstop settles any
+    // run still live, and pressing Leave does both one after the other. Measured: two identical settle
+    // calls for one key. It happened to pay nothing because the run was under the quarter-wave threshold;
+    // at three waves it would have inserted the chests twice.
+    //
+    // A ref is written synchronously, so the second caller in the same tick sees it.
+    const settledRef = useRef(false);
 
     const post = useCallback(async (body) => {
         const r = await fetch("/api/marketplace/grove/coliseum", {
@@ -60,7 +69,7 @@ export function useColiseum({ onChanged, onResult } = {}) {
         try {
             const j = await post({ action: "start", map });
             if (j?.ok) {
-                setSettled(false);
+                settledRef.current = false;
                 setRun({ map, plan: j.plan });
                 onChanged?.();
             } else {
@@ -75,8 +84,8 @@ export function useColiseum({ onChanged, onResult } = {}) {
     }, [busy, run, post, onChanged, onResult]);
 
     const finish = useCallback(async ({ wavesCleared, cleared }) => {
-        if (settled || !run) return;
-        setSettled(true);
+        if (settledRef.current || !run) return;
+        settledRef.current = true;
         const j = await post({ action: "settle", map: run.map, wavesCleared, cleared });
         setRun(null);
         if (j?.ok) {
@@ -94,7 +103,7 @@ export function useColiseum({ onChanged, onResult } = {}) {
             setChests(r?.chests || []);
         }
         onChanged?.();
-    }, [settled, run, post, onChanged, onResult]);
+    }, [run, post, onChanged, onResult]);
 
     const open = useCallback(async (chestId) => {
         // Marked opening immediately: the round trip is long enough that a chest still looking shut is a

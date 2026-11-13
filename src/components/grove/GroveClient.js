@@ -406,6 +406,16 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     // ⚠️ `useCallback` WITH AN EMPTY DEP LIST, which is only honest because every call below is a
     // setState setter and React guarantees those are stable. It matters: this is a dependency of three
     // callbacks inside useColiseum, so an inline arrow would rebuild all of them on every render.
+    // ── ⚠️ A RUN CAN END WITHOUT THE BELL, AND THE OTHER WAYS PAID NOTHING ─────────────────────────
+    // Luke: "If you leave early it should try and let you know." The scene asks before the Leave button
+    // ends a run — but Leave is not the only way out, and DYING is the one a player does not choose.
+    // onDeath sends you to the town view, which unmounts the scene, which means onRunEnd never fires:
+    // key spent, waves cleared paid nothing, and `col.run` left set so `start()` refuses every later run
+    // until the page is reloaded. The Coliseum was shut for the session by one bad fight.
+    //
+    // So the client keeps the wave count as it goes and settles on any exit that still has a run live.
+    // `finish` guards itself on `settled`, so the scene's own settle and this backstop cannot both pay.
+    const [waveAt, setWaveAt] = useState(0);
     const onColiseumResult = useCallback((r) => {
         if (!r) return;
         if (r.error) { setNote(r.error); return; }
@@ -444,6 +454,16 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     }, []);
 
     const col = useColiseum({ onChanged: refresh, onResult: onColiseumResult });
+
+    // ⚠️ BELOW useColiseum, because it reads `col`. It was written above it first and eslint caught the
+    // temporal dead zone — the same shape as the `const` note in GroveScene's swingRate.
+    const settleIfRunning = useCallback(() => {
+        if (!col.run) return;
+        // Waves CLEARED, not reached — onWave fires when a wave spawns, so the one being fought does not
+        // count. Same rule the bell uses when the clock runs out mid-wave.
+        col.finish({ wavesCleared: Math.max(0, waveAt - 1), cleared: false });
+    }, [col, waveAt]);
+
 
     // ── ✂️ THE QUEST MACHINERY WAS ALL HERE ─────────────────────────────────────────────────────────
     // Luke, 2026-11-08: "Remove all quest givers and quests." Five things went:
@@ -643,7 +663,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
     }, [session, refresh]);
 
 
-    const leave = useCallback(() => { setSession(null); setView("map"); setCard(null); refresh(); }, [refresh]);
+    const leave = useCallback(() => {
+        settleIfRunning();
+        setSession(null); setView("map"); setCard(null); refresh();
+    }, [refresh, settleIfRunning]);
 
     // ── ✂️ `goToArea` WAS HERE ──────────────────────────────────────────────────────────────────────
     // Luke: "we also need the ability to go see where to go look at the item, because people have no idea
@@ -1353,7 +1376,10 @@ export default function GroveClient({ initial, initialView = null, initialTown =
                     // The town you come back to is the town for the map you died on, every time.
                     // A town sits BEFORE the map it is named for, so the town for map N simply IS town N —
                     // the same identity GroveAtlas pairs them on (`towns.find((t) => t.n === m)`).
-                    onDeath={() => { setTownN(Number(session.zone.map) || 1); setView("town"); }}
+                    onWave={(n) => setWaveAt(n)}
+                    // ⚠️ DYING IN THE ARENA IS LEAVING EARLY WITHOUT CHOOSING TO. Settle first or the run
+                    // is simply gone — see the note on settleIfRunning.
+                    onDeath={() => { settleIfRunning(); setTownN(Number(session.zone.map) || 1); setView("town"); }}
                 />
                 {/* ⚠️ MOUNTED IN THE ZONE BRANCH, which is the one that early-returns — anything added at
                     the bottom of this file never renders here. [[groveclient-has-two-returns]]. It is also

@@ -2152,6 +2152,27 @@ export const GROVE_CSS = `
 /* The last twenty seconds. Amber and a touch larger -- the same vocabulary the vault's deadline
    uses, because it is the same message: this one is about to be decided for you. */
 .gv-clock.is-urgent { color: #F0B429; scale: 1.08; }
+
+/* ── LEAVING A RUN EARLY ──────────────────────────────────────────────────────────────────────
+   Luke: "If you leave early it should try and let you know." A small card over the fight rather
+   than a full-screen takeover -- the run is still live behind it and "keep fighting" has to look
+   like the easy thing to do.
+
+   ⚠️ z-index ABOVE the HUD it was launched from (gv-hud is 6) and below the reward pops (200),
+   so a chest landing at the same moment is not hidden behind a question. */
+.gv-ask { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center;
+    background: rgba(6,10,6,0.72); padding: 18px; }
+.gv-ask-card { max-width: 320px; text-align: center; padding: 20px 20px 16px; border-radius: 16px;
+    background: #12170f; border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 18px 44px rgba(0,0,0,0.75); }
+.gv-ask-card b { display: block; font-size: 1.05rem; color: #f2ead9; margin-bottom: 8px; }
+.gv-ask-card p { margin: 0 0 16px; font-size: 0.82rem; line-height: 1.5; color: #c7bda9; }
+.gv-ask-row { display: flex; gap: 10px; }
+.gv-ask-row button { flex: 1; padding: 11px 10px; border-radius: 11px; font-weight: 700;
+    font-size: 0.82rem; cursor: pointer; border: 1px solid transparent; }
+/* The safe choice is the loud one. */
+.gv-ask-go { background: #9fe08a; color: #10210c; }
+.gv-ask-out { background: transparent; color: #c7bda9; border-color: rgba(255,255,255,0.22); }
 .gv-kills span { display: block; margin-top: 2px; font-size: 0.6rem; font-weight: 700;
     letter-spacing: 0.1em; text-transform: uppercase; color: #e0a83c;
     text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,0.95); }
