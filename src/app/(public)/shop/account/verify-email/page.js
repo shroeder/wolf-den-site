@@ -68,6 +68,20 @@ function ShopVerifyEmailPageContent() {
             </button>
 
             {status ? <p className="shop-payment-success">{status}</p> : null}
+            {/* ── ⚠️ THE ONE MOMENT THE GAME ACCOUNT ACTUALLY EXISTS ────────────────────────────
+                Verification is where bridgeShopToMarketplace provisions the member (see the note in
+                shop-bridge.js), so this is the first instant there is something real to walk into rather
+                than something to sign up for. Shown only on success, and it offers a DOOR rather than
+                a form: they already have the account, which is the part worth telling them.
+
+                ⚠️ AFTER the status line, not instead of it. "You can continue checkout" is what they
+                came here for and it stays first; this sits under it. */}
+            {status ? (
+                <p className="secondary">
+                    That account plays <Link href="/marketplace">the Den</Link> too &mdash; same sign-in,
+                    and what you buy earns rewards on it.
+                </p>
+            ) : null}
             {error ? <p className="shop-payment-error">{error}</p> : null}
 
             <p className="secondary">

@@ -11,6 +11,7 @@ import { setShopCustomerSession } from "@/lib/shop-customer-session";
 import { resolveActiveCartId } from "@/lib/shop-carts";
 import { getShopCustomerByEmail } from "@/lib/shop-customers";
 import { withRequestLogging } from "@/lib/server-logger";
+import { bridgeShopToMarketplace } from "@/lib/marketplace/shop-bridge.js";
 
 export const runtime = "nodejs";
 
@@ -77,6 +78,13 @@ export async function POST(request) {
             if (!customer) {
                 return jsonNoStore({ error: "Verification link is invalid or expired." }, { status: 400 });
             }
+
+            // ⚠️ THE GAME ACCOUNT IS MADE HERE, at the first moment this email belongs to a person.
+            // Before this, signing up on the shop side created a customer the game could not see — see
+            // the note on bridgeShopToMarketplace. Best-effort and awaited: it is two queries, and a
+            // member who exists only after their next page load is a member who gets a different
+            // welcome depending on where they click.
+            await bridgeShopToMarketplace(customer.email).catch(() => {});
 
             const cookieStore = await cookies();
             setShopCustomerSession(cookieStore, customer.id);

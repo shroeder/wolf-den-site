@@ -267,6 +267,31 @@ export default function ShopAccountPage() {
                         <button type="button" className="button primary" onClick={handleAuthSubmit} disabled={busy}>
                             {busy ? "Working..." : mode === "register" ? "Create account" : "Sign in"}
                         </button>
+                        {/* ── ⚠️ THE SHOP NEVER ONCE MENTIONED THE GAME ──────────────────────────────
+                            Luke, 2026-11-12: "When people sign up to buy stuff I dont see a sign up for
+                            the game. Why?"
+
+                            Partly because the bridge only ran one way (fixed in shop-bridge.js), but
+                            mostly because this panel was an email box, a password box and a button. A
+                            customer creating an account to buy a booster box had no way to learn there
+                            was a game attached to it, so the only people in the Den were the people who
+                            already knew.
+
+                            ⚠️ IT SAYS WHAT THEY GET, NOT WHAT IT IS. "We have a game" is an advert;
+                            "your purchases already earn rewards on this account" is a fact about the
+                            thing they are in the middle of doing. The account is the same account —
+                            that is the whole pitch, and it is true.
+
+                            ⚠️ AND IT IS ONE LINE UNDER THE BUTTON, not a panel. Anything bigger is an
+                            interruption in a checkout, which is the one flow that must not be slowed
+                            down. [[no-temp-ui-scaffolding]] is the same instinct from the other end. */}
+                        {mode === "register" ? (
+                            <p className="secondary">
+                                This is one account for both: the same sign-in plays{" "}
+                                <Link href="/marketplace">the Den</Link> &mdash; the Grove, pets, the farm
+                                and the card game &mdash; and your purchases earn rewards on it.
+                            </p>
+                        ) : null}
                         <p className="secondary">Forgot your password? <Link href="/shop/account/reset-password">Reset it here</Link>.</p>
                     </div>
                 )}
