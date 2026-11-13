@@ -625,6 +625,31 @@ export default function GroveScene({
     const gearArtRef = useRef(gearArt || {});
     useEffect(() => { gearArtRef.current = gearArt || {}; }, [gearArt]);
 
+    // ── ⚠️ THE LOOP MUST NOT DEPEND ON A CALLBACK THAT CHANGES IDENTITY ────────────────────────────────
+    // Luke, 2026-11-13, twice in an hour, both at "WAVE 12 OF 12": "Frozen client."
+    //
+    // onSettle and onBoss are GroveClient's `settle` and `bossKill`, and both are
+    // useCallback(..., [session, refresh]). The settle handler calls setSession on every settle that
+    // carries a bar update — which is every settle with kills in it. So:
+    //
+    //     kills settle  ->  setSession  ->  both callbacks get new identities
+    //                   ->  the loop effect's dependency array changes
+    //                   ->  React tears the loop down and runs it again, MID-FIGHT
+    //
+    // Every forty-five seconds, for the whole life of this file. In a zone that reads as creatures
+    // respawning and is survivable. In a two-minute Coliseum run it lands on a run that cannot absorb it,
+    // and wave twelve is simply where the clock has run long enough for it to happen twice.
+    //
+    // ⚠️ THE FIX IS A REF, NOT A BIGGER DEPENDENCY ARRAY. The loop wants the LATEST callback, never a
+    // particular version of it, which is exactly what a ref is for — the same idiom gearArt above uses and
+    // for the same reason. Removing them from the deps is what stops the teardown; reading them through a
+    // ref is what keeps them current. [[callback-prop-in-effect-deps]] is this bug from the other end: a
+    // callback in a dependency array that re-runs the effect for ever.
+    const onSettleRef = useRef(onSettle);
+    const onBossRef = useRef(onBoss);
+    useEffect(() => { onSettleRef.current = onSettle; }, [onSettle]);
+    useEffect(() => { onBossRef.current = onBoss; }, [onBoss]);
+
     // ── ⚠️ THE LIST IS STATE; THE POSITIONS ARE NOT ─────────────────────────────────────────────────
     // The first version pushed foes into world.foes imperatively and React was never told, so the zone
     // rendered with zero enemies in it while the simulation happily ran thirty of them. The split that
@@ -1773,7 +1798,7 @@ export default function GroveScene({
                     const nextZone = GROVE_ZONES.find((z) => z.n === zone.n + 1);
                     fireHerald("The way is open", nextZone?.name || "Onward", "way");
                 }
-                onBoss?.();
+                onBossRef.current?.();
                 return;
             }
 
@@ -1863,7 +1888,7 @@ export default function GroveScene({
                 wd.clearFlushed = true;
                 if (wd.killLog.length) {
                     const ate = wd.eaten; wd.eaten = {};
-                    Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
+                    Promise.resolve(onSettleRef.current?.(wd.killLog.splice(0), ate)).catch(() => {});
                 }
             }
 
@@ -1888,7 +1913,7 @@ export default function GroveScene({
                 if ((Number(bar.kills) || 0) + pend >= bar.need) {
                     wd.barFlushed = true;
                     const ate = wd.eaten; wd.eaten = {};
-                    Promise.resolve(onSettle?.(wd.killLog.splice(0), ate)).catch(() => {});
+                    Promise.resolve(onSettleRef.current?.(wd.killLog.splice(0), ate)).catch(() => {});
                 }
             }
 
@@ -3650,7 +3675,7 @@ export default function GroveScene({
                 lastSettle = now;
                 const batch = w.killLog.splice(0, w.killLog.length);
                 const ate = w.eaten; w.eaten = {};
-                onSettle?.(batch, ate);
+                onSettleRef.current?.(batch, ate);
             }
 
             // ⚠️ A HEARTBEAT THE WATCHDOG BELOW READS. One assignment per frame; it is the only way to
@@ -3757,14 +3782,19 @@ export default function GroveScene({
             // ⚠️ SETTLE ON THE WAY OUT. Walking away must not throw the session's kills away — the same
             // reason the casino releases a held balance when you stand up.
             const wEnd = worldRef.current;
-            if (wEnd?.killLog?.length) { const ate = wEnd.eaten; wEnd.eaten = {}; onSettle?.(wEnd.killLog.splice(0), ate); }
+            if (wEnd?.killLog?.length) { const ate = wEnd.eaten; wEnd.eaten = {}; onSettleRef.current?.(wEnd.killLog.splice(0), ate); }
         };
     // ⚠️ mounted IS A REAL DEPENDENCY. The scene is portalled, so the first render returns null and
     // hostRef is still empty when this effect first runs — it takes the early return above and, without
     // mounted here, never runs again. The zone came up with the backdrop painted, the hero standing in his
     // start position and absolutely nothing happening: no spawn, no simulation, no camera.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [mounted, world, spawn, seed, bonuses, stats, onSettle, W, zone.id, zone.boss, labScene, maxHp, onBoss, rerender, worldAt]);
+    // ⚠️ onSettle AND onBoss ARE DELIBERATELY ABSENT — read through refs above. Putting either back
+    // re-arms a teardown of the whole loop on every settle. See the note on onSettleRef.
+    //
+    // ⚠️ AND THE eslint-disable THAT USED TO SIT HERE IS GONE, which is the tell that this is right: the
+    // rule was being silenced because the array was wrong, and the array was wrong in the way that tore
+    // the loop down mid-fight. The linter has no complaint now.
+    }, [mounted, world, spawn, seed, bonuses, stats, W, zone.id, zone.boss, labScene, maxHp, rerender, worldAt]);
 
     // ── WALKING THROUGH A DOOR ──────────────────────────────────────────────────────────────────────
     // ⚠️ SETTLE BEFORE TRAVELLING, AND AWAIT IT. The kills that open the right-hand door are the same ones
@@ -3789,13 +3819,13 @@ export default function GroveScene({
             // The kills are already spliced out of the log by the call, so a rejection does not
             // double-claim them either: they are gone from the client's list whichever way this goes.
             try {
-                await onSettle?.(w.killLog.splice(0), ate);
+                await onSettleRef.current?.(w.killLog.splice(0), ate);
             } catch {
                 /* open anyway */
             }
         }
         onPanel?.(kind);
-    }, [onSettle, onPanel]);
+    }, [onPanel]);
 
     const travel = useCallback(async (to) => {
         if (travelRef.current) return;
@@ -3813,7 +3843,7 @@ export default function GroveScene({
             const w = worldRef.current;
             if (w?.killLog?.length) {
                 const ate = w.eaten; w.eaten = {};
-                await onSettle?.(w.killLog.splice(0), ate);
+                await onSettleRef.current?.(w.killLog.splice(0), ate);
             }
             // The flare has to be covering the screen before the swap, not racing it.
             await new Promise((r) => setTimeout(r, WARP_OUT_MS));
@@ -3829,7 +3859,7 @@ export default function GroveScene({
         } finally {
             travelRef.current = false;
         }
-    }, [onSettle, onTravel]);
+    }, [onTravel]);
 
     // ── INPUT ───────────────────────────────────────────────────────────────────────────────────────
     const onTapWorld = useCallback((e) => {
