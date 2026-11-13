@@ -23,7 +23,7 @@ export const PICK_COUNT = 3;
 export async function loadPool() {
     const rows = await db.query(
         `SELECT f.variation_id, f.name, f.image_url, f.price, f.category_names AS category,
-                f.consigned, f.last_change_at, f.quantity, c.unit_cost_cents
+                f.consigned, f.last_change_at, f.last_change_kind, f.quantity, c.unit_cost_cents
            FROM inventory_feed f
            LEFT JOIN wolfden_item_cost c ON c.variation_id = f.variation_id
           WHERE f.in_stock = TRUE
@@ -113,9 +113,19 @@ export function pickFor(profile, pool, claimed = null, count = PICK_COUNT) {
         // because a discount on the wrong game is still the wrong game.
         if (item.offer) score += 15 + item.offer.pct;
 
-        // Newly arrived stock is the actual news. Decays over a month.
+        // Newly arrived stock is the actual news, and it is also the only stock the email is allowed to
+        // call new — so weighting it here means the honest sentence is also the usual one. Decays over a
+        // month; `null` kind (309 items that were never stamped) gets nothing rather than the benefit of
+        // the doubt.
         const age = item.last_change_at ? (now - new Date(item.last_change_at).getTime()) / 86400000 : 999;
-        if (age < 30) score += Math.round(20 * (1 - age / 30));
+        // ⚠️ WEIGHTED BY WHAT THE CHANGE WAS, NOT JUST HOW RECENT IT WAS. Treating every stamp alike handed
+        // price drops the top of 45 of 74 emails, purely because repricing is the most recent thing that
+        // happens to a row — there are only 125 price-dropped items in stock against 285 that arrived in
+        // the last week. A new arrival is the better hook and the rarer event; a price cut is a good one
+        // but it should not crowd out the shelf by an accident of timestamps.
+        const WEIGHT = { new: 1, restock: 0.7, price_drop: 0.45 };
+        const w = WEIGHT[item.last_change_kind] || 0;
+        if (age < 30) score += Math.round(24 * w * (1 - age / 30));
 
         if (score > 0) scored.push({ ...item, score });
     }

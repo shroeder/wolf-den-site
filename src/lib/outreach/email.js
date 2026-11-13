@@ -34,6 +34,33 @@ const FONTS = "-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-se
 /** How long an offer in one of these emails stands. */
 export const OFFER_DAYS = 14;
 
+// ── ⚠️ "JUST CAME IN" HAS TO BE TRUE ─────────────────────────────────────────────────────────────────────────
+// Luke, 2026-11-13: "dont lie, if it just came in, then feel free to hype, but dont lie about stale product
+// being nee."
+//
+// The draft opened every email with "This just came into the shop" regardless, and 1,024 of the 2,057
+// in-stock items are over thirty days old or were never stamped at all. So for half the shelf that sentence
+// was simply false — and it is false in the one direction a customer can personally check, by recognising a
+// card that has been in the case since summer. A shop that is wrong about that is wrong about the price too,
+// as far as the reader is concerned.
+//
+// `inventory_feed` already knows: `last_change_kind` is one of new / restock / price_drop, with
+// `last_change_at`. So the line is chosen from the record rather than assumed, and old stock gets a sentence
+// that is true of old stock. Hype is allowed; it just has to be earned.
+const NEW_DAYS = 14;
+
+function freshness(item) {
+    const at = item?.last_change_at ? new Date(item.last_change_at).getTime() : null;
+    const days = at ? (Date.now() - at) / 86400000 : Infinity;
+    if (days > NEW_DAYS) return { kind: "stock", line: "This is on the shelf right now." };
+    switch (item?.last_change_kind) {
+        case "new": return { kind: "new", line: "This just came into the shop." };
+        case "restock": return { kind: "restock", line: "This is back in stock." };
+        case "price_drop": return { kind: "price_drop", line: "The price on this just came down." };
+        default: return { kind: "stock", line: "This is on the shelf right now." };
+    }
+}
+
 const money = (cents) => `$${(cents / 100).toFixed(2)}`;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -96,12 +123,21 @@ export function renderOutreachEmail({ name = "", profile, picks = [], pattern = 
         || String(lead.name || "").replace(/\s*[-–]?\s*\b(NM|LP|MP|HP|DMG)\b\s*$/i, "").trim().slice(0, 44)
         || null;
     const anyOffer = picks.some((p) => p.offer);
+    const fresh = freshness(lead);
 
     // ⚠️ THE SUBJECT NAMES THE CARD, NOT THE CATEGORY. "Some Pokémon singles came in" is true of this shop
     // every week of the year and reads as a mailing list. "We got an Umbreon in" is a reason to open it.
+    // ⚠️ AND THE SUBJECT MAKES THE SAME CLAIM, SO IT ANSWERS TO THE SAME RECORD. "We got a Mew in" is a
+    // statement about arrival; on a card that has been in the case since August it is the lie moved to the
+    // one line everybody reads. Stale stock gets a subject that promises only what is true — that it is
+    // there — which is still worth opening when the card is right.
+    const article = /^[aeiou]/i.test(leadEntity || "") ? "an" : "a";
     const subject = leadEntity
-        ? `${first ? `${first}, w` : "W"}e got ${/^[aeiou]/i.test(leadEntity) ? "an" : "a"} ${leadEntity} in`
-        : `${first ? `${first}, s` : "S"}omething ${reasonFor(profile, { GAME_LABEL, KIND_LABEL })} just came in`;
+        ? (fresh.kind === "new" ? `${first ? `${first}, w` : "W"}e got ${article} ${leadEntity} in`
+            : fresh.kind === "restock" ? `${first ? `${first}, ` : ""}${leadEntity} is back in stock`
+            : fresh.kind === "price_drop" ? `${first ? `${first}, the` : "The"} ${leadEntity} just dropped in price`
+            : `${first ? `${first}, t` : "T"}here's ${article} ${leadEntity} on the shelf`)
+        : `${first ? `${first}, s` : "S"}omething ${reasonFor(profile, { GAME_LABEL, KIND_LABEL })} you might want`;
 
     // ── ⚠️ THE PATTERN NEVER APPEARS IN THE EMAIL ──────────────────────────────────────────────────────
     // Luke, 2026-11-13: "Dont tell them what we know about them."
@@ -113,7 +149,7 @@ export function renderOutreachEmail({ name = "", profile, picks = [], pattern = 
     //
     // `pattern` still does all its work: it chose the card. It is simply never spoken. A well-chosen card
     // demonstrates that you know them, which is the pleasant version of the same fact.
-    const intro = "This just came into the shop.";
+    const intro = fresh.line;
 
     const html = `
 <div style="margin:0;padding:0;background:${BG};">
@@ -150,7 +186,7 @@ export function renderOutreachEmail({ name = "", profile, picks = [], pattern = 
     const text = [
         greeting,
         "",
-        "This just came into the shop.",
+        fresh.line,
         "",
         `${lead.name} - ${lead.offer ? `${money(lead.offer.wasCents)} now ${money(lead.offer.nowCents)} (${lead.offer.pct}% off)` : money(lead.priceCents)}`,
         lead.url,
