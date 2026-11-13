@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 
+import { recurring } from "./patterns.js";
 import { classify } from "./taxonomy.js";
 
 // ── WHAT ONE MEMBER IS INTO, READ OFF WHAT THEY PAID FOR ─────────────────────────────────────────────────────
@@ -76,6 +77,23 @@ export async function profilesFor(buyerIds) {
             if (cents > 0) unitPrices.push(Math.round(cents / qty));
         }
 
+        // ── ⚠️ THE STRONGEST SIGNAL IN THE DATA, AND IT USED TO STOP HERE ──────────────────────────────
+        // patterns.js could already name the character on a card, and the report proved it worked: Jordan
+        // bought Eevee six times, Krauseka Slowpoke three times, Teegan Vulpix then two Ninetales. Then the
+        // profile threw it away and the scorer ranked on category, price band and freshness — so Jordan was
+        // offered a poster collection while an Eevee sat in stock at $35.
+        //
+        // A signal that is extracted, printed in a report and never read by the thing that decides is the
+        // same defect as not having it. [[declared-but-never-read]]
+        //
+        // Two or more is the bar. One Eevee is a card somebody liked; two is a habit.
+        const characters = recurring(lines.map((l) => l.name), "character")
+            .filter((c) => c.count >= 2)
+            .slice(0, 4)
+            // Already stemmed by recurring() — the evolution line is the attachment, not the printing.
+            .map((c) => ({ ...c, stem: c.value }))
+            .filter((c) => c.stem.length >= 4);
+
         const game = topKey(games);
         const format = topKey(formats);
         const kind = topKey(kinds);
@@ -85,6 +103,7 @@ export async function profilesFor(buyerIds) {
         out.set(buyerId, {
             buyerId,
             game, format, kind,
+            characters,
             lines: lines.length,
             spendCents: spend,
             lastBoughtAt: lines[0]?.bought_at || null,

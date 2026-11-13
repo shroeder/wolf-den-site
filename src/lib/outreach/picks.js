@@ -83,6 +83,25 @@ export function pickFor(profile, pool, claimed = null, count = PICK_COUNT) {
         }
 
         let score = 0;
+
+        // ── ⚠️ A LOVED CHARACTER OUTRANKS EVERYTHING ELSE ──────────────────────────────────────────────
+        // Worth more than the game match, because it IS a game match plus the only thing in this dataset
+        // that reliably says "this person, specifically". Somebody who has bought Eevee six times does not
+        // need a reason to look at an Eevee; everything else here is an educated guess by comparison.
+        //
+        // Matched word-bounded against the item name. [[duplicates-are-the-normal-case]] and the
+        // paintings-filed-as-card-games bug are both the same warning: a bare substring would make "Abra"
+        // match "Abracadabra" and "Mew" match "Mewtwo", which is a different Pokémon and a worse email
+        // than sending nothing.
+        let charMatch = null;
+        for (const c of profile.characters || []) {
+            if (new RegExp(`\\b${c.stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(item.name || "")) {
+                charMatch = c;
+                score += 140 + Math.min(90, c.count * 30);
+                break;
+            }
+        }
+
         if (profile.game && item.game === profile.game) score += 100;
         else if (item.game && profile.game) score -= 40;     // a different game is an actively wrong guess
         if (profile.format && item.format === profile.format) score += 45;
@@ -100,12 +119,18 @@ export function pickFor(profile, pool, claimed = null, count = PICK_COUNT) {
         // So the shortlist stays mixed and the model does the inference. See ai-match.js.
         if (profile.kind && item.kind === profile.kind) score += 20;
 
-        // Inside the band they actually spend in.
-        if (item.priceCents >= profile.bandLoCents && item.priceCents <= profile.bandHiCents) score += 60;
+        // ── INSIDE THE BAND THEY ACTUALLY SPEND IN ─────────────────────────────────────────────────────
+        // ⚠️ WIDER FOR A CHARACTER THEY LOVE, BECAUSE PEOPLE STRETCH FOR THOSE AND THE BAND IS A
+        // DESCRIPTION OF HABIT, NOT A LIMIT. Without this the band hands a $3-a-card buyer the $2 Chansey
+        // over the $65 holo, which is in-band and true to their history and still a thin email to lead
+        // with. Doubling the ceiling for a loved character reaches the copy worth crossing town for while
+        // leaving everyone else's budget alone.
+        const hiCents = charMatch ? profile.bandHiCents * 2 : profile.bandHiCents;
+        if (item.priceCents >= profile.bandLoCents && item.priceCents <= hiCents) score += 60;
         else {
             const d = item.priceCents < profile.bandLoCents
                 ? profile.bandLoCents / Math.max(1, item.priceCents)
-                : item.priceCents / Math.max(1, profile.bandHiCents);
+                : item.priceCents / Math.max(1, hiCents);
             score -= Math.min(70, (d - 1) * 30);
         }
 
@@ -127,7 +152,7 @@ export function pickFor(profile, pool, claimed = null, count = PICK_COUNT) {
         const w = WEIGHT[item.last_change_kind] || 0;
         if (age < 30) score += Math.round(24 * w * (1 - age / 30));
 
-        if (score > 0) scored.push({ ...item, score });
+        if (score > 0) scored.push({ ...item, score, charMatch });
     }
 
     scored.sort((a, b) => b.score - a.score || b.priceCents - a.priceCents);

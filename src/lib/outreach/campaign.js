@@ -81,6 +81,14 @@ export async function buildCohort({ limit = 500 } = {}) {
     // ordered by how long they have been away, so the people who have been gone longest are offered from the
     // fullest shelf — which is the right way round if anybody is going to be offered a near miss.
     const claimed = new Map();
+    // ── ⚠️ A SEPARATE, TIGHTER CAP ON BEING THE HERO ───────────────────────────────────────────────────
+    // The stock claim stops us promising a card we do not have, and it is not the same question as "should
+    // one product lead ten different emails". The Unova Poster Collection has 65 units, so the stock guard
+    // was perfectly happy to make it the hero for ten of eighteen members — technically available, and a
+    // shop that mails the same poster to everybody it has not seen in a month is a shop that obviously did
+    // not look at anybody. Being IN an email is cheap; being THE pick is the claim this feature makes.
+    const heroCount = new Map();
+    const HERO_CAP = 3;
     const out = [];
     for (const member of members) {
         const profile = profiles.get(member.id);
@@ -115,7 +123,39 @@ export async function buildCohort({ limit = 500 } = {}) {
             picks.push(item);
             return true;
         };
-        for (const item of ranked) { if (picks.length >= PICK_COUNT) break; claim(item); }
+        // ── ⚠️ A PROVEN ATTACHMENT OUTRANKS THE MODEL'S OPINION ────────────────────────────────────────
+        // The model is good at inference and it is not better than a receipt. Given somebody who had bought
+        // Psyduck three times, it read the room as "Charizard and Dragonite" and led with a Charizard —
+        // Charizard being what the average customer wants, which is exactly the averaging this feature
+        // exists to avoid. Where the shortlist contains a character they have bought twice or more, that
+        // card leads and the model orders what follows.
+        // ⚠️ TWO STEPS, AND THE ORDER OF THEM IS THE WHOLE POINT. Pick the CHARACTER first — the one they
+        // have bought most — then the best copy of that character the shelf has. Doing it in one pass, as
+        // "the highest-scoring item that happens to match any loved character", reintroduces the averaging
+        // twice over: a member with psyduck x3 and charizard x2 was handed the Charizard, because Charizard
+        // is simply worth more and scores higher, and a member with eevee x6 was handed a $3 Eevee because
+        // the model happened to list it first. Strongest attachment, best copy of it. `shortlist` is score
+        // ordered, so "first match" IS the best copy.
+        // ⚠️ EVERY COPY OF THE LOVED CHARACTER GOES IN FRONT, NOT JUST THE BEST ONE. Stock is claimed as
+        // the cohort is built, so the best Eevee is routinely gone by the time the next Eevee collector is
+        // reached — and a list with one loved item at the head falls straight past the other six Eevees on
+        // the shelf back to a generic Charizard. Queue them all and the fallback is still the thing they
+        // love, one grade down.
+        const topChar = (profile.characters || [])[0];
+        const lovedList = [
+            ...(topChar ? shortlist.filter((i) => i.charMatch?.stem === topChar.stem) : []),
+            ...shortlist.filter((i) => i.charMatch && i.charMatch.stem !== topChar?.stem),
+        ];
+        const order = lovedList.length
+            ? [...lovedList, ...ranked.filter((i) => !lovedList.includes(i))]
+            : ranked;
+
+        for (const item of order) {
+            if (picks.length >= PICK_COUNT) break;
+            // Only the FIRST pick is under the hero cap; an over-used item can still ride along below.
+            if (!picks.length && (heroCount.get(item.variation_id) || 0) >= HERO_CAP) continue;
+            claim(item);
+        }
         // ⚠️ AND FALL THROUGH THE REST OF THE SHORTLIST WHEN STOCK WAS TAKEN. Without this the members
         // processed last lose every pick to the members processed first and drop out of the run entirely —
         // measured, that was 10 of 74 silently getting no email at all, and they are by construction the
@@ -132,6 +172,8 @@ export async function buildCohort({ limit = 500 } = {}) {
         // The pool objects are SHARED between members, so this copies rather than nulling `offer` in place.
         // Mutating would strip the discount from that item for everyone processed afterwards, and the item
         // would read full-price in their emails for no reason anyone could trace.
+        heroCount.set(picks[0].variation_id, (heroCount.get(picks[0].variation_id) || 0) + 1);
+
         const shown = picks.map((item, i) => (i === 0 ? item : { ...item, offer: null }));
 
         const unsubscribeUrl = `${base}/api/outreach/unsubscribe?t=${encodeURIComponent(unsubscribeToken(member.id))}`;

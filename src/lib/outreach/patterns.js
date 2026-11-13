@@ -72,13 +72,34 @@ export function conditionTaste(conditions) {
     return scored.reduce((a, b) => a + b, 0) / scored.length / (CONDITIONS.length - 1);
 }
 
-/** The repeated things in a list of names, most repeated first. */
+/**
+ * The distinctive stem of a character name — what makes two cards the same attachment.
+ *
+ * ⚠️ THIS HAS TO RUN BEFORE ANYTHING COUNTS, AND IT USED TO RUN AFTER. `recurring()` tallied the raw
+ * character and the caller stemmed the survivors, so a member holding "Eevee" and "Eevee V" scored one
+ * each, fell under a "seen twice" bar, and came out with NO attachment at all — while a report that
+ * stemmed first happily printed EEVEE x2 for the same person. Two pieces of code disagreeing about who
+ * loves what, because one of them normalised and the other did not.
+ *
+ * Counting is only ever as good as what you count, and the thing worth counting is the creature, not the
+ * printing. [[duplicates-are-the-normal-case]]
+ */
+export function characterStem(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/^(sabrina's|brock's|misty's|n's|team\s+\w+'s)\s+/, "")
+        .split(/\s+/)[0]
+        .replace(/[^a-z-]/g, "");
+}
+
+/** The repeated things in a list of names, most repeated first. Characters are counted by stem. */
 export function recurring(names, field = "character") {
     const counts = new Map();
     for (const n of names) {
         const v = entitiesOf(n)[field];
         if (!v) continue;
-        const k = v.toLowerCase();
+        const k = field === "character" ? characterStem(v) : v.toLowerCase();
+        if (!k) continue;
         counts.set(k, (counts.get(k) || 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
