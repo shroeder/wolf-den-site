@@ -120,6 +120,12 @@ export async function createBuyer({ email, password, displayName = null, firstNa
     if (refCode) await attachReferrer(row.id, refCode).catch(() => {});
     // A few low-level seeds so the farm is playable from the first visit. Once-only (atomic flag), best-effort.
     await grantStarterSeeds(row.id).catch(() => {});
+    // ⚠️ NOT IN THE REGISTER ROUTE ANY MORE. It was there, and only there, which is why every other door
+    // was silent. `existing` means they were adopting a passwordless account that already announced itself
+    // when it was provisioned, so that one does not announce twice.
+    if (!existing) {
+        await announceNewMember(row.id, { email: row.email, displayName: row.display_name, via: "just signed up in the app" });
+    }
     return mapBuyer(row);
 }
 
@@ -418,6 +424,37 @@ export async function getBuyerSessionToken() {
 // customer into their marketplace identity so ONE sign-in covers rewards/friends/wants. Provisioned
 // accounts are passwordless (they authenticate via the shop session; they can set a marketplace
 // password later via reset). Does NOT copy the real name into display_name (that stays private).
+// ── ⚠️ A NEW MEMBER IS A NEW MEMBER, WHICHEVER DOOR THEY CAME THROUGH ───────────────────────────────────────
+// Luke, 2026-11-12: "I'm just not seeing them being created this way."
+//
+// The owner's app is pushed whenever somebody joins — and that push lived in ONE route handler,
+// /api/marketplace/auth/register. So it fired for the app signup and for nothing else. Accounts made by
+// getOrCreateBuyerByEmail — a shop signup, a purchase linked to an email, the shop-session bridge — were
+// created silently, which is exactly why the shop-side members were invisible: they were being made, and
+// nothing said so.
+//
+// Same shape as the ledge clamp earlier today: a rule that belongs to an EVENT was attached to one of the
+// places the event happens. It belongs next to the INSERT, where there is only one of them.
+//
+// ⚠️ `via` IS THE WHOLE POINT OF DOING IT HERE. "New member joined" told the owner nothing about where they
+// came from, and the answer is now the most interesting part of the message — somebody who appeared because
+// they bought something is a different fact than somebody who downloaded the app.
+async function announceNewMember(buyerId, { email, displayName, via }) {
+    try {
+        const { sendAdminPush } = await import("@/lib/push/send.js");
+        const who = displayName || email || "Somebody";
+        await sendAdminPush({
+            sound: { kind: "member" },
+            title: "🐺 New member joined!",
+            body: `${who} ${via}.`,
+            route: `members?member=${buyerId}`,
+            data: { type: "new_member", buyerId, via },
+        });
+    } catch {
+        // A push is never allowed to fail a signup or a checkout.
+    }
+}
+
 export async function getOrCreateBuyerByEmail(email, { emailVerified = false } = {}) {
     const normalized = normalizeEmail(email);
     if (!normalized || !isValidBuyerEmail(email)) return null;
@@ -437,6 +474,11 @@ export async function getOrCreateBuyerByEmail(email, { emailVerified = false } =
         // Starter seeds too (grantStarterSeeds is once-only via its atomic flag, so an ON CONFLICT re-touch
         // of an already-seeded account is a no-op).
         await grantStarterSeeds(row.id).catch(() => {});
+        // ⚠️ INSIDE THE `if (!row)`, so it fires once — when the member is actually created. Outside it,
+        // every shop page load that resolves this email would push the owner again.
+        await announceNewMember(row.id, {
+            email: row.email, displayName: row.display_name, via: "just bought something in the shop",
+        });
     }
     return mapBuyer(row);
 }

@@ -1,8 +1,7 @@
-import { after, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { createBuyer, createEmailVerification } from "@/lib/marketplace/buyer-session.js";
 import { sendVerificationEmail } from "@/lib/marketplace/email.js";
-import { sendAdminPush } from "@/lib/push/send.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,15 +30,10 @@ export async function POST(request) {
                     }
                 }
                 logger.info("marketplace.buyer.registered", { buyerId: buyer.id, needsVerification: true });
-                // Ping the owner/admin app that a new member joined (fire-and-forget).
-                const who = buyer.displayName || [buyer.firstName, buyer.lastName].filter(Boolean).join(" ") || buyer.email;
-                after(() => sendAdminPush({
-                    sound: { kind: "member" },
-                    title: "🐺 New member joined!",
-                    body: `${who} just signed up in the app.`,
-                    route: `members?member=${buyer.id}`, // deep-link straight to the new member's profile
-                    data: { type: "new_member", buyerId: buyer.id },
-                }).catch(() => {}));
+                // ✂️ THE "NEW MEMBER" PUSH MOVED INTO createBuyer / getOrCreateBuyerByEmail.
+                // It lived here, and only here, so it announced the app signup and stayed silent for every
+                // account made by a shop signup, a linked purchase or the bridge — which is how a whole
+                // door's worth of members became invisible. See announceNewMember in buyer-session.js.
                 return NextResponse.json({ ok: true, needsVerification: true, email: buyer.email });
             } catch (validationError) {
                 return NextResponse.json({ error: validationError.message }, { status: 400 });
