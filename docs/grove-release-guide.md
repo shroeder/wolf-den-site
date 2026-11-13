@@ -359,8 +359,18 @@ five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `gro
     already drawn). Gear is drawn with `ItemArt`, so a piece with no sprite yet still renders.
   - ⚠️ The card **queues behind** the new-area pop rather than stacking on it — both are `.gv-pop`, a fixed
     full-screen layer, and a first clear sets both.
-  - ⚠️ **Still unplayed by Luke.** The wiring is verified by reading and the build is clean; nobody has run
-    a Coliseum end to end. That is the one thing left on it.
+  - ✅ **PLAYED END TO END, 2026-11-12** (`e8fd9479`), on a 430px phone over CDP with real pointerdowns.
+    Marshal → "Step inside" → fought the clock out → the bell read **3 of 12 waves**, matching the server
+    exactly → the chest on the sand rattled and opened onto the **Apprentice Wand** the server had just
+    granted, with its art. Two bosses killed in cleared zones; both cards named the creature and the xp.
+    Playing it found three things reading had not: the run card claimed chests on a run that earned none
+    (`chestsFor` pays nothing under a quarter of the waves — the ordinary early run), the scene's Monster
+    Card ghosted through the result card, and the boss card printed the creature's name twice. All fixed.
+  - ⚠️ **ONE THING A RIG CANNOT ANSWER.** A full clear is 138 bodies in 120 seconds. Driven hard — a tap
+    every 400ms, 291 of them — it cleared 3 of 12 waves, and slowing the input down made it *worse*,
+    because auto-attack only steps to what is already in reach so the hero stops dead after each kill in a
+    26-unit arena. A human taps faster and reads the room. **Whether twelve waves is reachable, or whether
+    the Coliseum only ever pays its bottom chest, needs one real run by a real player.**
 - **3.9** — is `sigil_road`'s carved sign a defect?
 - **3.10** — does the Grove need an elite-gear route at all?
 - The Grove-town **Tavern building** points at `/marketplace/friends`, not the tavern room. Under the City
