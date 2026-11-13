@@ -122,18 +122,100 @@ function conditionFor(categoryNames) {
     return /single/i.test(categoryNames.join(" ")) ? "used" : "new";
 }
 
-// Best-effort brand + "is this a card game item" from the Square category name.
-function cardBrandFor(categoryNames) {
-    const j = categoryNames.join(" ").toLowerCase();
-    if (j.includes("pokemon") || j.includes("pokémon")) return "Pokémon";
-    if (j.includes("magic")) return "Magic: The Gathering";
-    if (j.includes("yu-gi-oh") || j.includes("yugioh")) return "Yu-Gi-Oh!";
-    if (j.includes("one piece")) return "One Piece Card Game";
-    if (j.includes("dbz") || j.includes("dragon ball")) return "Dragon Ball Super";
-    if (j.includes("final fantasy")) return "Final Fantasy TCG";
-    if (j.includes("lorcana")) return "Disney Lorcana";
-    if (/\bsealed\b|booster/i.test(categoryNames.join(" "))) return "Trading Card Game";
-    return null;
+// ── ⚠️ BRAND READS THE NAME AS WELL AS THE CATEGORY ─────────────────────────────────────────────────────────
+// This only ever looked at the Square category, and the category is frequently a PERSON — "Eric D",
+// "Justin's cards", "Josh comics" — because that is how consignment is filed at the counter. Measured:
+// 423 of 1,984 items had no brand, and 29 of them named their game in the title while the category said
+// nothing at all. The same sweep found whole classes with obvious publishers: comics, consoles and drinks.
+//
+// ⚠️ THE LIST IS KEYWORDS, NOT SKUs, AND THAT IS THE REQUIREMENT. Luke: "Ensure downstream when we board
+// more items they too are fixed going forward." Nothing in this file enumerates a product — every rule
+// reads the name and category of whatever Square happens to be holding, at the moment the feed is
+// rendered. A row boarded tomorrow is categorised, weighed, labelled, grouped and branded by the same
+// rules with nobody doing anything. An allow-list of ids would have been the version that rots.
+const BRANDS = [
+    { re: /pok[eé]mon|charizard|pikachu|eevee|umbreon|sylveon|snorlax|mewtwo/i, brand: "Pokémon" },
+    { re: /yu-?gi-?oh|blue-eyes|dark magician/i, brand: "Yu-Gi-Oh!" },
+    { re: /\bmagic\b|\bmtg\b|planeswalker/i, brand: "Magic: The Gathering" },
+    { re: /one piece/i, brand: "One Piece Card Game" },
+    { re: /\bdbz\b|dragon ball/i, brand: "Dragon Ball Super" },
+    { re: /final fantasy/i, brand: "Final Fantasy TCG" },
+    { re: /lorcana/i, brand: "Disney Lorcana" },
+    { re: /star trek|klingon|\bborg\b/i, brand: "Star Trek" },
+    { re: /marvel|spider-?man|x-men|avengers/i, brand: "Marvel" },
+    { re: /\bdc\b|superman|batman|justice league|wonder woman/i, brand: "DC Comics" },
+    { re: /nintendo|game ?boy|\bwii\b|\bn64\b/i, brand: "Nintendo" },
+    { re: /playstation|\bps[1-5]\b/i, brand: "Sony" },
+    { re: /\bxbox\b/i, brand: "Microsoft" },
+    { re: /mountain dew|\bpepsi\b/i, brand: "PepsiCo" },
+    { re: /coca-?cola|\bcoke\b|\bsprite\b/i, brand: "Coca-Cola" },
+    { re: /fortnite/i, brand: "Fortnite" },
+    // Last, and deliberately vague: a sealed thing we cannot name is still a trading card product, which
+    // is a better answer for Google than no brand at all.
+    { re: /\bsealed\b|booster/i, brand: "Trading Card Game" },
+];
+
+function cardBrandFor(categoryNames, name = "") {
+    const label = `${categoryNames.join(" ")} ${name}`;
+    return (BRANDS.find((b) => b.re.test(label)) || { brand: null }).brand;
+}
+
+// ── ⚠️ THE SAME CARD LISTED TWICE IS A VARIANT, NOT A DUPLICATE ─────────────────────────────────────────────
+// 248 rows share a title with another row — a shop with three copies of one Magic single at $28, $26 and
+// $26 has three Square variations and three feed rows. Rewriting those titles to force them apart would be
+// inventing differences that do not exist. item_group_id is the attribute Google has for exactly this, and
+// it lets the three compete as ONE product with a price range rather than as three near-identical listings
+// that look like a merchant padding the feed.
+//
+// ⚠️ DERIVED FROM THE NAME, so it is stable across syncs and needs nothing stored. Two rows group if and
+// only if they are the same product by name, which is the test a human at the counter would use.
+function itemGroupId(name) {
+    return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 50) || null;
+}
+
+// ── ⚠️ THE TITLE IS WHAT GOOGLE MATCHES A SEARCH AGAINST ────────────────────────────────────────────────────
+// 438 titles were under 25 characters — "Charizard Binder", "Pepsi" — because a Square name is written for
+// somebody standing at the counter who can already see the thing. A shopper typing into Google cannot.
+//
+// ⚠️ IT PREFIXES, IT NEVER REWRITES. The Square name stays exactly as it is and the brand goes in front of
+// it, and only when the name does not already say it. That keeps every match the feed already earns while
+// adding the word people actually search with. Anything cleverer — reordering, injecting set names,
+// stuffing keywords — risks losing matches that work today, and Google penalises the stuffed version.
+function titleFor(name, brand) {
+    const clean = String(name || "").trim();
+    if (!brand) return clean;
+    const bare = brand.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const already = clean.replace(/[^a-z0-9]/gi, "").toLowerCase().includes(bare);
+    return already ? clean : `${brand} ${clean}`;
+}
+
+// ── ⚠️ A DESCRIPTION THAT SAYS SOMETHING ────────────────────────────────────────────────────────────────────
+// Every item carried the same sentence: "<name> — <categories>. In stock at The Wolf Den in Montgomery, MN."
+// True, and it told a shopper nothing they could not see from the title. This says what KIND of thing it is
+// and, for a single, that it is a real second-hand card rather than sealed product — which is the question
+// anybody buying a single actually has.
+const KIND_SENTENCE = {
+    single: "A single trading card, pulled and sleeved in store.",
+    sealed: "Sealed product, exactly as it comes from the manufacturer.",
+    collectible: "A collectible, in store and ready to ship.",
+    comic: "A back-issue comic from our shelves.",
+    art: "Original artwork, one of one.",
+    accessory: "Protection and storage for your collection.",
+    other: "In store and ready to ship.",
+};
+
+function descriptionFor(item, kind, brand) {
+    const parts = [
+        brand && kind !== "art" ? `${brand}.` : null,
+        KIND_SENTENCE[kind] || KIND_SENTENCE.other,
+        item.categoryNames.length ? `Filed under ${item.categoryNames.join(", ")}.` : null,
+        "Shipped from The Wolf Den in Montgomery, Minnesota, or collect it free in store.",
+    ];
+    return `${item.name} — ${parts.filter(Boolean).join(" ")}`;
 }
 
 export async function GET() {
@@ -142,14 +224,16 @@ export async function GET() {
     const itemsXml = items
         .map((item) => {
             const link = `${SITE_URL}/shop/${productHandle(item.name, item.variationId)}`;
-            const brand = cardBrandFor(item.categoryNames);
+            const brand = cardBrandFor(item.categoryNames, item.name);
             const productType = productTypeFor(item.categoryNames);
-            const description = `${item.name}${item.categoryNames.length ? ` — ${item.categoryNames.join(", ")}` : ""}. In stock at The Wolf Den in Montgomery, MN.`;
+            const kind = kindFor(item.categoryNames, item.name);
+            const description = descriptionFor(item, kind, brand);
+            const groupId = itemGroupId(item.name);
 
             return [
                 "    <item>",
                 `      <g:id>${esc(item.variationId)}</g:id>`,
-                `      <g:title>${esc(item.name).slice(0, 150)}</g:title>`,
+                `      <g:title>${esc(titleFor(item.name, brand)).slice(0, 150)}</g:title>`,
                 `      <g:description>${esc(description).slice(0, 4000)}</g:description>`,
                 `      <g:link>${esc(link)}</g:link>`,
                 `      <g:image_link>${esc(item.imageUrl)}</g:image_link>`,
@@ -163,7 +247,9 @@ export async function GET() {
                 // all because they had no recognisable card brand, which is a different question entirely.
                 `      <g:google_product_category>${googleCategoryFor(item.categoryNames, item.name)}</g:google_product_category>`,
                 productType ? `      <g:product_type>${esc(productType)}</g:product_type>` : "",
-                `      <g:custom_label_0>${esc(kindFor(item.categoryNames, item.name))}</g:custom_label_0>`,
+                `      <g:custom_label_0>${esc(kind)}</g:custom_label_0>`,
+                // ⚠️ GROUPED, NOT DEDUPED — three copies of one single are one product with three prices.
+                groupId ? `      <g:item_group_id>${esc(groupId)}</g:item_group_id>` : "",
                 `      <g:custom_label_1>${esc(priceBand(Number(item.price) || 0))}</g:custom_label_1>`,
                 "    </item>",
             ]
