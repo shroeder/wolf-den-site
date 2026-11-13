@@ -7,6 +7,8 @@ import { createServerLogger } from "@/lib/server-logger";
 
 import { aiRank } from "./ai-match.js";
 import { renderOutreachEmail } from "./email.js";
+import { renderRipsEmail } from "./rips-email.js";
+import { isRipper, ripPitchFor } from "./rips.js";
 import { loadPool, pickFor, PICK_COUNT } from "./picks.js";
 import { profilesFor } from "./profile.js";
 import { unsubscribeToken } from "./unsubscribe.js";
@@ -88,6 +90,8 @@ export async function buildCohort({ limit = 500 } = {}) {
     // shop that mails the same poster to everybody it has not seen in a month is a shop that obviously did
     // not look at anybody. Being IN an email is cheap; being THE pick is the claim this feature makes.
     const heroCount = new Map();
+    // One counter per pool, so the chase card advances for each recipient of that pool.
+    const ripRotation = new Map();
     const HERO_CAP = 3;
     const out = [];
     for (const member of members) {
@@ -98,6 +102,30 @@ export async function buildCohort({ limit = 500 } = {}) {
         // will ever get on a coin flip. Somebody whose history says neither which game nor what kind of
         // thing they buy is better left alone than written to badly.
         if (!profile.game && !profile.kind) continue;
+
+        // ── ⚠️ PACK OPENERS GO DOWN A DIFFERENT ROAD ENTIRELY ──────────────────────────────────────────
+        // Luke, 2026-11-13: "There are certainly mystery pack pplz that we would want to try and have play
+        // the virtual rips." Somebody whose purchases are two thirds Mystery Packs has told you what they
+        // enjoy, and it is not a particular card — the product email can only answer them with another $7
+        // pack, which is the weakest thing this system produces. The rip room is the right answer and it
+        // has reached twelve people.
+        //
+        // It is checked FIRST and falls through on null: a shut pool or an empty chase slot drops them
+        // back to the product email rather than skipping them. See ripPitchFor.
+        if (isRipper(profile)) {
+            const poolKey = profile.game === "magic" ? "mtg" : "pkmn";
+            const spin = ripRotation.get(poolKey) || 0;
+            const pitch = await ripPitchFor(profile, spin);
+            ripRotation.set(poolKey, spin + 1);
+            if (pitch) {
+                const unsubscribeUrl = `${base}/api/outreach/unsubscribe?t=${encodeURIComponent(unsubscribeToken(member.id))}`;
+                const rendered = renderRipsEmail({ name: member.name, pitch, unsubscribeUrl });
+                if (rendered) {
+                    out.push({ member, profile, picks: [], pattern: `rips:${pitch.key}`, kind: "rips", pitch, ...rendered });
+                    continue;
+                }
+            }
+        }
 
         // The scorer produces a shortlist; the model re-ranks it and names the pattern. That is the right
         // division of labour: the scorer is good at "in stock, right game, right money, one of them left",
@@ -179,7 +207,7 @@ export async function buildCohort({ limit = 500 } = {}) {
         const unsubscribeUrl = `${base}/api/outreach/unsubscribe?t=${encodeURIComponent(unsubscribeToken(member.id))}`;
         const rendered = renderOutreachEmail({ name: member.name, profile, picks: shown, pattern, unsubscribeUrl });
         if (!rendered) continue;
-        out.push({ member, profile, picks: shown, pattern, ...rendered });
+        out.push({ member, profile, picks: shown, pattern, kind: "product", ...rendered });
     }
     return out;
 }
