@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { addDays, dayKey, endOfDayMillis, startOfDayMillis } from "@/lib/admin-app/chicago-day.js";
 
 // ── Break-even tracker ────────────────────────────────────────────────────────────────────────────────────
 // The business report shows "merchandise profit" (net product revenue − realized COGS) and deliberately leaves
@@ -182,10 +183,18 @@ export async function breakevenSummary({ from, to }) {
     const activeItems = items.filter((i) => i.active);
     const dailyOverheadCents = activeItems.reduce((s, i) => s + perDayCents(i), 0);
 
-    const fromDate = from ? new Date(`${from}T00:00:00-05:00`) : new Date(Date.now() - 29 * 864e5);
-    const toDate = to ? new Date(`${to}T23:59:59-05:00`) : new Date();
-    const fromISO = fromDate.toISOString();
-    const toISO = new Date(toDate.getTime() + 1000).toISOString();
+    // ── ⚠️ MIDNIGHT IS MEASURED, NOT ASSUMED ────────────────────────────────────────────────────────
+    // This was a date built from a hardcoded "-05:00", which IS midnight in Chicago for the eight months
+    // of the year the clocks are forward. From 2026-11-01 it resolved to 23:00 the previous evening, so
+    // every day row below came out keyed to YESTERDAY — and the labour lookup, which keys on the shift's
+    // own Chicago date, found nothing. Eric's six-hour shift showed as "$0 wages so far" on the owner's
+    // phone and the net was about $87 too generous, for eleven days, without anything erroring.
+    // See the long note in chicago-day.js.
+    const fromKey = from || dayKey(Date.now() - 29 * 864e5);
+    const toKey = to || dayKey(Date.now());
+    const fromISO = new Date(startOfDayMillis(fromKey)).toISOString();
+    // The exclusive end of the last day, which is also what Square wants as an end_at.
+    const toISO = new Date(endOfDayMillis(toKey) + 1).toISOString();
 
     // WHO counts as labor. If an employee is pinned in config, just them. If nobody is pinned — which was the
     // case in production, and is why break-even had been reporting overhead only — fall back to every ACTIVE
@@ -216,8 +225,10 @@ export async function breakevenSummary({ from, to }) {
     let totalLabor = 0;
     let totalHours = 0;
     const perMember = wages.map((m) => ({ ...m, hours: 0, cents: 0 }));
-    for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + 864e5)) {
-        const key = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+    // ⚠️ WALK DATES, NOT INSTANTS. Stepping a Date by 864e5 and formatting each step is calendar arithmetic
+    // in a unit that is not a calendar day — it repeats or skips a date on the two days a year Central
+    // changes length. addDays goes via noon, where no transition can reach it.
+    for (let key = fromKey; key <= toKey; key = addDays(key, 1)) {
         let laborCents = 0;
         let hrs = 0;
         for (const m of perMember) {

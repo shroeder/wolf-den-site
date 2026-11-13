@@ -1,5 +1,6 @@
 import "server-only";
 
+import { dayKey, startOfDayMillis } from "@/lib/admin-app/chicago-day.js";
 import { storeStatus, beforeOpeningToday } from "@/lib/marketplace/store-hours.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
@@ -76,7 +77,10 @@ async function openShift(teamMemberId) {
 // Today's clocked hours (Central), so the app can show "3h 20m so far" rather than just a raw start time.
 async function hoursToday(teamMemberId) {
     const now = new Date();
-    const dayStart = new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(now) + "T00:00:00-05:00");
+    // ⚠️ THE SAME HARDCODED OFFSET THAT BROKE THE WAGE LINE LIVED HERE TOO. "-05:00" is Central in summer;
+    // from November it put the day boundary at 23:00 the night before, so a late shift from YESTERDAY would
+    // have counted toward today's "so far" total. Measured now — see chicago-day.js.
+    const dayStart = new Date(startOfDayMillis(dayKey(now)));
     const r = await sq("/v2/labor/shifts/search", {
         method: "POST",
         body: JSON.stringify({ query: { filter: { team_member_ids: [teamMemberId], start: { start_at: dayStart.toISOString(), end_at: new Date(now.getTime() + 864e5).toISOString() } } }, limit: 50 }),

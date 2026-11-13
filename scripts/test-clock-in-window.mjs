@@ -14,6 +14,13 @@ import { register } from "node:module";
 register("./lib/app-loader.mjs", import.meta.url);
 
 const { shiftWindow, inClockInWindow, REMINDER_JOB_PERIOD_MIN } = await import("@/lib/admin-app/timeclock.js");
+// ⚠️ THE TICKS ARE WALL-CLOCK TIMES, because the cron and the store hours are both written in wall-clock
+// time. The first version of this built them as `WEEK_START + "T00:00:00-05:00"` plus elapsed minutes, with
+// a comment claiming "Central is UTC-5 (CST) on these November dates" — which is wrong twice over: CST is
+// UTC-6, and WEEK_START is the very day the clocks go back. The VERDICT survived it (untilOpen is derived
+// from the real instant either way) but every time it printed was an hour out, so "fires: 11:30" for an
+// 11:00 opening read like a reminder arriving after the door was already open.
+const { zonedMillis, addDays } = await import("@/lib/admin-app/chicago-day.js");
 
 // The cron in vercel.json: "0,30 * * * *".
 const TICK_MINUTES = [0, 30];
@@ -34,8 +41,7 @@ for (let d = 0; d < 7; d++) {
 
     for (let h = 0; h < 24; h++) {
         for (const m of TICK_MINUTES) {
-            // Central is UTC-5 (CST) on these November dates.
-            const at = new Date(Date.parse(`${WEEK_START}T00:00:00-05:00`) + ((d * 24 + h) * 60 + m) * 60000);
+            const at = new Date(zonedMillis(addDays(WEEK_START, d), h, m));
             const win = shiftWindow(at);
             if (win.untilOpen != null && win.untilOpen > 0) everPreOpen = true;
             if (inClockInWindow(win)) {
@@ -44,7 +50,7 @@ for (let d = 0; d < 7; d++) {
         }
     }
 
-    const label = DAYS[(new Date(Date.parse(`${WEEK_START}T12:00:00-05:00`) + d * 86400000)).getUTCDay()];
+    const label = DAYS[new Date(zonedMillis(addDays(WEEK_START, d), 12)).getUTCDay()];
     summary.push({ label, hits, everPreOpen });
 }
 

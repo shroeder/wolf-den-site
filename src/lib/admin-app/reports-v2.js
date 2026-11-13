@@ -4,6 +4,7 @@ import { db } from "@/lib/db.js";
 import { annotateFifoCosts } from "@/lib/admin-app/fifo-annotate.js";
 import { createServerLogger } from "@/lib/server-logger";
 import { expandShopOrders } from "@/lib/admin-app/shop-order-lines.js";
+import { addDays, dateParts, dayKey, hourOf, startOfDayMillis, ZONE } from "@/lib/admin-app/chicago-day.js";
 
 const logger = createServerLogger({ source: "api", subsystem: "reports-v2" });
 
@@ -674,39 +675,19 @@ export function summarise({ lines, cashRefunds = [], consignedRateByCategoryId =
 // phone is America/Chicago and on Vercel is UTC. Left to the default, every sale after 7pm files under
 // tomorrow and the daily series silently disagrees with the phone by a day. Same trap as the SQL one in
 // [[postgres-landmines]].
-const ZONE = "America/Chicago";
-
-const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
-const partsFmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: ZONE, weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", hour12: false,
-});
-
-/** The Chicago calendar date of an instant, as YYYY-MM-DD. */
-const dayKey = (ms) => dayKeyFmt.format(new Date(ms));
-
-/** Midnight Chicago on a YYYY-MM-DD, in epoch millis — the bucket's `startMillis`. */
-function startOfDayMillis(key) {
-    // Chicago is UTC-5 or UTC-6 depending on the date, so the offset is measured rather than assumed.
-    const noonUtc = Date.parse(`${key}T12:00:00Z`);
-    const hourAtNoon = Number(partsFmt.formatToParts(new Date(noonUtc)).find((p) => p.type === "hour").value);
-    const offsetHours = 12 - hourAtNoon;
-    return Date.parse(`${key}T00:00:00Z`) + offsetHours * 3600000;
-}
+// ── ⚠️ THESE MOVED OUT, THEY DID NOT CHANGE ────────────────────────────────────────────────────────────
+// dayKey / startOfDayMillis / addDays / dateParts were written here first and were always correct. They are
+// in chicago-day.js now because breakeven.js needed the same rule and had instead hardcoded "-05:00",
+// which went wrong the day the clocks changed and zeroed the wage line on the owner's phone for eleven
+// days. Imported rather than copied: a second implementation of "what day is it in the shop" is the thing
+// that caused the bug. [[reuse-the-rule-never-restate-it]]
+//
+// ⚠️ v1 PARITY IS UNAFFECTED BY DESIGN — this is a move, byte for byte, not a rewrite.
 
 const MONTHS = ["January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"];
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/** The parts of a YYYY-MM-DD, with the weekday it falls on. */
-function dateParts(key) {
-    const [y, m, d] = key.split("-").map(Number);
-    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    return { y, m, d, dow };
-}
-const addDays = (key, n) => {
-    const { y, m, d } = dateParts(key);
-    return dayKeyFmt.format(new Date(Date.UTC(y, m - 1, d + n, 12)));
-};
 
 // The four label formats the phone uses, reproduced exactly: "M/d", "EEE, MMM d, yyyy", "MMM ''yy", "MMMM yyyy".
 const shortDay = (key) => { const { m, d } = dateParts(key); return `${m}/${d}`; };
@@ -722,7 +703,6 @@ const mondayOf = (key) => { const { dow } = dateParts(key); return addDays(key, 
 const firstOfMonth = (key) => `${key.slice(0, 7)}-01`;
 
 const hourLabel = (h) => (h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`);
-const hourOf = (ms) => Number(partsFmt.formatToParts(new Date(ms)).find((p) => p.type === "hour").value) % 24;
 
 /**
  * One granularity's series and breakdowns — the port of `buildLevel`.
