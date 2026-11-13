@@ -76,12 +76,18 @@ function priceBand(price) {
     return "150-plus";
 }
 
-function kindFor(categoryNames, name) {
+function kindFor(categoryNames, name = "") {
     const label = `${categoryNames.join(" ")} ${name}`;
     if (/single/i.test(label)) return "single";
     if (/sealed|booster|\bpack\b|\bdeck\b|\btin\b|\bbox\b/i.test(label)) return "sealed";
     if (/plush|figure/i.test(label)) return "collectible";
-    if (/comic/i.test(label)) return "comic";
+    // ⚠️ THE NAME OUTRANKS THE CATEGORY FOR THESE. Square categories are often a person's shelf —
+    // "Josh comics" holds comics AND consoles AND action figures — so matching the category alone
+    // described a Nintendo 64 as "a back-issue comic from our shelves" on a live listing. Anything
+    // the NAME positively identifies wins; the category is the fallback, not the authority.
+    // [[art-is-not-the-authority-on-what-a-thing-is]]
+    if (/nintendo|playstation|xbox|wii|game ?boy|console/i.test(name)) return "other";
+    if (/comic|#d+/i.test(label)) return "comic";
     if (/painting|\bart\b/i.test(label)) return "art";
     if (/accessor|sleeve|binder|toploader/i.test(label)) return "accessory";
     return "other";
@@ -147,7 +153,9 @@ const BRANDS = [
     { re: /nintendo|game ?boy|\bwii\b|\bn64\b/i, brand: "Nintendo" },
     { re: /playstation|\bps[1-5]\b/i, brand: "Sony" },
     { re: /\bxbox\b/i, brand: "Microsoft" },
-    { re: /mountain dew|\bpepsi\b/i, brand: "PepsiCo" },
+    // ⚠️ THE BRAND ON THE CAN, NOT THE HOLDING COMPANY. Nobody searches "PepsiCo".
+    { re: /mountain dew/i, brand: "Mountain Dew" },
+    { re: /\bpepsi\b/i, brand: "Pepsi" },
     { re: /coca-?cola|\bcoke\b|\bsprite\b/i, brand: "Coca-Cola" },
     { re: /fortnite/i, brand: "Fortnite" },
     // Last, and deliberately vague: a sealed thing we cannot name is still a trading card product, which
@@ -185,12 +193,42 @@ function itemGroupId(name) {
 // it, and only when the name does not already say it. That keeps every match the feed already earns while
 // adding the word people actually search with. Anything cleverer — reordering, injecting set names,
 // stuffing keywords — risks losing matches that work today, and Google penalises the stuffed version.
-function titleFor(name, brand) {
+function titleFor(name, brand, kind) {
     const clean = String(name || "").trim();
     if (!brand) return clean;
-    const bare = brand.replace(/[^a-z0-9]/gi, "").toLowerCase();
-    const already = clean.replace(/[^a-z0-9]/gi, "").toLowerCase().includes(bare);
-    return already ? clean : `${brand} ${clean}`;
+
+    // ── ⚠️ A SINGLE'S TITLE IS A FORMAT, AND IT IS NOT MINE TO EDIT ─────────────────────────────
+    // Luke: "Im mostly concerned with pokemon singles as I had a specific format containing
+    // important info including condition."
+    //
+    // The format is <card> <collector number> <rarity> <condition>, and the CONDITION IS LAST —
+    // 890 of 1,035 Pokémon singles carry one. Google truncates a displayed title around 70
+    // characters, so eight characters added to the FRONT push the most perishable information off
+    // the END. Measured: Pokémon singles over 70 chars went 1 -> 6, and five cards had their
+    // condition pushed past the cut by the prefix alone. Across every game it was 12.
+    //
+    // ⚠️ AND IT BOUGHT NOTHING. g:brand is already its own field saying "Pokémon" — Google has the
+    // brand either way. The prefix was spending the one scarce resource in the title to repeat
+    // something already stated in a field built for it.
+    //
+    // So a single keeps the name exactly as it was written at the counter. The prefix survives only
+    // where there is no format to damage and the name is genuinely too thin to search against —
+    // "Charizard Binder", "Pepsi".
+    if (kind === "single") return clean;
+
+    // ⚠️ CONTAINMENT BOTH WAYS. "Pepsi" does not contain "PepsiCo", so the first version produced
+    // "PepsiCo Pepsi", and "McFarlane Toys DC Gold Label" does not contain "DCComics", so it
+    // produced "DC Comics McFarlane Toys DC Gold Label". A prefix that stutters is worse than none.
+    const a = clean.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const b = brand.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (a.includes(b) || b.includes(a)) return clean;
+    // ⚠️ AND THE BRAND'S FIRST WORD, AS A WORD. "McFarlane Toys DC Gold Label" does not contain the
+    // string "DCComics", so the squashed test above let it through and the title came out as
+    // "DC Comics McFarlane Toys DC Gold Label…" — the brand said twice in eight words. The thing a
+    // reader notices is the WORD, so that is what has to be looked for.
+    const head = brand.split(/[^a-z0-9]+/i)[0];
+    if (head && head.length >= 2 && new RegExp(`(^|[^a-z0-9])${head}([^a-z0-9]|$)`, "i").test(clean)) return clean;
+    return `${brand} ${clean}`;
 }
 
 // ── ⚠️ A DESCRIPTION THAT SAYS SOMETHING ────────────────────────────────────────────────────────────────────
@@ -203,7 +241,10 @@ const KIND_SENTENCE = {
     sealed: "Sealed product, exactly as it comes from the manufacturer.",
     collectible: "A collectible, in store and ready to ship.",
     comic: "A back-issue comic from our shelves.",
-    art: "Original artwork, one of one.",
+    // ⚠️ NOT "one of one". The first version said it, and nothing in the data knows whether
+    // these are originals or prints — 99 of them at $30 each suggests prints. A claim about
+    // provenance that the shop has not made is a claim I invented on a live listing.
+    art: "Artwork from our local artists, sold in store.",
     accessory: "Protection and storage for your collection.",
     other: "In store and ready to ship.",
 };
@@ -233,7 +274,7 @@ export async function GET() {
             return [
                 "    <item>",
                 `      <g:id>${esc(item.variationId)}</g:id>`,
-                `      <g:title>${esc(titleFor(item.name, brand)).slice(0, 150)}</g:title>`,
+                `      <g:title>${esc(titleFor(item.name, brand, kind)).slice(0, 150)}</g:title>`,
                 `      <g:description>${esc(description).slice(0, 4000)}</g:description>`,
                 `      <g:link>${esc(link)}</g:link>`,
                 `      <g:image_link>${esc(item.imageUrl)}</g:image_link>`,
