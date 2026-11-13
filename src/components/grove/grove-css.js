@@ -1541,7 +1541,12 @@ export const GROVE_CSS = `
 /* ── ⚠️ LOOT ARRIVES WITH ITS OWN FACE ────────────────────────────────────────────────────────
    Luke: "You should actually see the sprite and the name of it." The drop spends its whole life as a
    sprite on the floor and then turned into a line of text at the exact moment it became a reward. */
-.gv-num.is-loot img { width: 1.5em; height: 1.5em; margin-right: 0.3em; vertical-align: -0.38em;
+/* ⚠️ SAME FIX, SAME REASON, ON THE OTHER POP PIPELINE. lootPop takes an art argument too and this
+   rule was also keyed to one variant (.is-loot). Nothing passes art for another kind today, so this
+   half is latent rather than live — which is precisely the state the gear proc was in right up until
+   somebody passed art to it. Fixed at the same time because finding it twice is the thing worth
+   acting on, not the one instance that happened to fire. */
+.gv-num img { width: 1.5em; height: 1.5em; margin-right: 0.3em; vertical-align: -0.38em;
     object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85)); }
 
 /* ── ⚠️ A PROC IS NOT A DAMAGE NUMBER ─────────────────────────────────────────────────────────
@@ -1646,9 +1651,26 @@ export const GROVE_CSS = `
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 14px rgba(150,200,255,0.9), 0 0 30px rgba(70,130,220,0.55); }
 .gv-proc.is-heal { translate: -50% 0; color: #8dffb8; letter-spacing: 0.16em;
     text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 16px rgba(80,255,160,0.9), 0 0 36px rgba(30,200,110,0.6); }
-/* Sized off the type like the loot pop's, so the object scales with the number beside it rather than
-   being a fixed pixel count that is huge on a phone and lost on a desktop. */
-.gv-proc.is-heal img { width: 1.5em; height: 1.5em; margin-right: 0.34em; vertical-align: -0.4em;
+/* ── ⚠️ EVERY PROC THAT CARRIES AN OBJECT, NOT JUST THE HEAL ──────────────────────────────────
+   Luke, 2026-11-12: "I got a piece of gear in the grove. Temporarily the sprite took up the whole
+   screen."
+
+   It did, and it had since the gear proc shipped. This rule was written as .gv-proc.is-heal img,
+   and the comment above .is-heal still called it "the only proc that carries an object" — which was
+   true when it was written and stopped being true the moment procCall gained an art argument and
+   the super-rare gear drop started passing one. A gear proc therefore matched NO img rule at all and
+   the browser did the only thing it can with an unsized image: it drew it at its natural size. Item
+   sprites are 1024x1024, which on a 430px phone is two and a half screens wide. It vanished after a
+   second because the pop expires, which is exactly why it reads as a flicker rather than as a bug.
+
+   ⚠️ SO THE RULE IS ON THE ELEMENT, NOT ON THE VARIANT. A size that only applies to one kind is a
+   size that is missing for every kind added afterwards, and the next person to pass art to procCall
+   would have rediscovered this the same way. Sized off the type so the object scales with the number
+   beside it rather than being a fixed pixel count that is huge on a phone and lost on a desktop.
+
+   (The heal proc itself is dormant — the belt went on 2026-11-09 and nothing spends food any more —
+   so the live caller of this rule today is the gear drop.) */
+.gv-proc img { width: 1.5em; height: 1.5em; margin-right: 0.34em; vertical-align: -0.4em;
     object-fit: contain; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.85)); }
 .gv-num.is-hit { color: #ffe9a8; }
 /* ⚠️ A CRIT IS A DIFFERENT EVENT, NOT A BIGGER NUMBER. Bigger alone reads as more damage; what says CRIT
