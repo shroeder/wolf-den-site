@@ -12,6 +12,7 @@ import { buyBackCents } from "@/lib/marketplace/buyback.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { poolByKey } from "@/lib/marketplace/pack-pools.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { VAULT_HOLD_DAYS, vaultExpiryAt } from "@/lib/marketplace/vault-hold.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const logger = createServerLogger({ source: "api", subsystem: "vault" });
@@ -24,7 +25,6 @@ const logger = createServerLogger({ source: "api", subsystem: "vault" });
 // transition is guarded on the row's current status rather than on what the client believed when it rendered.
 
 const money = (cents) => Math.max(0, Math.round(Number(cents) || 0));
-
 function toVaultCard(row) {
     const tier = tierByKey(row.tier);
     return {
@@ -50,6 +50,12 @@ function toVaultCard(row) {
         releasableAt: row.releasable_at || null,
         releasable: !row.releasable_at || new Date(row.releasable_at) <= new Date(),
         pulledAt: row.created_at,
+        // ── ⚠️ THE DEADLINE IS SENT AS AN INSTANT, AND THE COUNTDOWN IS THE CLIENT'S JOB ────────────
+        // Sending "2 days left" would freeze the moment the payload was built — a tab left open would sit
+        // at "2 days left" through the sale itself, which is the one number on this screen that must never
+        // be stale. The client ticks it. `expiresAt` is null for anything not on the clock (an ordered
+        // card), and the UI reads that as "no timer" rather than as "expired".
+        expiresAt: row.status === "held" ? row.expires_at || null : null,
     };
 }
 
@@ -114,7 +120,8 @@ export async function getVault(buyerId) {
     const [cards, events, order, lifetime] = await Promise.all([
         db.query(
             `SELECT id, card_name, set_name, card_number, condition, image_url, tier,
-                    pulled_value_cents, current_value_cents, status, order_id, releasable_at, created_at
+                    pulled_value_cents, current_value_cents, status, order_id, releasable_at, created_at,
+                    expires_at
              FROM mkt_vault_card
              WHERE buyer_id = $1 AND status IN ('held', 'on_order')
              ORDER BY current_value_cents DESC, created_at DESC`,
@@ -209,8 +216,11 @@ export async function getVault(buyerId) {
  * neither the card nor the credit. A restock that fails leaves a loud warning and a card for a human to put
  * back — recoverable. A credit that fails after we took the card is not.
  */
-export async function sellVaultCards({ buyerId, cardIds }) {
-    if (!vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
+export async function sellVaultCards({ buyerId, cardIds, auto = false }) {
+    // ⚠️ THE SWEEP BYPASSES THE DOOR, AND ONLY THE SWEEP. vaultOpenFor is a question about whether a member
+    //    may USE the vault; closing the flag must not strand cards that are already on the clock, nor leave
+    //    the shop holding singles it can no longer sell because an expiry sweep silently stopped running.
+    if (!auto && !vaultOpenFor(buyerId)) return { ok: false, error: "closed" };
     const ids = (Array.isArray(cardIds) ? cardIds : []).filter(Boolean).slice(0, 50);
     if (!ids.length) return { ok: false, error: "nothing_selected" };
 
@@ -256,7 +266,12 @@ export async function sellVaultCards({ buyerId, cardIds }) {
                     buyerId,
                     card.id,
                     payouts.get(card.id),
-                    JSON.stringify({ card: card.card_name, marketCents: money(card.current_value_cents) }),
+                    JSON.stringify({
+                        card: card.card_name, marketCents: money(card.current_value_cents),
+                        // What the History tab reads to say "the three days ran out" rather than implying
+                        // the member pressed something they do not remember pressing.
+                        ...(auto ? { auto: true, reason: "expired" } : {}),
+                    }),
                 ]
             )
             .catch(() => {});
@@ -313,10 +328,67 @@ export async function sellVaultCards({ buyerId, cardIds }) {
         }
     }
 
-    await trackActivity(buyerId, "vault_sellback", { cents: totalCents, count: claimed.length }).catch(() => {});
-    logger.info("vault.sell.success", { buyerId, count: claimed.length, totalCents });
+    await trackActivity(buyerId, "vault_sellback", { cents: totalCents, count: claimed.length, auto }).catch(() => {});
+    logger.info("vault.sell.success", { buyerId, count: claimed.length, totalCents, auto });
 
     return { ok: true, soldCount: claimed.length, creditedCents: totalCents, balanceCents };
+}
+
+// ── THE SWEEP ───────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "Cards should auto sell back after 3 days."
+//
+// ⚠️ IT CALLS sellVaultCards. IT DOES NOT WRITE A SALE. That function is four separate jobs — rate the card,
+// move the credit, write the history row, put the single back on the shelf and post the trade — and a second
+// implementation of "sell a vault card" would be wrong in a different way within a month. The house has paid
+// for exactly this twice: the reveal's sell button and the vault's were separate once and immediately
+// disagreed (restocked nothing, recorded no cost, posted no trade), and the note above sellVaultCards still
+// says so. [[atomic-split-into-steps-drops-lines]]
+//
+// ⚠️ ONE CALL PER MEMBER, NOT PER CARD. sellVaultCards rates each card individually inside a basket, so a
+// member whose three cards expire in the same hour gets one credit event and one history entry rather than
+// three — and buyBackCents still rounds per card, so grouping costs them nothing.
+//
+// ⚠️ AND IT NEVER TOUCHES A CARD THAT IS NOT `held`. The guard is in sellVaultCards' own claiming UPDATE as
+// well as in the query below, which is deliberate belt-and-braces: a card that got ordered between this
+// SELECT and that UPDATE must lose the race, because the member has already decided to keep it.
+export async function sweepExpiredVaultCards({ limit = 200, now = new Date() } = {}) {
+    const due = await db.query(
+        `SELECT buyer_id, id
+           FROM mkt_vault_card
+          WHERE status = 'held' AND expires_at IS NOT NULL AND expires_at <= $1
+          ORDER BY expires_at
+          LIMIT $2`,
+        [now, limit]
+    ).catch((error) => {
+        logger.error("vault.sweep.query_failed", error);
+        return [];
+    });
+    if (!due.length) return { ok: true, members: 0, cards: 0, creditedCents: 0 };
+
+    const byBuyer = new Map();
+    for (const row of due) {
+        if (!byBuyer.has(row.buyer_id)) byBuyer.set(row.buyer_id, []);
+        byBuyer.get(row.buyer_id).push(row.id);
+    }
+
+    let cards = 0;
+    let creditedCents = 0;
+    const failed = [];
+    for (const [buyerId, cardIds] of byBuyer) {
+        // ⚠️ `auto` RIDES THROUGH TO THE HISTORY ROW. A member scrolling their vault history has to be able
+        //    to tell a sale they made from one the clock made for them; without it both read as "sold back"
+        //    and the screen looks like it invented a transaction.
+        const res = await sellVaultCards({ buyerId, cardIds, auto: true }).catch((error) => {
+            logger.error("vault.sweep.sell_failed", error, { buyerId });
+            return null;
+        });
+        if (!res?.ok) { failed.push({ buyerId, error: res?.error || "threw" }); continue; }
+        cards += res.soldCount;
+        creditedCents += res.creditedCents;
+    }
+
+    logger.info("vault.sweep.done", { members: byBuyer.size, cards, creditedCents, failed: failed.length });
+    return { ok: true, members: byBuyer.size, cards, creditedCents, failed };
 }
 
 /** Cards eligible to leave the building right now — the hold in §12 is applied here, not in the UI. */
@@ -337,9 +409,20 @@ export async function releasableCards(buyerId, cardIds) {
 /** Refresh the hold stamp on every held card — used after a credit purchase settles. */
 export async function refreshReleaseHold(buyerId) {
     const at = await releasableAt(buyerId);
+    // ⚠️ THE DEADLINE MOVES WITH THE HOLD, AND ONLY EVER FORWARD. A fresh credit purchase pushes the
+    //    release date out for every held card (§12), which would otherwise leave a card whose three-day
+    //    decision window closes BEFORE the member is allowed to order it — the trap vaultExpiryAt exists
+    //    to prevent, re-created here every time somebody buys credit. GREATEST so a top-up can never
+    //    shorten a window a member has already been shown.
     await db
-        .query(`UPDATE mkt_vault_card SET releasable_at = $2, updated_at = NOW() WHERE buyer_id = $1 AND status = 'held'`,
-            [buyerId, at])
+        .query(
+            `UPDATE mkt_vault_card
+                SET releasable_at = $2,
+                    expires_at = GREATEST(COALESCE(expires_at, $3::timestamptz), $3::timestamptz),
+                    updated_at = NOW()
+              WHERE buyer_id = $1 AND status = 'held'`,
+            [buyerId, at, vaultExpiryAt(at)]
+        )
         .catch(() => {});
 }
 
@@ -546,12 +629,16 @@ export async function cancelVaultOrder({ buyerId, orderId }) {
 
     const wasPrepared = order.fulfillment_status === "ready";
 
+    // ⚠️ A CANCELLED ORDER RESTARTS THE CLOCK, it does not resume the old one. The card has been out of
+    //    the race since it was ordered, and its stored deadline is whatever it was days ago — restoring it
+    //    to 'held' with that stamp still on it would put the card straight into the next sweep and sell it
+    //    out from under somebody who had just changed their mind about collecting it.
     const returned = await db.query(
         `UPDATE mkt_vault_card
-         SET status = 'held', order_id = NULL, updated_at = NOW()
+         SET status = 'held', order_id = NULL, expires_at = $3, updated_at = NOW()
          WHERE buyer_id = $1 AND order_id = $2 AND status = 'on_order'
          RETURNING id, card_name, mystery_card_id`,
-        [buyerId, orderId]
+        [buyerId, orderId, vaultExpiryAt(await releasableAt(buyerId))]
     );
     if (!returned.length) return { ok: false, error: "nothing_to_cancel" };
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BAGS_PUBLIC } from "@/lib/marketplace/bags-gate.js";
 
 import { BUYBACK_PERCENT } from "@/lib/marketplace/buyback.js";
+import { VAULT_HOLD_DAYS } from "@/lib/marketplace/vault-hold.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 const usd = (cents) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
@@ -32,6 +33,83 @@ const ACTION_LABEL = {
 function shortDate(value) {
     if (!value) return "";
     return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// ── THE CLOCK ───────────────────────────────────────────────────────────────────────────────────────────────
+// Luke, 2026-11-12: "the timer should be apparant for users."
+//
+// A card sits in the vault for three days and then trades itself back. That is a thing the shop does to a
+// member's card, so the deadline cannot be a sentence in a help page — it has to be on the card, counting,
+// wherever the card is shown. [[teach-by-showing-not-telling]]
+//
+// ⚠️ IT TICKS ON THE CLIENT FROM AN INSTANT, rather than the server sending "2 days left". A rendered
+// remainder is correct for exactly the moment the payload was built, and a vault tab left open overnight
+// would sit at "2 days left" straight through the sale. The server sends `expiresAt`; this turns it into
+// words, once a minute.
+const MIN = 60000;
+const HOUR = 3600000;
+const DAY = 86400000;
+
+/** "2d 4h" / "6h 12m" / "9m" / "any moment now" — the shortest honest form at each scale. */
+function timeLeftLabel(ms) {
+    if (ms <= 0) return "any moment now";
+    if (ms >= DAY) {
+        const d = Math.floor(ms / DAY);
+        const h = Math.floor((ms % DAY) / HOUR);
+        return h ? `${d}d ${h}h` : `${d}d`;
+    }
+    if (ms >= HOUR) {
+        const h = Math.floor(ms / HOUR);
+        const m = Math.floor((ms % HOUR) / MIN);
+        return m ? `${h}h ${m}m` : `${h}h`;
+    }
+    return `${Math.max(1, Math.ceil(ms / MIN))}m`;
+}
+
+/**
+ * A ticking "now", shared by every countdown on the screen.
+ *
+ * ⚠️ ONE TIMER FOR THE WHOLE PAGE, not one per card. A vault with twenty cards would otherwise mount twenty
+ * intervals that all fire a second apart, each re-rendering its own tile — and [[chrome-fanout-bills-every-page]]
+ * is the same lesson from the server side: the cost of a per-item timer is paid by whoever has the most items.
+ *
+ * ⚠️ AND IT STOPS WHEN THE TAB IS HIDDEN. A background tab counting down forever is a wake-up a minute for a
+ * screen nobody is looking at; the visibility handler re-reads the clock on return, so coming back shows the
+ * real remainder rather than where the timer left off. Same rule the poll gate enforces for anything that
+ * talks to the server, applied to something that does not.
+ */
+function useNow(active) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!active) return undefined;
+        let id = null;
+        const tick = () => setNow(Date.now());
+        const start = () => { if (id == null) { tick(); id = setInterval(tick, 30000); } };
+        const stop = () => { if (id != null) { clearInterval(id); id = null; } };
+        const onVis = () => (document.hidden ? stop() : start());
+        if (!document.hidden) start();
+        document.addEventListener("visibilitychange", onVis);
+        return () => { stop(); document.removeEventListener("visibilitychange", onVis); };
+    }, [active]);
+    return now;
+}
+
+/**
+ * The countdown as it appears on a card.
+ *
+ * ⚠️ URGENT UNDER A DAY, and that threshold is the whole reason this is not just text. "2d 4h" is
+ * information; "4h 12m" is a decision the member has to make today, and it has to look different from
+ * across the grid or the timer is decoration.
+ */
+function Countdown({ expiresAt, now, className = "vt-tile-timer" }) {
+    if (!expiresAt) return null;
+    const left = new Date(expiresAt).getTime() - now;
+    const urgent = left < DAY;
+    return (
+        <span className={`${className}${urgent ? " is-urgent" : ""}`}>
+            {left <= 0 ? "selling back now" : `${timeLeftLabel(left)} left`}
+        </span>
+    );
 }
 
 export default function VaultClient({ initial }) {
@@ -85,6 +163,12 @@ export default function VaultClient({ initial }) {
     // Memoised because `vault?.held || []` is a fresh array every render, which would make every useMemo
     // below it recompute on every keystroke elsewhere in the tree.
     const held = useMemo(() => vault?.held || [], [vault?.held]);
+    // Only runs while there is something to count down. An empty vault mounts no interval at all.
+    const now = useNow(held.some((c) => c.expiresAt));
+    // The card closest to its deadline decides what the banner says — a member with one card expiring in
+    // three hours and nine expiring in three days needs to be told about the three hours.
+    const soonest = useMemo(() => held.reduce((best, c) => (
+        c.expiresAt && (!best || new Date(c.expiresAt) < new Date(best)) ? c.expiresAt : best), null), [held]);
 
     const selectedCards = useMemo(
         () => held.filter((c) => selected.has(c.id)),
@@ -330,6 +414,22 @@ export default function VaultClient({ initial }) {
                                 &mdash; collect free from the shop in Montgomery, or have them shipped to you.
                             </p>
                         ) : null}
+                        {/* ── ⚠️ THE RULE, STATED ONCE, WHERE THE CARDS ARE ─────────────────────────────
+                            The countdown on each tile says WHEN. This says WHAT HAPPENS, because a number
+                            ticking down on something you own is alarming until you know what it means —
+                            and the answer is reassuring: the credit comes back, at the same rate the
+                            counter pays. Shown only while something is actually on the clock.
+
+                            It names the soonest deadline rather than the rule in the abstract. "Cards
+                            trade back after 3 days" is a policy; "the first one goes in 4h 12m" is a
+                            thing you can act on. */}
+                        {soonest ? (
+                            <p className="vt-deadline">
+                                Cards trade back to us after <b>{VAULT_HOLD_DAYS} days</b> at{" "}
+                                {BUYBACK_PERCENT}% store credit &mdash; order one and it is yours for good.
+                                {" "}Next <Countdown expiresAt={soonest} now={now} className="vt-deadline-at" />.
+                            </p>
+                        ) : null}
                         <ul className="vt-grid">
                             {held.map((card) => {
                                 const on = selected.has(card.id);
@@ -366,6 +466,10 @@ export default function VaultClient({ initial }) {
                                             {card.valueCents !== card.pulledValueCents ? (
                                                 <span className="vt-tile-was">pulled at {usd(card.pulledValueCents)}</span>
                                             ) : null}
+                                            {/* ⚠️ ON THE CARD, NOT IN A FOOTNOTE. The three days end in this
+                                                card trading itself back, so the clock belongs on the thing
+                                                it is going to happen to. */}
+                                            <Countdown expiresAt={card.expiresAt} now={now} />
                                         </div>
                                         {/* ⚠️ NOT A NATIVE CHECKBOX. Luke: "Checkbook ghetto". A browser
                                             checkbox is the one control that cannot be styled into the rest
@@ -466,7 +570,13 @@ export default function VaultClient({ initial }) {
                         {vault.history.map((h) => (
                             <li key={h.id}>
                                 <span className="vt-hist-what">
-                                    {ACTION_LABEL[h.action] || h.action}
+                                    {/* ⚠️ A SALE THE CLOCK MADE IS NOT A SALE THE MEMBER MADE, and the
+                                        history must not pretend otherwise — "Sold back" against a card
+                                        somebody does not remember selling reads as the shop taking it.
+                                        The sweep stamps `auto` on the event for exactly this line. */}
+                                    {h.action === "sold_back" && h.meta?.auto
+                                        ? `Traded back — ${VAULT_HOLD_DAYS} days were up`
+                                        : ACTION_LABEL[h.action] || h.action}
                                     {h.meta?.card ? <em> — {h.meta.card}</em> : null}
                                 </span>
                                 {h.creditDeltaCents !== 0 ? (
@@ -496,6 +606,16 @@ export default function VaultClient({ initial }) {
                     <p className="vt-sheet-trade">
                         {`Trades back for ${usd(detail.sellBackCents)} — ${BUYBACK_PERCENT}% store credit, the same rate we pay at the counter.`}
                     </p>
+                    {/* ⚠️ AND AGAIN IN THE SHEET, because the sheet is where somebody decides. It is the
+                        one screen with the Sell back button on it, so the alternative to pressing it
+                        belongs here too — and the alternative has a deadline. */}
+                    {detail.expiresAt ? (
+                        <p className="vt-sheet-trade">
+                            Trades back on its own in{" "}
+                            <Countdown expiresAt={detail.expiresAt} now={now} className="vt-deadline-at" />{" "}
+                            unless you order it.
+                        </p>
+                    ) : null}
                     {!detail.releasable ? (
                         <p className="vt-hold">
                             Ready to ship or collect from {shortDate(detail.releasableAt)} — new store credit

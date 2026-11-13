@@ -10,6 +10,7 @@ import { releasableAt } from "@/lib/marketplace/packs.js";
 import { tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
 import { createServerLogger } from "@/lib/server-logger";
+import { vaultExpiryAt } from "@/lib/marketplace/vault-hold.js";
 
 const logger = createServerLogger({ source: "api", subsystem: "discover-buy" });
 
@@ -107,17 +108,24 @@ export async function buyNowWithCredit({ buyerId, variationId, idempotencyKey = 
     // ── 4. INTO THE VAULT ───────────────────────────────────────────────────────────────────────────────
     const parsed = parsePackCardName(item.name || "");
     const tier = tierForCents(priceCents);
+    const releaseAt = await releasableAt(buyerId);
     const vaultCard = await db
         .queryOne(
+            // ⚠️ A CARD BOUGHT OUTRIGHT IS ON THE SAME CLOCK AS A PULLED ONE, and it has to be: the
+            //    expiry sweep reads `status = 'held'` and does not care how the card got there. Omitting
+            //    expires_at here would quietly create a second class of vault card that never expires and
+            //    never shows a timer — the member would see one card counting down beside one that is not,
+            //    with nothing on screen explaining the difference. Same rule, one function.
             `INSERT INTO mkt_vault_card
                 (buyer_id, square_variation_id, card_name, set_name, card_number, condition,
-                 image_url, tier, pulled_value_cents, current_value_cents, releasable_at, source)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10, 'credit_buy')
+                 image_url, tier, pulled_value_cents, current_value_cents, releasable_at, source,
+                 expires_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10, 'credit_buy', $11)
              RETURNING id`,
             [
                 buyerId, variationId, parsed.name || item.name, parsed.setCode,
                 parsed.number, parsed.condition, item.image_url || null, tier.key,
-                priceCents, await releasableAt(buyerId),
+                priceCents, releaseAt, vaultExpiryAt(releaseAt),
             ]
         )
         .catch((error) => {

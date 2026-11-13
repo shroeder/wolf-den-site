@@ -6,6 +6,7 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 import { BUYBACK_MIN_CENTS, BUYBACK_PERCENT, buyBackIsFloored, packsWorth } from "@/lib/marketplace/buyback.js";
 import { PACK_TIERS, tierByKey } from "@/lib/marketplace/pack-rarity.js";
 import { burst, coinIn, coinOut, fanfare, rumble, shimmer, stopPackAudio, tally, tierChord } from "@/components/packs/pack-audio.js";
+import { VAULT_HOLD_DAYS } from "@/lib/marketplace/vault-hold.js";
 
 // ── THE PACK OPENING ─────────────────────────────────────────────────────────────────────────────────────────
 // Design doc §3, rebuilt 2026-10-27. The rule the gachapon set still holds unchanged:
@@ -1084,6 +1085,18 @@ export default function PackOpenClient({ initial, hideLaunch = false, openSignal
                             <p className="pk-done-sub">
                                 Collect it free from the shop in Montgomery whenever you like, or have it
                                 shipped &mdash; both live in your <a href="/marketplace/vault">Card Vault</a>.
+                            </p>
+                            {/* ── ⚠️ THE DEADLINE BELONGS AT THE DECISION, NOT ONLY AT THE VAULT ──────
+                                "Keep it" is the moment a three-day clock starts, so this is the last
+                                honest place to say so. A member who learns about it later — from a
+                                countdown on a card they already chose to keep, or worse from a credit
+                                they did not ask for — was told after the fact about a term of the deal
+                                they had already taken. The same note as the sentence above it: the
+                                answer is small, and the celebration is what the screen is for. */}
+                            <p className="pk-done-sub">
+                                Order it within <b>{VAULT_HOLD_DAYS} days</b> and it is yours for good.
+                                Leave it longer and it trades back to us at {BUYBACK_PERCENT}% store credit
+                                &mdash; the vault counts the days down for you.
                             </p>
                             <PackAgain canOpen={canOpen} shortfallCents={shortfall} priceCents={priceCents} onAgain={openAgain} priceTrusted={priceTrusted} />
                         </div>

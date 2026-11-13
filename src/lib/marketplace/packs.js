@@ -12,6 +12,7 @@ import { BIG_HIT_CENTS, tierForCents } from "@/lib/marketplace/pack-rarity.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
 import { completeBuyBack } from "@/lib/marketplace/vault-restock.js";
 import { bagsOpenFor, isPreviewOpen, shelfPacksOpenFor, vaultOpenFor } from "@/lib/marketplace/vault-gate.js";
+import { vaultExpiryAt } from "@/lib/marketplace/vault-hold.js";
 import { poolByKey, poolStates } from "@/lib/marketplace/pack-pools.js";
 import { claimShelfCard } from "@/lib/marketplace/pack-shelf-claim.js";
 import { hasOpenedBefore, markFirstOpen } from "@/lib/marketplace/pack-weights.js";
@@ -817,16 +818,22 @@ export async function choosePackOutcome({ buyerId, openId, choice }) {
     }
 
     const parsed = parsePackCardName(card?.card_name || "");
+    // ⚠️ THE DEADLINE IS STAMPED AT THE MOMENT THE CARD IS VAULTED, from the same release stamp — see
+    // vaultExpiryAt. A card whose credit has not settled gets its three days from the day it becomes
+    // orderable, never from today, or the clock would run out on a card the member cannot claim.
+    const releaseAt = await releasableAt(buyerId);
     const vault = await db.queryOne(
         `INSERT INTO mkt_vault_card
             (buyer_id, pack_open_id, mystery_card_id, square_variation_id, card_name, set_name,
-             card_number, condition, image_url, tier, pulled_value_cents, current_value_cents, releasable_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12)
+             card_number, condition, image_url, tier, pulled_value_cents, current_value_cents, releasable_at,
+             expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13)
          RETURNING id`,
         [
             buyerId, open.id, card?.id, card?.square_variation_id || null, parsed.name,
             parsed.setCode, parsed.number, parsed.condition || card?.condition || null,
-            card?.image_url || null, open.tier, valueCents, await releasableAt(buyerId),
+            card?.image_url || null, open.tier, valueCents, releaseAt,
+            vaultExpiryAt(releaseAt),
         ]
     );
     await db

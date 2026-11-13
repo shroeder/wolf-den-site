@@ -147,6 +147,10 @@
     {
       "path": "/api/jobs/ledger-report-bundle",
       "schedule": "45 8 * * *"
+    },
+    {
+      "path": "/api/jobs/vault-expiry",
+      "schedule": "25 * * * *"
     }
   ]
 }
