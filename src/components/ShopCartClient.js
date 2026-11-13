@@ -250,6 +250,14 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // Live USPS rates (EasyPost). enabled:false => fall back to the flat shipping in cartData.
     const [shipRates, setShipRates] = useState({ enabled: false, options: [], shipmentId: null });
     const [selectedRateId, setSelectedRateId] = useState("");
+    // ── SHIPPING INSURANCE ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "ideally we would want the customer to elect to pay for insurance... probably if it's over a
+    // certain amount, they should be required to insure it."
+    //
+    // ⚠️ ONLY A BOOLEAN EVER LEAVES THIS FILE. The price is quoted by the cart and recharged by the
+    // checkout from the subtotal; the browser never sends an amount, for the same reason it never sent one
+    // for the EasyPost rate. Above the required line the server ignores this flag entirely.
+    const [insureShipment, setInsureShipment] = useState(false);
     const [ratesLoading, setRatesLoading] = useState(false);
     const [ratesError, setRatesError] = useState("");
 
@@ -355,7 +363,17 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     const liveTaxCents = Number.isFinite(cartData.taxRate)
         ? taxCentsFor(cartData.subtotalCents, cartData.taxRate, taxableShippingCents)
         : cartData.taxCents;
-    const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + liveTaxCents;
+    // Cover is offered on shipped orders over a floor and compulsory over a higher line; both come from the
+    // server with the cart so this screen cannot drift from what checkout will charge.
+    const insuranceOffered = fulfillmentMode === "shipping" && !cartPickupOnly && Boolean(cartData.insuranceOffered);
+    const insuranceRequired = insuranceOffered && Boolean(cartData.insuranceRequired);
+    const insuranceOn = insuranceOffered && (insuranceRequired || insureShipment);
+    const insuranceCents = insuranceOn ? (cartData.insuranceCents || 0) : 0;
+
+    // ⚠️ INSURANCE IS OUTSIDE THE TAX BASE, so it joins AFTER liveTaxCents rather than inside
+    // taxableShippingCents. Minnesota taxes delivery charges; cover on the goods is not one. If that is ever
+    // corrected it moves here, in shop-tax-base.js and in the Square service charge, together.
+    const baseCents = cartData.subtotalCents + cartData.onlineFeeCents + liveTaxCents + insuranceCents;
     const displayTotalCents = shippingKnown ? baseCents + (displayShippingCents || 0) : null;
 
     // Store-credit apply math. When the balance covers the whole known total, the card can be skipped.
@@ -676,6 +694,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         }
 
         const checkoutPayload = {
+            // Ignored by the server above the required line, where it is not a question.
+            insureShipment: insuranceOn,
             sourceId: null,
             // ⚠️ THE EFFECTIVE MODE, NOT THE BUTTON STATE. A pickup-only cart may never have had a mode
             // chosen at all, and sending "" or a stale "shipping" would be rejected by the server for a
@@ -1159,9 +1179,33 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     </strong>
                                 </p>
                             ) : null}
+                            {insuranceOn ? (
+                                <p>
+                                    <span>Shipping insurance{insuranceRequired ? " (required)" : ""}</span>
+                                    <strong>{formatMoney(cartData.insuranceCents || 0)}</strong>
+                                </p>
+                            ) : null}
                             <p><span>Online fee (3.5%)</span><strong>{formatMoney(cartData.onlineFeeCents)}</strong></p>
                             {applyCredit && appliedCreditCents > 0 ? (
                                 <p className="shop-credit-line"><span>Store credit</span><strong>−{formatMoney(appliedCreditCents)}</strong></p>
+                            ) : null}
+                            {insuranceOffered && !insuranceRequired ? (
+                                <label className="shop-insure-opt">
+                                    <input
+                                        type="checkbox"
+                                        checked={insureShipment}
+                                        onChange={(e) => setInsureShipment(e.target.checked)}
+                                    />
+                                    <span>
+                                        Insure this shipment for {formatMoney(cartData.insuranceCents || 0)} &mdash;
+                                        covers the full value if it is lost or damaged in transit.
+                                    </span>
+                                </label>
+                            ) : null}
+                            {insuranceRequired ? (
+                                <p className="secondary shop-insure-note">
+                                    Orders over $200 are insured in transit, and the cover is included above.
+                                </p>
                             ) : null}
                             <p className="shop-payment-total">
                                 <span>Total</span>

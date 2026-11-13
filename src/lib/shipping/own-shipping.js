@@ -59,3 +59,43 @@ export function bandedShippingCents(weightOz) {
     if (!Number.isFinite(oz) || oz <= 0) return SHIPPING_BANDS[SHIPPING_BANDS.length - 1].cents;
     return (SHIPPING_BANDS.find((band) => oz <= band.maxOz) || SHIPPING_BANDS[SHIPPING_BANDS.length - 1]).cents;
 }
+
+// ── INSURANCE ───────────────────────────────────────────────────────────────────────────────────────────────
+// Luke, 2026-11-13: "ideally we would want the customer to elect to pay for insurance... they should always
+// cover shipping costs, and probably if it's over a certain amount, they should be required to insure it. But
+// I don't know if EasyPost supports this or if we need a different provider."
+//
+// EasyPost supports it and no new provider is needed — `buyShippingLabel` has taken an `insurance` amount
+// since the Card Vault shipped, and the vault has been auto-insuring over $200 at ~1% of declared value for
+// weeks. What the SHOP had was the `insurance_cents` column and nothing that ever wrote to it, which is why
+// the largest order in the shop's history ($1,199.97) went out carrying zero cover.
+//
+// The one thing the vault does NOT do is let anybody choose, because a vault shipment is the member's own
+// cards coming home and the shop decides. A shop order is a purchase, so below the line it is offered and
+// above the line it is required — which is the rule Luke asked for.
+//
+// ⚠️ THE THRESHOLD LIVES HERE AND easypost.js RE-EXPORTS IT. It used to be declared in easypost.js, which is
+// `server-only`, so a pure module could not read it and the shop would have needed a second copy of the same
+// number — the thing that always ends with the vault insuring at one figure and the shop quoting another.
+
+/**
+ * At or above this order value, insurance is not optional.
+ *
+ * Also the vault's auto-insure line (see INSURE_OVER_CENTS, re-exported from easypost.js for the callers that
+ * have always imported it from there). Deliberately ONE number: a parcel worth insuring is worth insuring
+ * whichever door it leaves by.
+ */
+export const INSURE_OVER_CENTS = 20000;
+
+/** Below the required line, cover can still be bought — but not on an order too small for it to mean much. */
+export const INSURANCE_OFFER_OVER_CENTS = 5000;
+
+/** Is cover compulsory on an order of this value? */
+export function insuranceRequired(subtotalCents) {
+    return (Number(subtotalCents) || 0) >= INSURE_OVER_CENTS;
+}
+
+/** May cover be offered at all? Always true once it is required. */
+export function insuranceOffered(subtotalCents) {
+    return (Number(subtotalCents) || 0) >= INSURANCE_OFFER_OVER_CENTS;
+}

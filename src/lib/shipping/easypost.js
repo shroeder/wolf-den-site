@@ -408,8 +408,10 @@ export function insuranceCostCents(declaredValueCents) {
     return Math.max(100, Math.round(value * 0.01));
 }
 
-/** Above this declared value a vault shipment is insured and signature-required. See design doc §6. */
-export const INSURE_OVER_CENTS = 20000;
+// ⚠️ RE-EXPORTED, NOT DECLARED. The number now lives in shipping/own-shipping.js, which is pure, so the shop
+// cart can apply the same line this file's vault callers already use. Kept exported from here because
+// vault.js and others have always imported it from this module and there is no reason to churn them.
+export { INSURE_OVER_CENTS } from "@/lib/shipping/own-shipping";
 
 export async function buyShippingLabel({ shipmentId, rateId, insuranceCents = 0 }) {
     if (!isEasyPostEnabled()) {

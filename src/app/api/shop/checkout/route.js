@@ -32,7 +32,7 @@ import {
     updateShopOrderPaymentResult,
 } from "@/lib/shop-orders";
 import { resolveActiveCartId } from "@/lib/shop-carts";
-import { shopTaxCents } from "@/lib/shop-pricing";
+import { shopInsuranceQuote, shopTaxCents } from "@/lib/shop-pricing";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -395,8 +395,27 @@ export async function POST(request) {
                 cart.taxRate,
                 effectiveShippingCents,
             );
+            // ── SHIPPING INSURANCE ──────────────────────────────────────────────────────────────────────
+            // Luke: "the customer [should] elect to pay for insurance... probably if it's over a certain
+            // amount, they should be required to insure it."
+            //
+            // ⚠️ THE QUOTE IS RECOMPUTED HERE AND THE CLIENT'S ANSWER IS ONLY A BOOLEAN. The browser never
+            // sends an amount — the same rule the EasyPost rate followed, for the same reason: a price that
+            // arrives from a page is a price a page can edit. Above the line the buyer's answer is ignored
+            // outright, because there it is not a question.
+            const insuranceQuote = shopInsuranceQuote(cart.subtotalCents, fulfillment.fulfillmentMode);
+            const wantsInsurance = body?.insureShipment === true;
+            const effectiveInsuranceCents = insuranceQuote.offered && (insuranceQuote.required || wantsInsurance)
+                ? insuranceQuote.cents
+                : 0;
+
+            // ⚠️ NOT IN THE TAX BASE. Minnesota taxes delivery charges; cover on the goods is not one, so it
+            // sits outside the base exactly as the online processing fee does — see the note on the Square
+            // service charge. If that reading is ever corrected, this line, shop-tax-base.js and the Square
+            // charge all have to move in the same commit.
             const effectiveTotalCents =
-                cart.subtotalCents + cart.onlineFeeCents + effectiveTaxCents + effectiveShippingCents;
+                cart.subtotalCents + cart.onlineFeeCents + effectiveTaxCents + effectiveShippingCents
+                + effectiveInsuranceCents;
 
             // Optional store-credit apply: drain the member's balance to reduce (or fully cover) the card
             // charge. Only for a SIGNED-IN shop customer whose email maps to a marketplace account — never a
@@ -427,6 +446,7 @@ export async function POST(request) {
                 onlineFeeCents: cart.onlineFeeCents,
                 taxCents: effectiveTaxCents,
                 shippingCents: effectiveShippingCents,
+                insuranceCents: effectiveInsuranceCents,
                 totalCents: effectiveTotalCents,
                 idempotencyKey,
                 cartId,
@@ -519,6 +539,7 @@ export async function POST(request) {
                         taxCents: effectiveTaxCents,
                         taxRate: cart.taxRate || 0,
                         shippingCents: effectiveShippingCents,
+                        insuranceCents: effectiveInsuranceCents,
                         onlineFeeCents: cart.onlineFeeCents,
                         discountCents: appliedCreditCents,
                         referenceId: pendingOrder.id,

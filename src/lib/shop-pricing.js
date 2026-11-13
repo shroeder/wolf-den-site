@@ -1,8 +1,8 @@
 import "server-only";
 
 import { taxCentsFor } from "@/lib/shop-tax-base";
-import { bandedShippingCents, OWN_SHIPPING } from "@/lib/shipping/own-shipping";
-import { parcelEstimate } from "@/lib/shipping/easypost";
+import { bandedShippingCents, insuranceOffered, insuranceRequired, OWN_SHIPPING } from "@/lib/shipping/own-shipping";
+import { insuranceCostCents, parcelEstimate } from "@/lib/shipping/easypost";
 
 // Tax + shipping for the online shop.
 //
@@ -66,4 +66,25 @@ export function shopShippingCents(subtotalCents, fulfillmentMode, items = null) 
         return bandedShippingCents(oz);
     }
     return 599;
+}
+
+/**
+ * What cover costs on an order of this value, and whether the buyer gets a say.
+ *
+ * ⚠️ THE PRICE COMES FROM insuranceCostCents, WHICH IS THE VAULT'S OWN ESTIMATOR. One formula — ~1% of
+ * declared value with a $1 floor, EasyPost's published shape — so the shop cannot quote cover at one rate
+ * while the vault charges another for the same parcel. It is an ESTIMATE, and the real charge is reconciled
+ * off the bought label; that was already true of the vault and is why the function says so.
+ */
+export function shopInsuranceQuote(subtotalCents, fulfillmentMode) {
+    if (fulfillmentMode !== "shipping") {
+        return { offered: false, required: false, cents: 0 };
+    }
+    const required = insuranceRequired(subtotalCents);
+    const offered = required || insuranceOffered(subtotalCents);
+    return {
+        offered,
+        required,
+        cents: offered ? insuranceCostCents(subtotalCents) : 0,
+    };
 }

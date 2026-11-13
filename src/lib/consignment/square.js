@@ -1685,6 +1685,7 @@ export async function createSquareShopOrder({
     taxCents = 0,
     taxRate = 0,
     shippingCents = 0,
+    insuranceCents = 0,
     onlineFeeCents = 0,
     discountCents = 0,
     referenceId = null,
@@ -1734,6 +1735,18 @@ export async function createSquareShopOrder({
             serviceCharges.push({
                 uid: "sc-ship", name: "Shipping", amount_money: money(shippingCents),
                 calculation_phase: "SUBTOTAL_PHASE", taxable: true,
+            });
+        }
+        if (insuranceCents > 0) {
+            // ⚠️ TOTAL_PHASE AND NOT TAXABLE, which is the opposite of shipping above and is a deliberate
+            // call rather than a copy. Minnesota taxes DELIVERY charges; insurance is cover on the goods,
+            // not a charge for moving them, so it is treated like the online processing fee — outside the
+            // taxable base, and flagged to Luke rather than decided here. If that reading is wrong the fix
+            // is two words (SUBTOTAL_PHASE, taxable: true) plus the matching change in shop-tax-base.js,
+            // and both have to move together or Square's total stops matching the card charge.
+            serviceCharges.push({
+                uid: "sc-insure", name: "Shipping insurance", amount_money: money(insuranceCents),
+                calculation_phase: "TOTAL_PHASE", taxable: false,
             });
         }
         if (onlineFeeCents > 0) {

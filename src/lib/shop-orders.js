@@ -77,6 +77,7 @@ export async function createPendingShopOrder({
     onlineFeeCents,
     taxCents = 0,
     shippingCents = 0,
+    insuranceCents = 0,
     totalCents,
     idempotencyKey,
     cartId,
@@ -119,6 +120,7 @@ export async function createPendingShopOrder({
             shipping_validation_status,
             tax_cents,
             shipping_cents,
+            insurance_cents,
             easypost_shipment_id,
             easypost_rate_id,
             shipping_carrier,
@@ -129,7 +131,7 @@ export async function createPendingShopOrder({
             square_customer_id,
             order_ip,
             status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, 'pending')
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, 'pending')
         RETURNING *`,
         [
             catalogObjectId,
@@ -154,6 +156,7 @@ export async function createPendingShopOrder({
             toNullableText(shippingValidationStatus) || "pending",
             Math.max(0, Math.round(Number(taxCents) || 0)),
             Math.max(0, Math.round(Number(shippingCents) || 0)),
+            Math.max(0, Math.round(Number(insuranceCents) || 0)),
             toNullableText(easyPostShipmentId),
             toNullableText(easyPostRateId),
             toNullableText(shippingCarrier),

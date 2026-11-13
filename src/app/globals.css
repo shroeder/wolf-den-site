@@ -3008,6 +3008,39 @@ textarea {
     border-top: 1px solid var(--line);
 }
 
+/* ── OPTING INTO SHIPPING INSURANCE ──────────────────────────────────────────────────────────────────────
+   Luke: "the customer [should] elect to pay for insurance."
+
+   A real checkbox and a real <label>, so the whole sentence is the hit target -- a 0.75rem tick box on a
+   phone is not one. It sits inside .shop-payment-breakdown, whose `p` rule is a space-between flex row,
+   which is why this is a label with its own grid rather than another paragraph: reusing that row would put
+   the box at one end of the card and the words at the other. */
+.shop-insure-opt {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.45rem;
+    align-items: start;
+    margin: 0.3rem 0 0.1rem;
+    font-size: 0.72rem;
+    line-height: 1.45;
+    color: var(--ink-secondary);
+    cursor: pointer;
+}
+
+.shop-insure-opt input {
+    width: 0.95rem;
+    height: 0.95rem;
+    margin: 0.12rem 0 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.shop-insure-note {
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+
+
 .shop-payment-total strong {
     color: var(--accent);
 }

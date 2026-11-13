@@ -8,7 +8,7 @@ import {
     toPriceCents,
 } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
-import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
+import { shopInsuranceQuote, shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import {
     getExistingCartId,
     setShopCartId,
@@ -352,6 +352,11 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
     // ⚠️ ITEMS, NOT JUST THE SUBTOTAL — postage is priced on weight. See shopShippingCents.
     const shippingCents = shopShippingCents(subtotalCents, effectiveMode, items);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
+    // ⚠️ THE CART QUOTES COVER BUT DOES NOT ADD IT TO THE TOTAL. Whether to insure is the buyer's answer
+    // below the required line, so the cart cannot know it — it publishes the offer and its price, the screen
+    // adds it once the box is ticked, and checkout recomputes the whole thing server-side. Baking it into
+    // totalCents here would charge everybody for cover nobody had agreed to.
+    const insurance = shopInsuranceQuote(subtotalCents, effectiveMode);
 
     return {
         preorderArrivesOn,
@@ -366,7 +371,13 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         // line rather than a number we asserted, and Square's own sales-tax report sees it.
         taxRate,
         shippingCents,
-        totalCents: subtotalCents + onlineFeeCents + taxCents + shippingCents,
+        // `insuranceCents` is what cover WOULD cost, not what is being charged. When it is required the
+        // screen and the checkout both add it, which is why `insuranceRequired` travels with it.
+        insuranceCents: insurance.cents,
+        insuranceOffered: insurance.offered,
+        insuranceRequired: insurance.required,
+        totalCents: subtotalCents + onlineFeeCents + taxCents + shippingCents
+            + (insurance.required ? insurance.cents : 0),
         hasUnavailableItems,
         // True when ANY line is pickup-only, because fulfilment is per ORDER: one pickup-only item makes the
         // whole order a pickup rather than splitting it into two shipments.
