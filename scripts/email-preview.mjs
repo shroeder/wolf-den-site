@@ -18,6 +18,7 @@ process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || "preview-key-not-used
 const {
     sendOrderCancelledEmail,
     sendOrderConfirmationEmail,
+    sendOrderItemRefundedEmail,
     sendOrderStatusEmail,
 } = await import("@/lib/shop-order-email.js");
 
@@ -68,8 +69,19 @@ const CASES = [
     ["Pickup · ready to collect", () => sendOrderStatusEmail({ ...pickup, fulfillment_status: "ready" }, "ready")],
     ["Pickup · picked up", () => sendOrderStatusEmail({ ...pickup, fulfillment_status: "picked_up" }, "picked_up")],
     ["Pickup · cancelled + refunded", () => sendOrderCancelledEmail(pickup, { reason: "One of the boosters was damaged in the case and we'd rather not send it.", refundAmountCents: 8080 })],
+    // One line of two could not be found. Pickup, already marked ready, so the survivor is named and the
+    // sentence after it takes a pronoun -- the two halves of this email are the thing that drift apart.
+    ["Pickup · one line out of stock, rest ready to collect", () => sendOrderItemRefundedEmail(
+        { ...pickup, fulfillment_status: "ready" },
+        { itemNames: ["Prismatic Evolutions Booster Bundle"], refundAmountCents: 6428 },
+    )],
     ["Shipping · confirmation", () => sendOrderConfirmationEmail(shipped)],
     ["Shipping · shipped with tracking", () => sendOrderStatusEmail({ ...shipped, fulfillment_status: "shipped" }, "shipped")],
+    // Shipped, and so much of it was missing that naming the remainder would be the whole basket again.
+    ["Shipping · every line but one out of stock", () => sendOrderItemRefundedEmail(
+        { ...shipped, fulfillment_status: "shipped" },
+        { itemNames: ["Alolan Ninetales 145/236 Holo Rare NM"], refundAmountCents: 1392 },
+    )],
     ["Shipping · cancelled, no refund yet", () => sendOrderCancelledEmail(shipped, { reason: "Sold in store before we could pack it.", refundAmountCents: 0 })],
     // `unfulfilled` is a correction the owner makes, not news — it must send NOTHING, and that is worth seeing.
     ["Pickup · moved back to unfulfilled (should send nothing)", () => sendOrderStatusEmail(pickup, "unfulfilled")],

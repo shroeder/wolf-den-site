@@ -523,7 +523,7 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
 }
 
 /**
- * One line of an order could not be filled, so it was refunded and the rest shipped anyway.
+ * Some of an order could not be filled, so those lines were refunded and the rest handed over anyway.
  *
  * ⚠️ NOT sendOrderCancelledEmail, WHICH IS THE ONE THAT WAS ALREADY HERE AND IS WRONG FOR THIS. That one
  * says "your order was cancelled" and lists the whole basket. Sent to somebody whose parcel is already in
@@ -532,8 +532,18 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
  * "an email to the customer apologizing for the inconvenience and noting that we're refunding the item we
  * did not have in stock."
  *
- * ⚠️ IT NAMES THE ONE ITEM AND NOT THE BASKET. The whole point is that everything else is fine, so listing
- * everything invites a re-read of an order that no longer needs checking.
+ * ⚠️ IT NAMES WHAT IS MISSING, AND NAMES WHAT IS LEFT ONLY WHEN THERE IS LITTLE OF IT. Listing the whole
+ * basket invites a re-read of an order that no longer needs checking, which is why the first version of this
+ * said nothing but "everything else is unaffected". That holds for eleven of twelve. It fails for FOUR of
+ * five — Eric, 2026-11-13: "The only card we have is Lucario. So I refunded on everything except for
+ * Lucario." Told only that four cards were missing and everything else was fine, that customer cannot work
+ * out what he is actually coming to collect. So when three or fewer lines survive they are named; above that
+ * the basket is big enough that "everything else" is the clearer sentence.
+ *
+ * ⚠️ AND THE SURVIVORS ARE DERIVED FROM THE ORDER, NOT PASSED IN. The caller says what is MISSING and the
+ * remainder is items_json minus those names, so the two halves of the email cannot contradict each other. If
+ * a named item fails to match a line — a typo, a renamed variation — the diff is untrustworthy, so it falls
+ * back to the generic wording rather than confidently listing the wrong cards at somebody.
  *
  * ⚠️ AND IT DOES NOT PROMISE A RESHIP. We did not have it; whether it comes back into stock is not a thing
  * this email can know, and "we'll send it when it arrives" is a promise nobody is tracking.
@@ -542,27 +552,83 @@ export async function sendOrderCancelledEmail(order, { reason, refundAmountCents
  * live on shop_orders yet — refund_id and refund_amount_cents are read by the cancel flow as "this order was
  * cancelled". Until that path exists the number comes from whoever issued the refund in Square.
  */
-export async function sendOrderItemRefundedEmail(order, { itemName, refundAmountCents } = {}) {
+export async function sendOrderItemRefundedEmail(order, { itemNames, itemName, refundAmountCents } = {}) {
     const resend = getResendClient();
     const to = recipientEmail(order);
-    if (!resend || !to || !itemName) {
+    const missing = (Array.isArray(itemNames) ? itemNames : [itemNames ?? itemName])
+        .map((n) => String(n || "").trim())
+        .filter(Boolean);
+    if (!resend || !to || !missing.length) {
         return false;
     }
+
+    let lines = [];
+    try {
+        lines = Array.isArray(order?.items_json) ? order.items_json : JSON.parse(order?.items_json || "[]");
+    } catch {
+        lines = [];
+    }
+    const lineNames = lines.map((i) => String(i?.name || i?.itemName || i?.title || "").trim()).filter(Boolean);
+
+    // One occurrence struck off per named item, so two copies of a card with one missing leaves one behind.
+    const pool = [...lineNames];
+    let allMatched = lineNames.length > 0;
+    for (const n of missing) {
+        const at = pool.indexOf(n);
+        if (at === -1) {
+            allMatched = false;
+            break;
+        }
+        pool.splice(at, 1);
+    }
+    const remaining = allMatched ? pool : [];
+    const nameTheRest = remaining.length > 0 && remaining.length <= 3;
+
     const name = buyerName(order);
+    const isPickup = String(order?.fulfillment_mode || "") === "pickup";
     const shipped = String(order?.fulfillment_status || "") === "shipped";
+    const ready = String(order?.fulfillment_status || "") === "ready";
+    const many = missing.length > 1;
+
+    // "one of the cards" / "4 of the 5 cards" — the fraction is the apology's actual size, and somebody who
+    // ordered five and is getting one should read that in the first sentence rather than count a list.
+    const howMany = many
+        ? `${missing.length}${lineNames.length ? ` of the ${lineNames.length}` : ""} cards on it`
+        : "one of the cards on it";
+
+    // ⚠️ THE LIST AND THE SENTENCE AFTER IT MUST NOT BOTH NAME THE SURVIVORS. The first draft printed
+    // "The one card we did have:", the card, and then "The card we did have is packed and waiting for you" —
+    // the same noun three lines apart, which reads like a mail merge. Once the list is on the page the
+    // sentence takes a pronoun, and it is only when there is no list that it has to say what it refers to.
+    const ref = nameTheRest
+        ? (remaining.length === 1 ? { it: "It", be: "is", has: "has" } : { it: "Those", be: "are", has: "have" })
+        : { it: "Everything else on the order", be: "is", has: "has" };
+
+    const restSentence = (() => {
+        if (shipped) {
+            return `${ref.it} ${ref.has} already shipped, and the tracking number is in the shipping email we sent you.`;
+        }
+        if (isPickup) {
+            return ready
+                ? `${ref.it} ${ref.be} packed and waiting for you at ${escapeHtml(PICKUP_LOCATION)}, ${pickupNameLine(order)}.`
+                : `${ref.it} ${ref.be} being set aside for you, and we will email you as soon as the order is ready to collect.`;
+        }
+        return `${ref.it} ${ref.be} unaffected and on the way to you.`;
+    })();
+
     const html = shellHtml(`
-        <h1>One item in your order was out of stock</h1>
+        <h1>${many ? "Some items in your order were out of stock" : "One item in your order was out of stock"}</h1>
         <p>${name ? `Hi ${escapeHtml(name.split(" ")[0])},` : "Hi,"}</p>
         <p>We&rsquo;re sorry &mdash; when we went to pack order <strong>#${shortId(order.id)}</strong> we could not
-           find one of the cards on it:</p>
-        <ul><li><strong>${escapeHtml(itemName)}</strong></li></ul>
+           find ${howMany}:</p>
+        <ul>${missing.map((n) => `<li><strong>${escapeHtml(n)}</strong></li>`).join("")}</ul>
         <p>Our stock count was wrong, and that is our mistake rather than anything to do with your order.
-           We&rsquo;ve refunded <strong>${money(refundAmountCents)}</strong> for it &mdash; the item plus the
-           sales tax charged on it &mdash; to your original payment method. Refunds usually take a few
-           business days to show up on a card statement.</p>
-        <p>${shipped
-            ? "Everything else on the order has already shipped, and the tracking number is in the shipping email we sent you."
-            : "Everything else on the order is unaffected and is on its way."}</p>
+           We&rsquo;ve refunded <strong>${money(refundAmountCents)}</strong> for ${many ? "them" : "it"} &mdash; the
+           ${many ? "items" : "item"} plus the sales tax charged on ${many ? "them" : "it"} &mdash; to your original
+           payment method. Refunds usually take a few business days to show up on a card statement.</p>
+        ${nameTheRest ? `<p>${remaining.length === 1 ? "The one card we did have:" : "What we did have:"}</p>
+        <ul>${remaining.map((n) => `<li><strong>${escapeHtml(n)}</strong></li>`).join("")}</ul>` : ""}
+        <p>${restSentence}</p>
         <p>Sorry again for the inconvenience.</p>
         <p style="color:#777;font-size:13px;">Questions? Just reply to this email and it comes straight to us.</p>
     `);
@@ -570,7 +636,9 @@ export async function sendOrderItemRefundedEmail(order, { itemName, refundAmount
         kind: "item_refunded",
         orderId: order?.id || null,
         to,
-        subject: `An item on your Wolf Den order #${shortId(order.id)} was out of stock — refunded`,
+        subject: many
+            ? `Some items on your Wolf Den order #${shortId(order.id)} were out of stock — refunded`
+            : `An item on your Wolf Den order #${shortId(order.id)} was out of stock — refunded`,
         html,
     });
 }
