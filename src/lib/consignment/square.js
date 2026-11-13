@@ -510,6 +510,55 @@ export async function getInventoryCounts(variationIds) {
     return totals;
 }
 
+// ── WRITING OFF A CARD THAT IS NOT IN THE CASE ──────────────────────────────────────────────────────────────
+// Luke, 2026-11-13: "we need something in both apps to manually verify what we have for singles, that way we
+// can conclusively say what we dont have."
+//
+// ⚠️ IN_STOCK -> NONE, NOT IN_STOCK -> SOLD, AND THE DIFFERENCE IS THE BOOKS. A write-off is a unit that is
+// simply gone: no customer, no money, no revenue line. Recording it as SOLD would consume the card's FIFO
+// cost layer as cost-of-goods against a sale that never happened, which shows up as margin on revenue that
+// does not exist — stock-moves.js already reads IN_STOCK -> NONE as exactly this, "a unit that is simply
+// gone", so the ledger understands the transition it is being handed.
+//
+// Best-effort and per-line, like the sale adjustment it sits next to: one refused write-off must not abandon
+// the rest of an audit somebody is halfway through.
+export async function writeOffInventory(items, { idempotencyKey } = {}) {
+    const locationId = getSquareLocationId();
+    const occurredAt = new Date().toISOString();
+
+    const changes = [];
+    for (const item of items || []) {
+        const catalogObjectId = String(item?.catalogObjectId || "").trim();
+        const quantity = Math.floor(Number(item?.quantity || 0));
+        if (!catalogObjectId || catalogObjectId === "cart" || quantity < 1) continue;
+        changes.push({
+            type: "ADJUSTMENT",
+            adjustment: {
+                catalog_object_id: catalogObjectId,
+                location_id: locationId,
+                from_state: "IN_STOCK",
+                to_state: "NONE",
+                quantity: String(quantity),
+                occurred_at: occurredAt,
+            },
+        });
+    }
+    if (!changes.length) return { applied: 0 };
+
+    const results = [];
+    for (const batch of chunk(changes, 100)) {
+        const payload = await squareFetch("/v2/inventory/changes/batch-create", {
+            method: "POST",
+            body: JSON.stringify({
+                idempotency_key: `${idempotencyKey || randomUUID()}-wo-${results.length}`,
+                changes: batch,
+            }),
+        });
+        results.push(...(payload?.counts || []));
+    }
+    return { applied: changes.length, counts: results };
+}
+
 // Move sold quantities out of IN_STOCK so an online-purchased card can't be double-sold in-store.
 // Records an ADJUSTMENT (IN_STOCK -> SOLD) per line. `items` is [{ catalogObjectId, quantity }].
 // Best-effort: callers should not fail a completed order if this throws (payment already captured).
