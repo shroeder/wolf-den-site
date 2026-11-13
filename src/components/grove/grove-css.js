@@ -2142,6 +2142,16 @@ export const GROVE_CSS = `
     text-shadow: 0 0 14px rgba(0,0,0,0.95), 0 2px 5px rgba(0,0,0,0.95); }
 /* The denominator is deliberately quieter: the number that moves is the one worth reading. */
 .gv-kills b i { font-style: normal; font-size: 0.78em; font-weight: 700; opacity: 0.55; }
+/* ── THE COLISEUM'S CLOCK ─────────────────────────────────────────────────────────────────────
+   Luke: "I'm in the collusium and I dont see s timer or wave number." It borrows the kill
+   counter's slot and type, so the arena does not introduce a second HUD for the same job.
+
+   ⚠️ TABULAR FIGURES. A proportional 1 is narrower than a 0, so a counting clock jitters
+   sideways every second and the eye reads movement where there is none. */
+.gv-clock { font-variant-numeric: tabular-nums; }
+/* The last twenty seconds. Amber and a touch larger -- the same vocabulary the vault's deadline
+   uses, because it is the same message: this one is about to be decided for you. */
+.gv-clock.is-urgent { color: #F0B429; scale: 1.08; }
 .gv-kills span { display: block; margin-top: 2px; font-size: 0.6rem; font-weight: 700;
     letter-spacing: 0.1em; text-transform: uppercase; color: #e0a83c;
     text-shadow: 0 0 10px rgba(0,0,0,1), 0 1px 4px rgba(0,0,0,0.95); }

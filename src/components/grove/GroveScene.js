@@ -560,6 +560,20 @@ export default function GroveScene({
     // card stays up while the fight carries on underneath, and the loop must not own something whose
     // lifetime it does not control.
     const [trophy, setTrophy] = useState(null);
+    // ── ⚠️ THE COLISEUM HAD NO CLOCK AND NO WAVE NUMBER ON SCREEN ──────────────────────────────────
+    // Luke, 2026-11-12: "I'm in the collusium and I dont see s timer or wave number."
+    //
+    // Neither existed. The run is twelve waves against a two-minute clock and the chest it pays is a
+    // function of waves cleared (chestsFor), so the one number that decides the reward was invisible and
+    // so was the one that decides how long you have to earn it. `onWave` has been firing since the arena
+    // shipped — into GroveLab, a debug surface, and nowhere else. Another [[declared-but-never-read]].
+    //
+    // ⚠️ SPLIT ON PURPOSE: the WAVE is React state because it changes twelve times in two minutes, and
+    // the CLOCK is written straight to a DOM node by the loop because it changes sixty times a second.
+    // Putting the clock in state would re-render the whole scene every frame, which is the one thing
+    // this file is built to avoid — the same rule as .gv-status and .gv-ehp on the bodies.
+    const [waveNow, setWaveNow] = useState(0);
+    const clockRef = useRef(null);
     const [menuOpen, setMenuOpen] = useState(false);
     // ⚠️ KEYED ON THE TROPHY ITSELF so a second emblem during the first one's hold restarts the moment
     // rather than being swallowed — rare twice in a row is the best thing that can happen and must not
@@ -989,6 +1003,9 @@ export default function GroveScene({
 
             const wv = waves[w.waveAt];
             w.waveAt += 1;
+            // ⚠️ THE SCENE TELLS ITSELF, not only its caller. onWave is a lab hook and was the only
+            // consumer; the player needs the number more than the lab does.
+            setWaveNow(w.waveAt);
             onWave?.(w.waveAt, waves.length);
 
             const bodies = [
@@ -1179,6 +1196,10 @@ export default function GroveScene({
     // A held finger is re-resolved every frame (see the hold block in the loop), so this conversion has two
     // callers. Written out twice it is two ideas of where a tap landed, which is the bug the scale note
     // below already records once.
+    // How deep a ledge is DRAWN, in world units — --gv-ledge-h in grove-css.js. A tap inside that depth
+    // is a tap on the slab; a tap below it is a tap on the air under the slab.
+    const LEDGE_DEPTH = 2.9;
+
     const worldAt = useCallback((clientX, clientY) => {
         const w = worldRef.current;
         const host = hostRef.current;
@@ -1198,9 +1219,29 @@ export default function GroveScene({
         // could reach them. Snapped to the surface under the point, so tapping the air over a ledge means
         // that ledge rather than a spot in mid-air the hero can never stand on.
         const yRaw = camYRef.current + (rect.height - (clientY - rect.top) - ground) / unit;
+        // ── ⚠️ THE GRACE IS THE SLAB YOU CAN SEE, AND IT USED TO BE DOUBLE THAT ────────────────
+        // Luke, 2026-11-12: "I cant get down from a platform, I'm clicking below my platform."
+        //
+        // He reported this once before and the fix went into navigate() — see its "going down is a
+        // decision too" note. That fix is correct and still works. This is the SAME SYMPTOM FROM A
+        // DIFFERENT CAUSE, one step upstream: the tap never reached navigate as a downward goal,
+        // because this snap turned it into the ledge he was already standing on.
+        //
+        // The rule keeps the highest platform whose surface is at most `grace` ABOVE the tap, so you can
+        // tap a ledge's drawn body and mean that ledge. At 6 units that reached well past the slab into
+        // open air underneath it. Measured on the Coliseum's own arena (floor y=0, ledge y=11): a tap
+        // anywhere from 5 to 8 — below the ledge, in plain air, where a player tapping "down" aims —
+        // snapped back to y=11, navigate read the goal as the floor he was already on, and returned
+        // dir 0. He stands still with the tap marker under his feet. Four units of the eleven-unit gap
+        // were dead.
+        //
+        // ⚠️ SO IT IS THE SLAB'S OWN DEPTH, NOT A ROUND NUMBER. --gv-ledge-h is 2.9 world units
+        // (grove-css.js) and that is exactly the question being asked: "did they point at the thing
+        // that is drawn there?" Anything below the drawn slab is air, and air below a ledge means the
+        // floor. Keep this in step with --gv-ledge-h if the art changes depth.
         const surf = w.platforms.reduce((best, p) => {
             if (x < p.x || x > p.x + p.w) return best;
-            if (p.y > yRaw + 6) return best;
+            if (p.y > yRaw + LEDGE_DEPTH) return best;
             return !best || p.y > best.y ? p : best;
         }, null);
         return { x: Math.max(2, Math.min(W - 2, x)), y: surf ? surf.y : 0 };
@@ -2056,6 +2097,25 @@ export default function GroveScene({
                     const standing = w.foes.filter((f) => !f.dying).length;
                     w.waveCleared = Math.max(0, w.waveAt - (standing > 0 ? 1 : 0));
                     onRunEnd?.({ wavesCleared: w.waveCleared, cleared: done });
+                }
+                // ── ⚠️ THE CLOCK IS WRITTEN, NOT RENDERED ──────────────────────────────────────
+                // Straight onto the node, once a frame, which is the same reason the health flash and
+                // the enemy strips are loop-owned: a seconds counter in React state is a re-render of
+                // the whole scene sixty times a second for the sake of one digit changing once.
+                //
+                // Only when the TEXT would actually change — the node is touched about twice a second
+                // instead of 120 times, and a DOM write nobody can see is still a DOM write.
+                const node = clockRef.current;
+                if (node) {
+                    const leftMs = Math.max(0, (w.endsAt || now) - now);
+                    const secs = Math.ceil(leftMs / 1000);
+                    const text = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+                    if (node.textContent !== text) node.textContent = text;
+                    // ⚠️ THE LAST TWENTY SECONDS LOOK DIFFERENT. A clock that reads the same at 1:40
+                    // and 0:08 is a number, not tension — and the back half of the wave ramp is where
+                    // a run is actually won or lost.
+                    const urgent = secs <= 20;
+                    if (node.classList.contains("is-urgent") !== urgent) node.classList.toggle("is-urgent", urgent);
                 }
             }
             if (now >= w.nextRespawn) spawn(w, now);
@@ -4263,7 +4323,18 @@ export default function GroveScene({
                 this zone, and a counter that restarts at zero each visit would tell a player on their
                 nineteenth kill that they had made no progress at all. */}
             <div className="gv-kills" aria-hidden="true">
-                {killsHere < zone.toUnlock ? (
+                {/* ── ⚠️ IN THE ARENA THIS SLOT ANSWERS A DIFFERENT QUESTION ─────────────────────
+                    The zone's kill count is meaningless during a Coliseum run — the door it counts
+                    toward is not the thing you are doing. What a player needs for two minutes is the
+                    clock and which wave they are on, and this is already the top-middle slot the eye
+                    goes to. Reusing it rather than adding a second HUD keeps one place for "the number
+                    that matters right now", which is what it was built to be. */}
+                {arena && waves ? (
+                    <>
+                        <b ref={clockRef} className="gv-clock">2:00</b>
+                        <span>{waveNow > 0 ? `Wave ${Math.min(waveNow, waves.length)} of ${waves.length}` : `${waves.length} waves`}</span>
+                    </>
+                ) : killsHere < zone.toUnlock ? (
                     <>
                         <b>{killsHere}<i>/{zone.toUnlock}</i></b>
                         <span>{zone.toUnlock - killsHere} to open the way</span>

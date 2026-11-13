@@ -21,6 +21,25 @@
 // on platformsFor. validateArenas() refuses a layout that does it.
 
 import { TIER_RISE } from "@/lib/marketplace/grove-world.js";
+import { HERO_UNITS } from "@/lib/marketplace/grove-view.js";
+
+// ── ⚠️ THE EDGE OF A LEDGE HAS TO BE SOMEWHERE A BODY CAN STAND ─────────────────────────────────────────────
+// Luke, 2026-11-12: "I cant get down from a platform, I'm clicking below my platform."
+//
+// The scene clamps every body to `[HERO_UNITS * 0.6, W - HERO_UNITS * 0.6]` so nothing stands half outside
+// the world. In a 26-unit arena that is 4.2 to 21.8 — and EVERY first-tier ledge in this file was authored
+// wider than that. Map one's ran 3 to 23. So the hero walks toward the lip, hits the world bound at 4.2
+// with two units of slab still under his feet, and stops. The floor never runs out, he never falls, and the
+// layout's own comment ("the gap at each end is deliberate: it is how you get down") described a gap no
+// body could reach.
+//
+// Measured in the live arena before fixing: tapping the floor from the ledge walked him 13 -> 4.2 and he
+// stood there for the rest of the run. All seven arenas were trapped the same way.
+//
+// So a ledge is clamped to end INSIDE the walkable strip, with a unit of margin past the bound — the hero
+// has to be able to stand clear of the lip for the surface under him to run out.
+const WALK_INSET = HERO_UNITS * 0.6;
+const LIP_MARGIN = 1.3;
 
 /** The backdrop plate for each Coliseum. Drawn by scripts/gen-grove-arenas.mjs. */
 export const ARENA_ART = {
@@ -127,13 +146,21 @@ const LAYOUTS = {
  */
 export function arenaFor(mapN) {
     const rows = LAYOUTS[Number(mapN)] || LAYOUTS[1];
-    return rows.map((p, i) => ({
-        x: p.x,
-        w: p.w,
-        y: (p.y || 0) * TIER_RISE,
-        i,
-        parent: i === 0 ? -1 : (p.parent ?? 0),
-    }));
+    const lo = WALK_INSET + LIP_MARGIN;
+    const hi = ARENA_W - WALK_INSET - LIP_MARGIN;
+    return rows.map((p, i) => {
+        // ⚠️ THE GROUND IS NOT CLAMPED. It is the world floor; the body clamp already stops anyone walking
+        // off the side of it, and narrowing it would move the walls in rather than make a lip reachable.
+        const x = i === 0 ? p.x : Math.max(lo, p.x);
+        const right = i === 0 ? p.x + p.w : Math.min(hi, p.x + p.w);
+        return {
+            x,
+            w: Math.max(2, right - x),
+            y: (p.y || 0) * TIER_RISE,
+            i,
+            parent: i === 0 ? -1 : (p.parent ?? 0),
+        };
+    });
 }
 
 /**
@@ -151,6 +178,13 @@ export function validateArenas() {
         for (const p of plats) {
             if (p.i === 0) continue;
             if (p.x < 0 || p.x + p.w > ARENA_W) bad.push(`map ${map} ledge ${p.i} runs off the arena (${p.x}..${p.x + p.w} of ${ARENA_W})`);
+            // ⚠️ AND CAN YOU GET OFF IT. This validator checked that a ledge fits the arena and overlaps
+            // its parent, and never that a body could leave it — which is how all seven shipped as boxes.
+            // arenaFor clamps, so this reads the clamped values and can only fail if the clamp is removed.
+            if (p.x < WALK_INSET || p.x + p.w > ARENA_W - WALK_INSET) {
+                bad.push(`map ${map} ledge ${p.i} has a lip outside the walkable strip `
+                    + `(${p.x}..${p.x + p.w} against ${WALK_INSET}..${ARENA_W - WALK_INSET}) — nobody can walk off it`);
+            }
             if (p.parent >= p.i) bad.push(`map ${map} ledge ${p.i} has parent ${p.parent}, which is not below it in the list`);
             const par = plats[p.parent];
             if (!par) { bad.push(`map ${map} ledge ${p.i} has no parent`); continue; }
