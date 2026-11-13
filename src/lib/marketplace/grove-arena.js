@@ -20,8 +20,7 @@
 // actually overlap is a shelf the hero will step off, fall from, and try again for ever — see the long note
 // on platformsFor. validateArenas() refuses a layout that does it.
 
-import { TIER_RISE } from "@/lib/marketplace/grove-world.js";
-import { HERO_UNITS } from "@/lib/marketplace/grove-view.js";
+import { TIER_RISE, WALK_INSET, walkableSpan } from "@/lib/marketplace/grove-world.js";
 
 // ── ⚠️ THE EDGE OF A LEDGE HAS TO BE SOMEWHERE A BODY CAN STAND ─────────────────────────────────────────────
 // Luke, 2026-11-12: "I cant get down from a platform, I'm clicking below my platform."
@@ -38,8 +37,9 @@ import { HERO_UNITS } from "@/lib/marketplace/grove-view.js";
 //
 // So a ledge is clamped to end INSIDE the walkable strip, with a unit of margin past the bound — the hero
 // has to be able to stand clear of the lip for the surface under him to run out.
-const WALK_INSET = HERO_UNITS * 0.6;
-const LIP_MARGIN = 1.3;
+// ⚠️ THE NUMBERS COME FROM grove-world.js NOW. They were declared here first, when this looked like an
+// arena problem; Luke's next sentence was "This happens outside the arena many places", and it did — the
+// zone generator had the same hole with a different number in it. One rule, one home, three readers.
 
 /** The backdrop plate for each Coliseum. Drawn by scripts/gen-grove-arenas.mjs. */
 export const ARENA_ART = {
@@ -146,8 +146,7 @@ const LAYOUTS = {
  */
 export function arenaFor(mapN) {
     const rows = LAYOUTS[Number(mapN)] || LAYOUTS[1];
-    const lo = WALK_INSET + LIP_MARGIN;
-    const hi = ARENA_W - WALK_INSET - LIP_MARGIN;
+    const [lo, hi] = walkableSpan(ARENA_W);
     return rows.map((p, i) => {
         // ⚠️ THE GROUND IS NOT CLAMPED. It is the world floor; the body clamp already stops anyone walking
         // off the side of it, and narrowing it would move the walls in rather than make a lip reachable.

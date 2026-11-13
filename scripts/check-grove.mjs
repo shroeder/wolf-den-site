@@ -27,7 +27,8 @@ import {
 import { GROVE_RECIPES, discoveredRecipes, TOOL_SLOTS, TOOL_TIER_CAP } from "@/lib/marketplace/grove-recipes.js";
 import { MAP_LAYOUT, mapSpot, nodeArt, spotForDepth } from "@/lib/marketplace/grove-map.js";
 import { pickHyper, rollBoss } from "@/lib/marketplace/grove-roll.js";
-import { makeTelegraph } from "@/lib/marketplace/grove-world.js";
+import { makeTelegraph, platformsFor, WALK_INSET } from "@/lib/marketplace/grove-world.js";
+import { arenaFor, validateArenas, ARENA_W } from "@/lib/marketplace/grove-arena.js";
 import { CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { DECORATIONS } from "@/lib/marketplace/decorations.js";
 import { CLASSES, treeFor } from "@/lib/marketplace/arena-classes.js";
@@ -497,6 +498,52 @@ for (const id of ["rootrat", "thornling", "elderling"]) {
 
 console.log(`\n  art still to draw (${needArt.length}): ${needArt.join(", ") || "none"}`);
 console.log(`  backdrops to draw: ${zones} (one per zone)`);
+
+// ── ⚠️ CAN YOU GET OFF EVERY LEDGE YOU CAN GET ONTO? ───────────────────────────────────────────────
+// Luke, 2026-11-12: "I cant get down from a platform, I'm clicking below my platform." And then, after the
+// arena was fixed: "This happens outside the arena many places. Seems like a fundamental fix is in order."
+//
+// The scene clamps every body to WALK_INSET from each end of the world. A ledge whose lip lies inside that
+// inset cannot be walked off — the hero reaches the bound with slab still under his feet and simply stops,
+// on that ledge, for the rest of the session. Nothing errors, nothing looks wrong, and no screenshot shows
+// it: it is a player standing still, which is also what a player standing still looks like.
+//
+// The placer allowed a ledge 2 units from the world edge against an inset of 4.2. Measured over 40 rolls of
+// every built zone: 482 of 23,669 ledges (2.0%) were traps, in 83 of the 84 zones. Every Coliseum arena was
+// worse — all seven were authored wider than the strip, so their first tier had no exit at all, always.
+//
+// ⚠️ ROLLED MANY TIMES PER ZONE, because a layout is rolled per session and one roll is not the zone. A
+// check that sampled a single seed would pass on a zone that traps a player one visit in fifty.
+{
+    let rolled = 0;
+    const traps = [];
+    const rand = (seed) => { let x = seed >>> 0 || 1; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
+    for (const z of GROVE_ZONES) {
+        for (let seed = 1; seed <= 40; seed += 1) {
+            const plats = platformsFor(z.n, rand(z.n * 7919 + seed));
+            const W = plats[0].w;
+            for (const p of plats) {
+                if (p.i === 0) continue;
+                rolled += 1;
+                if (p.x < WALK_INSET || p.x + p.w > W - WALK_INSET) {
+                    traps.push(`zone ${z.n} seed ${seed}: ledge ${p.x.toFixed(1)}..${(p.x + p.w).toFixed(1)} of ${W}`);
+                }
+            }
+        }
+    }
+    ok(traps.length === 0, `${traps.length} of ${rolled} rolled ledges have a lip nobody can walk off`
+        + (traps.length ? ` — e.g. ${traps[0]}` : ""));
+    // And the arenas, which are authored rather than rolled and were wrong in all seven.
+    for (let map = 1; map <= 7; map += 1) {
+        for (const p of arenaFor(map)) {
+            if (p.i === 0) continue;
+            ok(p.x >= WALK_INSET && p.x + p.w <= ARENA_W - WALK_INSET,
+                `arena ${map} ledge ${p.i} (${p.x}..${p.x + p.w}) has a lip outside the walkable strip`);
+        }
+    }
+    const badArenas = validateArenas();
+    ok(badArenas.length === 0, `validateArenas: ${badArenas.join("; ")}`);
+}
 
 // ── ⚠️ IS THE HERO ACTUALLY ON THE SCREEN? ─────────────────────────────────────────────────────────
 // The content checks above are about strings that can be wrong without throwing. This one is about NUMBERS

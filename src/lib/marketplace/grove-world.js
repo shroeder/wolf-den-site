@@ -1,5 +1,6 @@
 import { critStacks } from "@/lib/marketplace/arena-engine.js";
 import { procFrom, drFrom, LIFESTEAL_PER_POINT } from "@/lib/marketplace/arena-kit.js";
+import { HERO_UNITS } from "@/lib/marketplace/grove-view.js";
 
 // ── THE ZONE, AS A PLACE ─────────────────────────────────────────────────────────────────────────────────────
 // Pure geometry and simulation for one zone: the platforms, who is standing on what, where everything is
@@ -68,6 +69,30 @@ export const zoneWidth = (n) => Math.round(CROSS_SECONDS(n) * TOP_SPEED);
 // up and lose the ground. At 11 it is about one and a half hero-heights: visible from the floor, reachable
 // in one hop, and it finally puts something in the empty canopy that was four-fifths of every phone frame.
 export const TIER_RISE = 11;
+
+// ── ⚠️ THE LIP OF A LEDGE MUST BE SOMEWHERE A BODY CAN STAND ────────────────────────────────────────────────
+// Luke, 2026-11-12: "I cant get down from a platform, I'm clicking below my platform." Then, after the
+// arena was fixed: "This happens outside the arena many places. Seems like a fundamental fix is in order."
+//
+// He is right, and this is that fix. The scene clamps every body to WALK_INSET from each end of the world so
+// nothing stands half outside it. A platform whose lip lies INSIDE that inset therefore cannot be walked
+// off: the hero reaches the bound with slab still under his feet, the floor never runs out, and he is on
+// that ledge until he closes the game. Nothing errors and nothing looks wrong — he simply stops.
+//
+// Measured across 23,669 generated ledges (40 rolls of every built zone): 2.0% had a lip inside the inset,
+// and 83 of the 84 zones could roll one. The ledge placer allowed x as close as 2 units to the world edge
+// while the inset is 4.2. Every Coliseum arena was worse — all seven were authored wider than the strip, so
+// their first tier was a box with no exit, 100% of the time.
+//
+// ⚠️ SO THE RULE LIVES HERE, WITH THE REST OF THE WORLD'S GEOMETRY, AND EVERY GENERATOR READS IT. It was
+// three separate numbers before: 0.6 * HERO_UNITS in GroveScene, a bare 2 in the ledge placer, and nothing
+// at all in grove-arena.js. Three ideas of where the edge of the world is, two of which were wrong.
+export const WALK_INSET = HERO_UNITS * 0.6;
+// A ledge has to end far enough inside the bound that a body can stand CLEAR of the lip — standing exactly
+// on it means the surface under you has not run out yet.
+export const LIP_MARGIN = 1.3;
+/** The span a ledge's ends must both lie within, for a world this wide. */
+export const walkableSpan = (worldW) => [WALK_INSET + LIP_MARGIN, worldW - WALK_INSET - LIP_MARGIN];
 // How much of its parent a ledge must sit over. This is the landing window: a body standing on the ledge
 // below has to be underneath the one above for a straight-up hop to put it there.
 const TIER_OVERLAP = 7;
@@ -145,8 +170,12 @@ export function platformsFor(zoneN, rand) {
                 // rather than as a platform, and a platformer whose platforms have no visible edges is just
                 // a corridor at a different height.
                 const pw = 13 + rand() * 16;
-                const lo = Math.max(2, parent.x - pw + TIER_OVERLAP);
-                const hi = Math.min(w - pw - 2, parent.x + parent.w - TIER_OVERLAP);
+                // ⚠️ THE STRIP, NOT A BARE 2. A ledge placed 2 units from the end of the zone has its lip
+                // inside the body clamp and is a ledge nobody can walk off — see WALK_INSET above. This was
+                // 2.0% of every ledge the Grove has ever generated.
+                const [spanLo, spanHi] = walkableSpan(w);
+                const lo = Math.max(spanLo, parent.x - pw + TIER_OVERLAP);
+                const hi = Math.min(spanHi - pw, parent.x + parent.w - TIER_OVERLAP);
                 if (hi <= lo) return;
                 const x = lo + rand() * (hi - lo);
                 // Two ledges a few units apart on the same tier read as one broken ledge, and the gap

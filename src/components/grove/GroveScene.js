@@ -15,7 +15,7 @@ import { rngFrom, rollKillTimes, rollRareSpawn } from "@/lib/marketplace/grove-r
 import {
     UNITS_PER_SCREEN, zoneWidth, platformsFor, decorateLedges, swing, makeTelegraph, telegraphHits, mitigate,
     BLEED_TICK_MS, BLEED_TICKS, BURN_SHARE, BURN_TICK_MS, BURN_TICKS,
-    BURN_SPREAD_UNITS, BURN_SPREAD_SHARE, petBite, petBiteCd,
+    BURN_SPREAD_UNITS, BURN_SPREAD_SHARE, petBite, petBiteCd, WALK_INSET,
 } from "@/lib/marketplace/grove-world.js";
 // Pure files, both of them — no DB and no server-only, which is why a client scene may read them. The
 // alternative was a second haste curve that drifts from the ring's the first time either is touched.
@@ -2128,7 +2128,11 @@ export default function GroveScene({
 
             const plats = w.platforms;
             // Walkable bounds, inset by a body so nothing can stand with half of itself outside the zone.
-            const bounds = [HERO_UNITS * 0.6, W - HERO_UNITS * 0.6];
+            // ⚠️ WALK_INSET, NOT A SECOND COPY OF THE ARITHMETIC. This number decides whether a ledge can
+            // be walked off, so the generators that PLACE ledges have to agree with it exactly — and when
+            // it lived here as `HERO_UNITS * 0.6` they did not: the ledge placer used 2 and the arena used
+            // nothing. See the long note on WALK_INSET in grove-world.js.
+            const bounds = [WALK_INSET, W - WALK_INSET];
 
             // ── ⚠️ A HELD FINGER IS RE-RESOLVED EVERY FRAME ─────────────────────────────────────
             // Luke: "If i hold down my finger it should continue to pursue where im clicking." The hold is
