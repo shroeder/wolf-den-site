@@ -1743,6 +1743,25 @@ export default function GroveScene({
                 // died nowhere near the door. The word is the PLACE it opened — a name you can now
                 // walk to is the reward. "Onward" is only for zone twelve, where there is nowhere
                 // further to name.
+                // ── ⚠️ IN THE ARENA, A BOSS IS JUST THE LAST WAVE ──────────────────────────────
+                // Luke, 2026-11-13, mid-Coliseum at "WAVE 12 OF 12": "Frozen client."
+                //
+                // Wave twelve spawns the MAP'S BOSS, flagged isBoss like any other — and this branch has
+                // never asked whether it is standing in a zone. So killing the Coliseum's final boss ran
+                // the whole zone-clear ceremony: it opened the door of whatever zone the Coliseum happens
+                // to sit in, fired the herald and the celebration over a live fight, and called onBoss().
+                //
+                // onBoss() is GroveClient's bossKill, which POSTs a real boss kill for session.zone — a
+                // zone whose boss was never touched. That is a free emblem, free xp and the next zone
+                // opened, repeatable every single run. And since today it also fires the kill card and the
+                // new-area pop: two full-screen .gv-pop layers thrown over a running arena with 24 seconds
+                // left on the clock, which is what a frozen client looks like from the outside.
+                //
+                // ⚠️ THE EARLY RETURN STAYS FOR BOTH. Keeping it means the arena's boss pays exactly what
+                // it paid yesterday; only the zone's consequences are skipped. Letting execution fall
+                // through here would be a second change riding along with a fix.
+                if (arena) return;
+
                 const open = wd.doors.find((d) => d.side === "on");
                 if (open && !open.openedAt) {
                     open.openedAt = now;
@@ -3634,10 +3653,58 @@ export default function GroveScene({
                 onSettle?.(batch, ate);
             }
 
+            // ⚠️ A HEARTBEAT THE WATCHDOG BELOW READS. One assignment per frame; it is the only way to
+            // tell "the loop is running and the world is slow" from "the loop stopped".
+            w.beatAt = now;
             raf = requestAnimationFrame(step);
         };
 
         raf = requestAnimationFrame(step);
+
+        // ── ⚠️ A FROZEN CLIENT LEAVES NO TRACE, SO IT HAS TO LEAVE ONE ──────────────────────────────────
+        // Luke, 2026-11-13, at "WAVE 12 OF 12" with 24 seconds left: "Frozen client." Nothing threw, so
+        // mkt_client_error has no row for it — and a freeze photographs exactly like a player standing
+        // still. There was no evidence at all, which is the thing to fix first.
+        //
+        // This is a plain setInterval, deliberately: setInterval keeps firing when requestAnimationFrame
+        // has stopped, which is the whole case being watched for. If the loop has not written its
+        // heartbeat for six seconds while the scene is mounted and the tab is visible, say so, once, with
+        // the state that would otherwise be lost — which wave, how many bodies, whether hit-stop is
+        // holding the clock, whether an overlay is covering the screen.
+        //
+        // ⚠️ ONCE PER MOUNT. A watchdog that reports every six seconds of a freeze turns one incident into
+        // a hundred rows and buries the next one. [[a-rule-moved-and-the-watcher-did-not]]
+        let barked = false;
+        const watchdog = setInterval(() => {
+            if (barked || document.hidden) return;
+            const beat = w.beatAt || 0;
+            const stalled = performance.now() - beat;
+            if (beat === 0 || stalled < 6000) return;
+            barked = true;
+            try {
+                fetch("/api/client-error", {
+                    method: "POST", keepalive: true, headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                        name: "GroveLoopStalled",
+                        message: `scene loop silent for ${Math.round(stalled)}ms`,
+                        path: window.location.pathname,
+                        where: JSON.stringify({
+                            zone: zone?.n ?? null,
+                            arena: Boolean(arena),
+                            wave: w.waveAt ?? null,
+                            totalWaves: waves ? waves.length : null,
+                            runOver: Boolean(w.runOver),
+                            foes: (w.foes || []).length,
+                            pops: (w.pops || []).length,
+                            // The two states that can hold a simulation still without stopping the browser.
+                            hitStopFor: Math.max(0, Math.round((w.clock?.stopUntil || 0) - performance.now())),
+                            paused: Boolean(w.pauseAt),
+                            overlay: Boolean(document.querySelector(".gv-pop, .gv-ask")),
+                        }),
+                    }),
+                }).catch(() => {});
+            } catch { /* a watchdog must never be the thing that throws */ }
+        }, 2000);
         const onVis = () => {
             if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
             // ⚠️ A HIDDEN TAB IS A PAUSE TOO, AND IT WAS NOT BEING BANKED. The loop was cancelled and
@@ -3681,6 +3748,7 @@ export default function GroveScene({
         window.addEventListener("orientationchange", measureHost);
 
         return () => {
+            clearInterval(watchdog);
             cancelAnimationFrame(raf);
             ro?.disconnect();
             window.removeEventListener("orientationchange", measureHost);
