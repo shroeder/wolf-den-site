@@ -2102,6 +2102,24 @@ export default function GroveScene({
             // and the only place to restart it from is the effect whose cleanup banks the kill log.
             if (pausedRef.current) {
                 if (!w.pauseAt) w.pauseAt = raw;
+                // ── ⚠️ THE HEARTBEAT HAS TO BE WRITTEN HERE TOO, AND NOT WRITING IT CRIED WOLF ──────
+                // This branch returns BEFORE `w.beatAt = now` at the bottom of the frame. The rAF loop
+                // is deliberately still running (see the note above) — but the watchdog reads beatAt,
+                // not rAF, so six seconds with a sheet open looked exactly like a dead loop and posted
+                // "scene loop silent for 7437ms" to the admin phone.
+                //
+                // Jrobert, the first member into the Grove after it opened on 2026-11-14, filed three of
+                // those in eleven minutes — 6.4s, 7.2s and 7.5s — and every one of them was him reading
+                // a sheet. Reproduced by scripts/qa-grove-playthrough.mjs, whose capture of the
+                // watchdog's own payload said `paused: true, foes: 26, hitStopFor: 0, overlay: false`.
+                // The report literally carried the field that explained why it should not have fired.
+                //
+                // ⚠️ THE HEARTBEAT MEANS "THE LOOP IS ALIVE", NOT "THE WORLD IS MOVING" — that is its
+                // whole purpose, stated in its own comment: to tell "running and slow" from "stopped".
+                // A paused loop is running. Fixing it here rather than by teaching the watchdog to
+                // ignore `paused` keeps it able to catch a genuine freeze that happens WHILE paused,
+                // which the other fix would have gone blind to. [[a-rule-moved-and-the-watcher-did-not]]
+                w.beatAt = raw;
                 raf = requestAnimationFrame(step);
                 return;
             }

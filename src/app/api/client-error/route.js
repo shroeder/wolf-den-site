@@ -81,7 +81,17 @@ export async function POST(request) {
             [buyer?.id || null, path, quiet ? `[chunk] ${message}` : message, digest, stack, ua]
         ).catch(() => { /* the log line above is the real record */ });
 
-        const key = `${path}|${message}`;
+        // ── ⚠️ THE COOLDOWN KEY CANNOT CONTAIN THE THING THAT VARIES ───────────────────────────────────
+        // It was `${path}|${message}`, and a message like "scene loop silent for 6148ms" carries a
+        // different number every single time — so every report was its own key, the 10-minute window
+        // never matched anything, and the "one push per path per 10 minutes" promise in the comment above
+        // was never kept for any error that quotes a measurement.
+        //
+        // Luke's phone, 2026-11-14: three "A page crashed" pushes at 12:59, 13:00 and 13:01 — 7527ms,
+        // 7813ms, 6148ms. Three keys, three pushes, cooldown untouched.
+        //
+        // Digits collapse to # so the shape of the message is the key. [[a-rule-moved-and-the-watcher-did-not]]
+        const key = `${path}|${message.replace(/\d+/g, "#")}`;
         const now = Date.now();
         if (!quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
             lastPush.set(key, now);
