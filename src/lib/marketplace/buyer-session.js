@@ -7,6 +7,7 @@ import { cookies, headers } from "next/headers";
 
 import { hashPassword, verifyPassword } from "@/lib/consignment/password";
 import { db } from "@/lib/db";
+import { createServerLogger } from "@/lib/server-logger";
 import { DEFAULT_AVATAR } from "@/lib/marketplace/avatar-options.js";
 import { ensureSquareCustomerForBuyer } from "@/lib/marketplace/loyalty.js";
 import { ensureAlias } from "@/lib/marketplace/profile.js";
@@ -427,6 +428,8 @@ export async function getBuyerSessionToken() {
 // ── ⚠️ A NEW MEMBER IS A NEW MEMBER, WHICHEVER DOOR THEY CAME THROUGH ───────────────────────────────────────
 // Luke, 2026-11-12: "I'm just not seeing them being created this way."
 //
+const logger = createServerLogger({ source: "api", subsystem: "buyer-session" });
+
 // The owner's app is pushed whenever somebody joins — and that push lived in ONE route handler,
 // /api/marketplace/auth/register. So it fired for the app signup and for nothing else. Accounts made by
 // getOrCreateBuyerByEmail — a shop signup, a purchase linked to an email, the shop-session bridge — were
@@ -439,19 +442,41 @@ export async function getBuyerSessionToken() {
 // ⚠️ `via` IS THE WHOLE POINT OF DOING IT HERE. "New member joined" told the owner nothing about where they
 // came from, and the answer is now the most interesting part of the message — somebody who appeared because
 // they bought something is a different fact than somebody who downloaded the app.
+// ⚠️ IT SAYS WHAT HAPPENED NOW, AND THAT IS THE FIX FOR A SECOND REPORT OF THE SAME THING.
+// Luke, 2026-11-13: "I get alerts for in store sign ups but still not when people sign up from online
+// purchases." Every link in the chain checks out when read: the bridge is awaited, the announce sits inside
+// `if (!row)` so it fires exactly once at creation, `member` maps to wolfden_member_v1, the app defines that
+// channel, and the owner's handset is active on v1.0.735 with a live token.
+//
+// So the fault is somewhere the code was deliberately not looking. The bare `catch {}` below swallowed
+// everything — a failed import, a Firebase refusal, a dead token, "no_devices" — and `sendAdminPush` itself
+// RETURNS its failures rather than throwing them ({sent: 0, skipped: "no_devices"}), so even a total
+// non-delivery left no trace anywhere. Two rounds of reading code have now cost more than logging would
+// have, which is the actual lesson: a silent catch on a thing somebody will report as broken is a decision
+// to debug it twice.
+//
+// Still best-effort — a push must never fail a signup or a checkout — it just stops being invisible.
 async function announceNewMember(buyerId, { email, displayName, via }) {
     try {
         const { sendAdminPush } = await import("@/lib/push/send.js");
         const who = displayName || email || "Somebody";
-        await sendAdminPush({
+        const result = await sendAdminPush({
             sound: { kind: "member" },
             title: "🐺 New member joined!",
             body: `${who} ${via}.`,
             route: `members?member=${buyerId}`,
             data: { type: "new_member", buyerId, via },
         });
-    } catch {
-        // A push is never allowed to fail a signup or a checkout.
+        // `sent` is the only number that means a phone actually got it.
+        if (!result?.sent) {
+            logger.warn("new_member_push_not_delivered", {
+                buyerId, via, skipped: result?.skipped || null, failed: result?.failureCount ?? null,
+            });
+        } else {
+            logger.info("new_member_push_sent", { buyerId, via, sent: result.sent });
+        }
+    } catch (error) {
+        logger.error("new_member_push_threw", error, { buyerId, via });
     }
 }
 
