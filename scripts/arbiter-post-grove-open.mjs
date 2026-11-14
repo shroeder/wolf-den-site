@@ -37,7 +37,7 @@ Kills fill a bar that belongs to the map you are on. Fill it and the forest hand
 This is the part worth reading twice if you have no interest in a forest crawler: **those tools pay out in the farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss.** Twelve rooms you already play. Once all twelve of your tools are current for a map, the bar starts handing you chests instead, and the deeper the map the better they roll.
 
 # The Coliseum
-There is a marshal in the forest with a key. Twelve waves, a clock, and a chest on the sand at the end of it. You get a key a day. Nobody has cleared all twelve yet — if you are the first, say so.
+There is a marshal in the forest with a key. Twelve waves, a clock, and a chest on the sand at the end of it. You get a key a day. **Nobody has ever cleared all twelve** — the best anyone has managed is eleven. If you are the first, say so.
 
 # Where to find it
 It is on your hub as **The Grove**, second in the game menu, and there is a door to it in town. The Pathfinder has a chapter on it now too, with four steps and a gold chest at the end, so there is a paid reason to take the first walk.
