@@ -491,6 +491,50 @@ export async function sendOrderStatusEmail(order, status) {
 }
 
 /**
+ * ── WE GAVE YOU THE WRONG TRACKING NUMBER ───────────────────────────────────────────────────────────────────
+ * Not a status change — an apology and a correction, for when the number we already emailed was wrong.
+ *
+ * It exists because of order #E83FA83B, 2026-11-12. A mis-scanned label saved the customer's own ZIP+4 glued
+ * to a truncated tracking number; she tried it for two days before writing in. The parser is fixed
+ * (tracking-scan.js) so it cannot happen again, but a fixed parser does not tell the person still holding
+ * the dead number — and the shipped email had already gone out, so there was no later message that would
+ * ever carry the right one.
+ *
+ * ⚠️ IT SAYS THE NUMBER WAS OURS TO GET WRONG. A customer who has been pasting a dead number into USPS for
+ * two days has been told by the carrier that it does not exist, which reads as "they never shipped it".
+ * Saying plainly that the parcel is real and moving, and that the mistake was ours, is the content.
+ *
+ * Reuses trackingHtml, so the corrected number arrives as a working link to the right carrier's site —
+ * derived from the NUMBER's shape, which is the whole point when the label was bought at the counter.
+ */
+export async function sendTrackingCorrectedEmail(order) {
+    const resend = getResendClient();
+    const to = recipientEmail(order);
+    if (!resend || !to) return false;
+    if (!String(order?.tracking_number || "").trim()) return false;
+
+    const number = confirmationNumber(order);
+    const name = buyerName(order);
+    const body = `
+        <h1>Here's the right tracking number</h1>
+        <p>${name ? `Hi ${escapeHtml(name.split(" ")[0])},` : "Hi,"}</p>
+        <p>The tracking number we sent for order <strong>#${number}</strong> was wrong &mdash; that was a mistake
+           on our end, not a problem with the carrier. Your parcel shipped on time and is moving. This is the
+           correct number:</p>
+        ${trackingHtml(order)}
+        <p>Sorry for sending you chasing a number that was never going to work, and thank you for telling us &mdash;
+           you found a real bug in how we read shipping labels, and it is fixed now.</p>
+    `;
+
+    return resend.emails.send({
+        from: FROM,
+        to,
+        subject: `Correction: the right tracking number for order #${number}`,
+        html: shellHtml(`${body}${footerHtml()}`),
+    });
+}
+
+/**
  * Customer cancellation + refund notice with the owner's reason. Skips only if we have no address.
  * Reads the same recipient as every other order email, so a PICKUP cancellation reaches the buyer too.
  */
