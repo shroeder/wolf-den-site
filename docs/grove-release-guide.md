@@ -366,11 +366,15 @@ five places in `grove-catalog.js`, `grove-maps.js` and `grove-recipes.js`); `gro
     Playing it found three things reading had not: the run card claimed chests on a run that earned none
     (`chestsFor` pays nothing under a quarter of the waves — the ordinary early run), the scene's Monster
     Card ghosted through the result card, and the boss card printed the creature's name twice. All fixed.
-  - ⚠️ **ONE THING A RIG CANNOT ANSWER.** A full clear is 138 bodies in 120 seconds. Driven hard — a tap
-    every 400ms, 291 of them — it cleared 3 of 12 waves, and slowing the input down made it *worse*,
-    because auto-attack only steps to what is already in reach so the hero stops dead after each kill in a
-    26-unit arena. A human taps faster and reads the room. **Whether twelve waves is reachable, or whether
-    the Coliseum only ever pays its bottom chest, needs one real run by a real player.**
+  - ✅ **ANSWERED BY A REAL RUN, 2026-11-14.** Luke, asked for the one thing a rig could not settle:
+    *"The coliseum is good."* So the building is not launch-blocked, and the rig's 3-of-12 was the rig,
+    not the design — a tap every 400ms with auto-attack stepping only to what is already in reach is a
+    worse player than a person, which is exactly what it looked like at the time. **Nothing here to
+    change, and nothing left to find out before launch.** Kept as the record of why 3 of 12 is not the
+    number to tune against: a full clear is 138 bodies in 120 seconds, and the rig's shortfall measured
+    its own input, not the clock.
+    ⚠️ The per-tier chest `gear` CHANCE is still the line to change if a chest should be able to
+    disappoint — every tier pays at least one piece today (1 / 1 / 2 / 3). See backlog item T.
 - **3.9** — is `sigil_road`'s carved sign a defect?
 - **3.10** — does the Grove need an elite-gear route at all?
 - The Grove-town **Tavern building** points at `/marketplace/friends`, not the tavern room. Under the City
