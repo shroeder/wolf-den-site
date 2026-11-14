@@ -46,6 +46,16 @@ function argsAt(s, open) {
     return null;
 }
 
+// ── A TIMER THAT CAN ONLY FIRE ONCE IS NOT WHAT RULE 2 IS ABOUT ─────────────────────────────────────────────
+// Rule 2 exists because a member standing still sent 1,440 identical writes an hour. A watchdog that latches
+// — returns early on a flag it then sets, so it can post at most once per mount — cannot do that, and it has
+// no "last sent" to compare against because there is no second send. Recognised structurally rather than by a
+// comment somebody can paste onto anything: the body must guard on a name and then set that same name true.
+const onceOnly = (args) => {
+    const m = args.match(/if\s*\(\s*(\w+)\b[^)]*\)\s*return\b/);
+    return Boolean(m && new RegExp(`\\b${m[1]}\\s*=\\s*true\\b`).test(args));
+};
+
 const problems = [];
 let checked = 0;
 for (const f of files) {
@@ -65,7 +75,7 @@ for (const f of files) {
         const where = `${f.split(sep).join("/").replace("src/components/", "")}:${line}`;
         if (!/visibilityState/.test(args)) {
             problems.push(`${where} polls the server on a timer with no visibilityState gate — it bills the same whether anybody is looking`);
-        } else if (PUSHES.test(args) && !/(sentRef|lastSent|prevSent)/.test(args)) {
+        } else if (PUSHES.test(args) && !/(sentRef|lastSent|prevSent)/.test(args) && !onceOnly(args)) {
             problems.push(`${where} PUSHES on a timer with no "did it change" check — a member standing still still sends every tick`);
         }
     }

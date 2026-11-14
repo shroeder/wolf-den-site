@@ -3717,12 +3717,35 @@ export default function GroveScene({
         //
         // ⚠️ ONCE PER MOUNT. A watchdog that reports every six seconds of a freeze turns one incident into
         // a hundred rows and buries the next one. [[a-rule-moved-and-the-watcher-did-not]]
+        //
+        // ── ⚠️ AND A SUSPENDED PAGE IS NOT A FROZEN ONE ─────────────────────────────────────────────
+        // Its first day live this reported 13 stalls from 5 different members and buzzed the phone for
+        // every one, including "silent for 859951ms" — a phone in a pocket for fourteen minutes, not a
+        // freeze. The hidden check below cannot see any of those, because it samples a moment and the
+        // thing being measured is a window: onVis cancels the rAF when the tab goes away, so the
+        // heartbeat goes stale by the whole time off-screen, and when the page comes back the overdue
+        // interval fires BEFORE the first frame can repaint it — with document.hidden already false.
+        //
+        // So measure the window. The page must have been continuously awake for the whole silence
+        // (awakeAt), and the silence has to be short enough to be a freeze at all: past a minute nobody
+        // is sitting in front of a wedged browser, that is a closed lid or a locked phone. Luke's WAVE
+        // 12 freeze is on-screen and seconds long, and still reports.
+        const STALL_MS = 6000;
+        const SLEEP_MS = 60000;
         let barked = false;
+        let awakeAt = performance.now();
+        // Every way a page can stop being run and then start again: tab switch, Chrome freezing a
+        // backgrounded page on a phone, bfcache restore. Each one ends a silence that was never ours.
+        const woke = () => { awakeAt = performance.now(); };
         const watchdog = setInterval(() => {
-            if (barked || document.hidden) return;
+            if (barked || document.visibilityState === "hidden") return;
+            const now = performance.now();
             const beat = w.beatAt || 0;
-            const stalled = performance.now() - beat;
-            if (beat === 0 || stalled < 6000) return;
+            const stalled = now - beat;
+            if (beat === 0 || stalled < STALL_MS || stalled > SLEEP_MS) return;
+            // The silence has to fit inside the time since the page last woke. Any of it older than
+            // that happened while the page was away, where the loop is cancelled on purpose.
+            if (now - awakeAt < stalled) return;
             barked = true;
             try {
                 fetch("/api/client-error", {
@@ -3749,6 +3772,7 @@ export default function GroveScene({
             } catch { /* a watchdog must never be the thing that throws */ }
         }, 2000);
         const onVis = () => {
+            woke();
             if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
             // ⚠️ A HIDDEN TAB IS A PAUSE TOO, AND IT WAS NOT BEING BANKED. The loop was cancelled and
             // restarted with a fresh `last`, which fixed dt and left every absolute deadline in the past —
@@ -3757,6 +3781,8 @@ export default function GroveScene({
             else if (!raf) { if (!w.pauseAt) w.pauseAt = performance.now(); raf = requestAnimationFrame(step); }
         };
         document.addEventListener("visibilitychange", onVis);
+        document.addEventListener("resume", woke);
+        window.addEventListener("pageshow", woke);
 
         // The tab being closed, backgrounded on a phone, or navigated away from. Fire-and-forget by design:
         // nothing can read a response after this point, which is exactly why it has to be a beacon.
@@ -3796,6 +3822,8 @@ export default function GroveScene({
             ro?.disconnect();
             window.removeEventListener("orientationchange", measureHost);
             document.removeEventListener("visibilitychange", onVis);
+            document.removeEventListener("resume", woke);
+            window.removeEventListener("pageshow", woke);
             window.removeEventListener("pagehide", flush);
             // ⚠️ SETTLE ON THE WAY OUT. Walking away must not throw the session's kills away — the same
             // reason the casino releases a held balance when you stand up.
