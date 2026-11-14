@@ -47,9 +47,36 @@ export function upsCheckOk(code) {
     return ((10 - (total % 10)) % 10) === Number(s[17]);
 }
 
+/**
+ * USPS's mod-10 check digit, over the 20- and 22-digit IMpb forms. Weights 3 and 1 alternating from the
+ * right of the body. Used to CHOOSE between candidates, never to reject a lone one — same rule as
+ * upsCheckOk above, and for the same reason: the label in the owner's hand is the ground truth.
+ */
+export function uspsCheckOk(code) {
+    const d = clean(code).replace(/[^0-9]/g, "");
+    if (d.length !== 22 && d.length !== 20) return false;
+    const body = d.slice(0, -1);
+    let sum = 0;
+    for (let i = body.length - 1, w = 3; i >= 0; i -= 1, w = w === 3 ? 1 : 3) sum += Number(body[i]) * w;
+    return ((10 - (sum % 10)) % 10) === Number(d.slice(-1));
+}
+
 // ── USPS ─────────────────────────────────────────────────────────────────────────────────────────────
 // An IMpb scan is routing-then-tracking. Strip "420" + ZIP5 or ZIP9 before looking at anything else.
-const USPS_ROUTING = /^420\d{5}(\d{4})?/;
+//
+// ⚠️ NOT ANCHORED ANY MORE, AND THAT ANCHOR COST A REAL CUSTOMER HER TRACKING NUMBER.
+// It was /^420.../. A 2D barcode's rawValue does start at the 420 — but an OCR pass over the same label
+// does not: it hands back "USPS", "PRIORITY MAIL", a meter number, whatever ink is above the bars. One
+// character before the 420 and `routed` was false, the routing prefix was never stripped, and the search
+// fell through to USPS_22_ANY, which scans from the LEFT and happily starts its match inside the ZIP+4.
+//
+// Order #E83FA83B, 2026-11-12, shipped to 78132-9595: the number saved and emailed was
+// `9595346148010163164677` — her own ZIP+4 with a truncated tracking number stuck to it. It fails the
+// USPS check digit and it tracks on nothing. She wrote in two days later to say so.
+//
+// The irony is that this file's own header warns about exactly this: "Scan it raw and you email the
+// customer their own ZIP code with a number stuck to it, which tracks on nothing."
+const USPS_ROUTING = /420\d{5}(\d{4})?/;
 // 22-digit (most retail, starts 92/93/94/95) and 20-digit (starts 91/94, and the older 03/70/23 forms).
 //
 // ⚠️ ANCHORED AT THE FRONT, NOT WORD-BOUNDED. These were written with a trailing \b, which is wrong for a
@@ -93,13 +120,27 @@ export function parseTrackingFromScan(raw) {
     }
 
     // ── USPS. Routing prefix off first, or the ZIP leads and everything after is misread.
+    //
+    // ⚠️ EVERY CANDIDATE, THEN THE CHECK DIGIT PICKS — the same shape as the UPS branch above, and for the
+    // same reason: a label's digits can yield more than one string of the right shape, and only one of them
+    // is a tracking number. Taking the FIRST match is what glued a ZIP+4 to the front of #E83FA83B.
+    //
+    // The ranking is: a candidate from the de-routed string that validates, then any candidate that
+    // validates, then the de-routed front, then the first match anywhere. Only the last of those is
+    // reported `confident: false` — a lone shape with nothing corroborating it is exactly the case the
+    // header says to hand to a human rather than guess at.
     const routed = USPS_ROUTING.test(s);
-    const noRoute = s.replace(USPS_ROUTING, "");
-    // A routed scan is read from its front — that is where the tracking begins once the ZIP is off.
-    const u22 = (routed && noRoute.match(USPS_22)) || s.match(USPS_22_ANY);
-    if (u22) return { carrier: "USPS", tracking: u22[1], confident: true };
-    const u20 = (routed && noRoute.match(USPS_20)) || s.match(USPS_20_ANY);
-    if (u20) return { carrier: "USPS", tracking: u20[1], confident: true };
+    const noRoute = routed ? s.replace(USPS_ROUTING, "") : s;
+    const candidates = [];
+    for (const re of [USPS_22, USPS_20]) { const m = noRoute.match(re); if (m) candidates.push(m[1]); }
+    for (const re of [USPS_22_ANY, USPS_20_ANY]) {
+        for (const m of noRoute.matchAll(new RegExp(re.source, "g"))) candidates.push(m[1]);
+        for (const m of s.matchAll(new RegExp(re.source, "g"))) candidates.push(m[1]);
+    }
+    if (candidates.length) {
+        const good = candidates.find((c) => uspsCheckOk(c));
+        return { carrier: "USPS", tracking: good || candidates[0], confident: Boolean(good) };
+    }
 
     // ── FEDEX. The 20-digit form carries the real number in its last 12.
     const f20 = s.match(FEDEX_20);
