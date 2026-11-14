@@ -29,8 +29,25 @@ export async function POST(request) {
         const path = String(body?.path || "unknown").slice(0, 300);
         const message = String(body?.message || "(no message)").slice(0, 500);
         const digest = body?.digest ? String(body.digest).slice(0, 120) : null;
-        const stack = body?.stack ? String(body.stack).slice(0, 4000) : null;
-        const ua = body?.ua ? String(body.ua).slice(0, 300) : null;
+        // ── ⚠️ `where` WAS BEING SILENTLY DISCARDED, AND IT IS THE WHOLE POINT OF THE WATCHDOG ──────────
+        // GroveScene's freeze watchdog (added 2026-11-13, after Luke's own freeze at wave 12 of 12) posts a
+        // `where` object: which zone, which wave, how many foes, whether hit-stop is holding the clock,
+        // whether an overlay is covering the screen. This route read `stack` and `ua` — NEITHER of which
+        // that watchdog sends — so every field of it went in the bin and the row kept a message string and
+        // three nulls.
+        //
+        // Found 2026-11-14, twenty minutes after the Grove opened to everybody, on the first real member to
+        // freeze: three reports, zero state on any of them. The comment in GroveScene says "a frozen client
+        // leaves no trace, so it has to leave one". It was still leaving no trace.
+        //
+        // `where` lands in `stack` because that is the free-text diagnostic column and a stalled loop has no
+        // JS stack to compete for it. Labelled so a reader knows which kind of row they are looking at.
+        // [[declared-but-never-read]]
+        const where = body?.where ? String(typeof body.where === "string" ? body.where : JSON.stringify(body.where)).slice(0, 3900) : null;
+        const stack = body?.stack ? String(body.stack).slice(0, 4000) : (where ? `where: ${where}` : null);
+        // ⚠️ AND THE SERVER ALWAYS HAS THE USER-AGENT, so stop depending on the client to send its own. Every
+        // report posted by anything other than the crash screen arrived with ua null — which is most of them.
+        const ua = (body?.ua ? String(body.ua) : request.headers.get("user-agent") || "").slice(0, 300) || null;
         // A chunk failure that the client already recovered from by reloading (see ChunkRecovery). Still worth
         // recording — a run of them means we deployed on top of people — but it is not worth a push, because
         // the member saw a blink and carried on, and a phone buzzing "A page crashed" for that is a false alarm
