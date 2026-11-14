@@ -352,6 +352,54 @@ export async function sendSailingLaunchEmail(email, { name = "" } = {}) {
     return true;
 }
 
+// ── ⚠️ THE GROVE LAUNCH EMAIL — 2026-11-14 ──────────────────────────────────────────────────────────────────
+// Luke: "I would expect an email. Draft." Modelled on sendSailingLaunchEmail directly below-ish, because the
+// Grove opening is the same KIND of event — a whole room becoming available at once — and a member who got
+// the sailing one should recognise the shape.
+//
+// ⚠️ THE AUDIENCE LIVES IN THE SCRIPT, NOT HERE. scripts/grove-launch-email.mjs owns who it goes to and
+// honours `notify_prefs -> email:announce`, the same column broadcastAnnouncementEmail reads. This function
+// sends to ONE address, so a dry run can render it without a database and a resend can target one person.
+//
+// ⚠️ IT NAMES THE TOOL BONUS AND IT DOES SO DELIBERATELY. The Grove reads as a thing for people who want a
+// forest crawler, and most of the Den does not. The honest hook for everybody else is that the tools it pays
+// raise the farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the
+// weekly boss — that is the sentence that makes it everyone's feature rather than a side mode.
+export async function sendGroveLaunchEmail(email, { name = "" } = {}) {
+    if (!email) return false;
+    if (!process.env.RESEND_API_KEY) return false;
+    const resend = getResendClient();
+    return resend.emails.send(groveLaunchMessage(email, { name }));
+}
+
+/** The message object itself, so a preview can render exactly what would be sent without sending it. */
+export function groveLaunchMessage(email, { name = "" } = {}) {
+    const hi = name ? `Hey ${name},` : "Hey there,";
+    const url = `${baseUrl()}/marketplace/grove`;
+    return {
+        from: "The Wolf Den <portal@wolfdengamingmn.com>",
+        to: email,
+        subject: "🌲 The Grove is open — seven maps of forest, and the gear in it",
+        html: `
+            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#201a12;">
+                <p>${hi}</p>
+                <div style="text-align:center;padding:26px 18px;margin:14px 0;border:1px solid #6fae63;border-radius:16px;background:linear-gradient(160deg,#1d3a22,#0e1a11);color:#eaf6e6;">
+                    <div style="font-size:48px;line-height:1;">🌲</div>
+                    <div style="font-size:22px;font-weight:800;margin-top:10px;">The Grove is open</div>
+                    <div style="color:#b7ccb4;margin-top:8px;">The biggest thing in the Den, and it is no longer behind a door.</div>
+                </div>
+                <p>It has been in testing for months with a handful of members. That is over — <b>every account can walk in now</b>.</p>
+                <p><b>Seven maps of forest, twelve zones each.</b> You move your hero through it in real time and fight what is in front of you. Zones open by kill count: clear what you can see, take what it drops, go further in.</p>
+                <p><b>The gear is the point.</b> Every creature carries three pieces — ordinary, rare and super-rare — running common all the way up to mythic. The zone bosses are where the good ones come from, and they sit on a cooldown rather than a key.</p>
+                <p><b>And it pays out in rooms you already play.</b> Kills fill a bar; fill it and the forest hands you one of twelve crafting tools, a tier better than the one you hold. Those tools raise what you earn in the <b>farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss</b>. Once your twelve are current for a map, the bar starts paying chests instead.</p>
+                <p>There is also a <b>Coliseum</b> in there — a marshal, a key a day, twelve waves against a clock and a chest at the end. Nobody has cleared all twelve yet.</p>
+                <p style="text-align:center;margin-top:20px;"><a href="${url}" style="display:inline-block;padding:12px 22px;background:#5fbf55;color:#07160a;text-decoration:none;border-radius:999px;font-weight:800;">Walk into the Grove →</a></p>
+                <p style="color:#777;font-size:13px;margin-top:20px;">The Pathfinder has a chapter on it now, with a gold chest at the end — if you would rather be walked through it, start there. 🐺</p>
+            </div>
+        `,
+    };
+}
+
 // Sent to every member when the weekly boss is slain. Winners get the "come claim your prize" version.
 export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winnerLabel = "", championLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
     if (!email) return false;

@@ -24,6 +24,9 @@ const ART = {
     gear: "/images/nav/gear.png",
     pets: "/images/nav/pets.png",
     farm: "/images/nav/farm.png",
+    // ⚠️ grove.png ALREADY EXISTED AND WAS ALREADY MAPPED IN THE NAV. It was drawn when the Grove's menu
+    // entry stopped being a react-icons oak leaf; nothing had to be generated for the tile below.
+    grove: "/images/nav/grove.png",
     arena: "/images/guide/ch-arena.webp",
     mine: "/images/nav/mining.png",
     fishing: "/images/nav/fishing.png",
@@ -96,6 +99,19 @@ const READY = [
 // The doors. `badge` is the live count drawn in the corner; everything without one is a place rather than a
 // chore, and gets no badge at all rather than a zero.
 const TILES = [
+    // ── ⚠️ THE GROVE WAS NOT ON THIS PAGE AT ALL, FOR THE WHOLE PREVIEW ─────────────────────────────────
+    // It had a nav entry, a sprite and a town door, and no tile on the most-opened screen in the Den. The
+    // only Grove link here was in the OWNER block on play/page.js, labelled "· owner / behind the preview
+    // flag" — so the eight guest testers never saw a door either; they had to know the URL or find it in
+    // the drag-strip. Opening `groveOpen` on its own would have opened a room with no handle on it.
+    //
+    // `when: h.grove` is the HUD's own copy of that gate (hud/route.js), so this tile follows the switch
+    // instead of carrying a second opinion about who may enter. `big` because it is the largest thing in
+    // the game and Luke had already made that call once, about its position in the nav: "The Grove in the
+    // horizontally scrollable menu should be one of the first ones."
+    //
+    // No badge. A badge is a chore count, and the Grove is somewhere you GO — see the note above TILES.
+    { href: "/marketplace/grove", art: "grove", title: "The Grove", desc: "Seven maps of forest. Kill, take the gear, go deeper.", tone: "quests", when: (h) => h.grove, big: true },
     { href: "/marketplace/boss", art: "boss", title: "Weekly Boss", desc: "Strike the shared boss for XP and raffle tickets.", tone: "boss", badge: (h) => h.bossStrikes, big: true },
     { href: "/marketplace/spin", art: "spin", title: "Daily Spin", desc: "One free spin a day — gold, chests, the jackpot.", tone: "spin", badge: (h) => h.spins, big: true },
     { href: "/marketplace/inventory", art: "gear", title: "Gear & Chests", desc: "Your loadout, the shop, and everything unopened.", tone: "gear", badge: (h) => h.chests },

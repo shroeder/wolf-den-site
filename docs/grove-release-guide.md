@@ -1,6 +1,8 @@
 # Releasing the Grove — the ordered steps, and the gotchas
 
-Started 2026-11-04. **The Grove is not released.** This is the file that says what has to happen, in what
+Started 2026-11-04. **THE GROVE IS OPEN — step 2 shipped 2026-11-14.** Gating is still off (step 4 has not
+happened and the onboarding guide has not been retired), so the rest of this file is still live. This is the
+file that says what has to happen, in what
 order, on the day it is — and the place to write down anything found between now and then that would bite on
 launch day.
 
@@ -20,7 +22,7 @@ exactly why it is easy to miss — see §3.11.
 
 | switch | file | today | what it does |
 |---|---|---|---|
-| `canPreview("grove")` | `owner.js` | owners + **9** guests | who may enter the Grove at all |
+| `canPreview("grove")` | `owner.js` | ✅ **everyone**, 2026-11-14 | who may enter the Grove at all |
 | `GATING_LIVE` | `towns.js` | `false` | whether new signups are stamped `gated_at` |
 | the onboarding guide | `guide-chapters.js`, `/marketplace/guide` | live | a chapter-by-chapter ramp through a game that gating locks |
 
@@ -60,8 +62,17 @@ keep everything"* — is already implemented by doing nothing. Do not write a mi
 
 1. **Decide the Grove is content-complete enough.** Maps 8–12 are declared but unbuilt; `mapIsBuilt` keeps
    them out of `GROVE_ZONES`, so shipping with seven is fine and needs no change.
-2. **Open the Grove** — widen `canPreview("grove")` from the allow-list to everyone.
-   Re-check `src/app/(public)/marketplace/grove/page.js`, which does `if (!groveOpen(buyer.id)) redirect(...)`.
+2. ✅ **DONE 2026-11-14 — the Grove is open.** `groveOpen` returns true for any signed-in member;
+   `PREVIEW_GUESTS.grove` is kept as the record of who tested it. Luke: *"Sure. We should be official about
+   it."*
+   ⚠️ **AND IT WAS NOT ONE LINE, WHICH IS THE THING TO CARRY FORWARD.** Every *gate* funnelled through
+   `groveOpen` — the page, the Coliseum route, the HUD, the town door, the inventory's crafting tab — so the
+   gate really was one edit. **The DOOR did not.** The Grove's only tile on `/marketplace/play` sat inside the
+   `{owner ? ...}` block, wearing the farm's sprite and the words "· owner / behind the preview flag", so for
+   the whole preview the nine testers had no door to it on the Den's most-opened page. `PlayHub`'s own `TILES`
+   list — the actual hub — **had no Grove entry at all**. Opening the gate alone would have opened a room with
+   no handle on it. See [[what-does-this-sit-on-top-of]] and [[add-things-fully]].
+   The tile is now in `TILES`, `big`, gated on the HUD's `grove` flag so it follows the switch.
 3. **Deploy and watch, with gating still off.** Everyone can play; nobody is gated. This is the window where
    load, the economy and the curve get their first real numbers.
 4. **Then flip `GATING_LIVE = true`**, in its own deploy, once step 3 looks right.
@@ -156,6 +167,13 @@ thing a new account could be handed.
 
 - **Not before.** Until `GATING_LIVE` flips nobody is gated, every door the guide names is open, and it is
   doing its job. Pulling it early deletes a working ramp and puts nothing in its place.
+- ⚠️ **AND IT NOW HAS A GROVE CHAPTER IN IT — ADDED 2026-11-14.** Luke asked for the guide to be updated
+  when the Grove opened, so `GUIDE_CHAPTERS` has a four-step `grove` chapter at `minLevel: 5`, paying 525
+  gold across its steps plus 400 and a gold chest at the end. Its steps are all `verify`, reading the Grove's
+  own tables through one query in `guide.js` — **the Grove calls `trackActivity` nowhere**, so an `events:`
+  step would have been a row that could never tick, which is exactly the defect the casino step carried for
+  the life of this database. ⚠️ **When the guide retires, this chapter and its four `grove_*` verifies go
+  with it** — the verifies are dead code the moment `guide-chapters.js` stops naming them.
 - **⚠️ IT IS A DELETION WITH A PAYOUT ATTACHED.** `src/lib/marketplace/guide.js`, `guide-chapters.js`,
   `/marketplace/guide`, and **`guide_step` / `guide_chapter` mint reasons already wired into the coin
   ledger**. Remove the guide without the reasons and two faucets exist that nothing can reach; remove the

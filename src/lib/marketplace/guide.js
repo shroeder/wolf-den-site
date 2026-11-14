@@ -27,7 +27,7 @@ async function trueSteps(buyerId, steps) {
     if (!steps.length) return new Set();
     const wanted = [...new Set(steps.flatMap((s) => s.events || []))];
     const needs = (v) => steps.some((s) => s.verify === v);
-    const [events, avatar, table, wish, push, purchase, recipe, shopVisit] = await Promise.all([
+    const [events, avatar, table, wish, push, purchase, recipe, shopVisit, grove] = await Promise.all([
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
@@ -109,6 +109,32 @@ async function trueSteps(buyerId, steps) {
                 [buyerId]
             ).catch(() => null)
             : null,
+        // ── ⚠️ THE GROVE: FOUR FACTS, ONE ROUND TRIP ────────────────────────────────────────────────
+        // ONE query, not four, and the shape is deliberate: the Grove chapter has four steps and this
+        // page is opened by every new member, so four reads of three small tables is exactly the family-A
+        // mistake CLAUDE.md opens with. Subqueries against the three tables keyed on buyer_id.
+        //
+        // ⚠️ WHY NONE OF THESE IS AN ACTIVITY EVENT. grove*.js never calls trackActivity — not once — so
+        // an `events:` step for the Grove would be a row that can never tick. That is the casino defect
+        // (see the casinotable note above) and it went unnoticed for the life of this database. Reading
+        // the Grove's own tables also credits the nine preview testers for what they have already done.
+        //
+        // `entered` is the mkt_grove_player row, which playerRow() INSERTs the first time anything asks
+        // for it — i.e. the first time you load the Grove. That is what "walk into the Grove" means.
+        //
+        // `tooled` is a mkt_grove_tool row and nothing else seeds one: grove-bar.js is the ONLY writer
+        // left in the repo, so a row means the kill bar paid out. (Legacy rows from the deleted bench
+        // count too, which is the point — a tester who crafted one is not asked to earn it again.)
+        needs("grove_enter") || needs("grove_deeper") || needs("grove_boss") || needs("grove_tool")
+            ? db.queryOne(
+                `SELECT (SELECT 1 FROM mkt_grove_player WHERE buyer_id = $1)                            AS entered,
+                        (SELECT 1 FROM mkt_grove_player WHERE buyer_id = $1 AND unlocked_n >= 2)        AS deeper,
+                        (SELECT 1 FROM mkt_grove_zone   WHERE buyer_id = $1
+                                                          AND (boss_done OR boss_kills > 0) LIMIT 1)    AS bossed,
+                        (SELECT 1 FROM mkt_grove_tool   WHERE buyer_id = $1 LIMIT 1)                    AS tooled`,
+                [buyerId]
+            ).catch(() => null)
+            : null,
     ]);
     const seen = new Set(events.map((r) => r.event));
     const out = new Set();
@@ -121,6 +147,11 @@ async function trueSteps(buyerId, steps) {
         else if (s.verify === "purchase" && purchase) out.add(s.key);
         else if (s.verify === "recipe" && recipe) out.add(s.key);
         else if (s.verify === "shopvisit" && (shopVisit || purchase)) out.add(s.key);
+        // The Grove. Each reads its own column off the single row fetched above.
+        else if (s.verify === "grove_enter" && grove?.entered) out.add(s.key);
+        else if (s.verify === "grove_deeper" && grove?.deeper) out.add(s.key);
+        else if (s.verify === "grove_boss" && grove?.bossed) out.add(s.key);
+        else if (s.verify === "grove_tool" && grove?.tooled) out.add(s.key);
     }
     return out;
 }

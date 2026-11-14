@@ -176,6 +176,40 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 350, chest: "gold" },
     },
     {
+        // ── ⚠️ THE GROVE, ADDED THE DAY IT OPENED — 2026-11-14 ──────────────────────────────────────────
+        // Luke: "Onboarding guide updated." The Grove went from an owner preview to everybody's, and the
+        // book that walks a new member through the game had NO chapter for the largest room in it.
+        //
+        // ⚠️ EVERY STEP HERE IS A `verify`, AND NOT ONE IS AN `event`. The Grove writes nothing to
+        // mkt_activity_event — grepped, zero calls to trackActivity in any grove*.js — so an `events:`
+        // step would have been a row that could never tick, which is the exact defect the casino step
+        // carried for the life of this database (see the casinotable note in guide.js).
+        //
+        // Reading the Grove's own tables is also the better answer for a reason that has nothing to do
+        // with the missing writer: those tables ARE the record, so the nine preview testers and everybody
+        // who plays in the first week are credited for what they already did, rather than being told to go
+        // and do it again. Same argument, same shape, as the casino fix.
+        //
+        // minLevel 5, not 1 and not 10. The Grove needs a hero that can survive being hit, and gear comes
+        // from the chapters before this one — but it must sit WELL BEFORE the arena and the mine, because
+        // when GATING_LIVE flips (docs/grove-release-guide.md §1) Grove depth is the only thing that opens
+        // a town, and therefore the only thing that opens those rooms at all. A gated account that reads
+        // this book in order has to arrive here before it arrives at a locked door.
+        id: "grove", name: "The Grove", minLevel: 5, tint: "#7ed57e", icon: "/images/guide/ch-grove.webp",
+        blurb: "Seven maps of forest, and the gear ladder that runs through them.",
+        steps: [
+            { key: "grove_enter", label: "Walk into the Grove", why: "A real-time forest you move your hero through, not a menu you press a button in. Twelve zones to a map, a creature in every one of them, and the whole thing is played on a phone with one thumb.", href: "/marketplace/grove", cta: "Go in", gold: 100, verify: "grove_enter" },
+            { key: "grove_deeper", label: "Clear a zone and open the next one", why: "Zones unlock by kill count, and the gate to the next one opens the moment you hit it. This is the loop the Grove is built on: kill what is in front of you, take what it drops, walk further in.", href: "/marketplace/grove", cta: "Go deeper", gold: 125, verify: "grove_deeper" },
+            { key: "grove_boss", label: "Kill a zone boss", why: "Every zone has one, on a cooldown rather than a key. A boss is where the zone's best piece of gear actually comes from — one normal, one rare and one super-rare drop per creature, running all the way up to mythic.", href: "/marketplace/grove", cta: "Hunt it", gold: 150, verify: "grove_boss" },
+            // ⚠️ THE ONE STEP THAT IS NOT ABOUT THE GROVE. It is here because the tool bonus is the Grove's
+            // only reach into the rest of the game, and it answers "why would I go in there" for a member
+            // who does not want a forest crawler: twelve systems read groveToolPct — the farm, the mine,
+            // fishing, cooking, sailing, pets, the jeweller, delves, the arena and the boss among them.
+            { key: "grove_tool", label: "Fill the kill bar for a crafting tool", why: "Kills fill a bar that belongs to the map. Fill it and the Grove hands you one of twelve crafting tools, a tier higher than the one you hold — and those tools pay out in the farm, the mine, fishing, cooking, sailing, the arena and six more rooms you already play.", href: "/marketplace/grove", cta: "Start filling it", gold: 150, verify: "grove_tool" },
+        ],
+        reward: { gold: 400, chest: "gold" },
+    },
+    {
         id: "arena", name: "The Arena", minLevel: 10, tint: "#ff6f7d", icon: "/images/guide/ch-arena.webp",
         blurb: "Everything you have built, pointed at somebody else.",
         steps: [

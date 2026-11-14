@@ -10,6 +10,8 @@ import path from "node:path";
 
 import sharp from "sharp";
 
+import { IMAGE_MODEL } from "./lib/image-model.mjs";
+
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -48,6 +50,12 @@ const ART = {
     "ch-casino": E("a neat stack of three round casino chips in red, cream and gold beside one face-down playing card with an ornate wolf-head back"),
     "ch-trade": E("two open hands exchanging a gold coin above a small balance scale"),
     "ch-store": E("a paper shopping bag with a trading card and a gold coin peeking out of the top"),
+    // ⚠️ NOT A TREE AND NOT A LEAF. A plain tree reads as the farm — which already owns the green,
+    // growing-things half of this icon set — and a leaf is what the Grove's nav entry wore as a
+    // react-icons glyph for months, which Luke called out: "It should be a sprite, not an icon or a
+    // glyph." The Grove is a forest you FIGHT through, so the emblem has to carry both halves: the
+    // trunks say where, the blade stuck in the root says what you do there.
+    "ch-grove": E("two dark mossy tree trunks framing a narrow forest path with a notched short sword driven point-down into a gnarled root between them, a few hanging leaves above"),
 };
 
 const want = process.argv.slice(2);
@@ -60,7 +68,10 @@ async function generate(prompt) {
             const r = await fetch("https://api.openai.com/v1/images/generations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", quality: "low", n: 1, background: "transparent" }),
+                // ⚠️ IMAGE_MODEL, NOT A LITERAL. This script had `model: "gpt-image-1"` hardcoded, which was retired
+                // on 2026-10-23 and answers `400 — The model 'gpt-image-1' does not exist.` — an error that reads
+                // like a typo in the name and is not. See scripts/lib/image-model.mjs.
+                body: JSON.stringify({ model: IMAGE_MODEL, prompt, size: "1024x1024", quality: "low", n: 1, background: "transparent" }),
             });
             if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 140)}`);
             const b64 = (await r.json())?.data?.[0]?.b64_json;

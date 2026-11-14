@@ -83,15 +83,14 @@ export default async function GamePlayHub({ searchParams }) {
                 directly under the title on every visit for the rest of your life. */}
             {alias ? <ReferralInvite alias={alias} referrerGold={REF_REFERRER_GOLD} joinerGold={REF_JOINER_GOLD} /> : null}
 
+            {/* ✂️ THE GROVE'S TILE WAS HERE, AND THIS IS WHY IT HAD TO LEAVE. It was inside this
+                OWNER-ONLY block, wearing the farm's sprite and the words "· owner / behind the preview
+                flag" — so for the whole preview the eight guest testers had no door to it on the Den's
+                most-opened page. It is a real tile in PlayHub's own TILES now, gated on the HUD's
+                `grove` flag, so it follows `groveOpen` instead of `isOwner`. 2026-11-14. */}
             {owner ? (
             <div className="game-hub-grid">
                 {/* Sprites here too — the owner tiles were the last two glyphs on the page. */}
-                <Link href="/marketplace/grove" className="game-tile tone-pets">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <span className="game-tile-emoji" aria-hidden="true"><img src="/images/nav/farm.png" alt="" width={30} height={30} style={{ display: "block", objectFit: "contain" }} /></span>
-                    <span className="game-tile-title">The Grove <span className="muted" style={{ fontSize: "0.7em" }}>· owner</span></span>
-                    <span className="game-tile-desc">Seven maps of it, behind the preview flag.</span>
-                </Link>
                 <Link href="/marketplace/cards" className="game-tile tone-sets">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <span className="game-tile-emoji" aria-hidden="true"><img src="/images/nav/cards.png" alt="" width={30} height={30} style={{ display: "block", objectFit: "contain" }} /></span>

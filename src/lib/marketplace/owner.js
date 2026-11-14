@@ -107,8 +107,23 @@ export function canPreview(feature, buyerId) {
  * canPreview it is one definition with no dependencies, which is what a gate should be.
  *
  * grove.js still re-exports it, so the eight existing callers did not have to move.
+ *
+ * ── ✅ THE GROVE IS OPEN. 2026-11-14 ───────────────────────────────────────────────────────────────────────
+ * Luke, asked straight out whether to widen it to everyone with gating still off: *"Sure. We should be
+ * official about it."* So this returns true for every signed-in member, and `PREVIEW_GUESTS.grove` above is
+ * kept for the same reason the `forest` key is kept — it is the record of who tested it, and it costs
+ * nothing, because canPreview only reads the key a live feature asks for.
+ *
+ * ⚠️ `GATING_LIVE` IN towns.js IS STILL `false`, AND THAT IS THE WHOLE POINT OF DOING IT IN THIS ORDER.
+ * Everyone can now play the Grove; nobody is gated out of anything. The other order — gating on while the
+ * Grove is shut — mints accounts that can never unlock the farm, the mine or the arena, because Grove
+ * progress is the only thing that opens a town. See docs/grove-release-guide.md §1.
+ *
+ * ⚠️ IT STILL TAKES A buyerId, AND STILL REFUSES WITHOUT ONE. A signed-out visitor has no Grove row, no
+ * hero and nothing to settle a dive against, so the eight verbs in grove.js that ask this question are
+ * asking "is there a member here", not only "is the feature live".
  */
-export const groveOpen = (buyerId) => canPreview("grove", buyerId);
+export const groveOpen = (buyerId) => Boolean(buyerId);
 
 // ── DEN QUEST: ONE SWITCH ────────────────────────────────────────────────────────────────────────────────────
 // ⚠️ A GATE THAT DOES NOT HEAR THE LAUNCH SWITCH IS A GATE THAT NEVER OPENS, and the Halloween event taught
