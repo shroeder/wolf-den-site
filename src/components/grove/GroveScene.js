@@ -1076,6 +1076,13 @@ export default function GroveScene({
                     attacks: body.attacks || [],
                     face: w.rand() < 0.5 ? -1 : 1,
                     phase: w.rand(),
+                    // ⚠️ atk: 0 IS LOAD-BEARING AND ITS ABSENCE FROZE EVERY COLISEUM RUN.
+                    // The boss attack cycler reads f.attacks[f.atk % f.attacks.length]. Undefined % n is
+                    // NaN, arr[NaN] is undefined, and the next line reads .telegraph off it -- a TypeError
+                    // thrown INSIDE the frame, which skips the requestAnimationFrame at the bottom of the
+                    // loop and kills the scene permanently. The zone boss spawner sets it (line ~1201);
+                    // this one never did, and wave 12 is the only wave in a run that carries a boss.
+                    atk: 0,
                     born: now, landedAt: now, flash: 0, node: null,
                 });
             }
@@ -2091,7 +2098,43 @@ export default function GroveScene({
             rerender();
         };
 
-        const step = (raw) => {
+        // ── ⚠️ ONE THROW USED TO END THE GAME, SILENTLY AND PERMANENTLY ────────────────────────────────
+        // A requestAnimationFrame callback that throws does not reschedule itself. The whole loop is
+        // `do the frame; raf = requestAnimationFrame(step)` -- so ANY exception anywhere in the frame skips
+        // that last line and the scene is dead where it stands, with no error screen, no recovery, and a
+        // player looking at a world that has simply stopped. That is what a "frozen client" is, and the
+        // missing `atk: 0` above was only the first thing to find the trapdoor.
+        //
+        // So the frame is wrapped. A throw now: reports itself ONCE with its message (the thing every one
+        // of those twenty stall reports was missing), and keeps rescheduling, because a scene that is
+        // visibly wrong beats a scene that is stopped -- the player can still walk out of it.
+        //
+        // ⚠️ IT REPORTS ONCE PER MOUNT, not once per frame. A throw in a game loop is a throw sixty times
+        // a second; reporting each one would bury the first and bill the endpoint for the privilege.
+        let threw = false;
+        // ── ⚠️ THE ORDINARY MOMENTS, NOT ONLY THE BROKEN ONES ──────────────────────────────────────────
+        // A crash table can only ever show what went wrong, which is why a day was spent asking "is wave 12
+        // special?" with nothing to compare against. These rows are what NORMAL looks like: how far a run
+        // got, how a frame behaved on that device. Fire-and-forget, keepalive, never awaited — telemetry
+        // that can stutter a frame is worse than no telemetry.
+        const tele = (kind, extra = {}) => {
+            try {
+                fetch("/api/marketplace/grove/telemetry", {
+                    method: "POST", keepalive: true, headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                        kind,
+                        zone: zone?.n ?? null,
+                        arena: Boolean(arena),
+                        foes: (w.foes || []).length,
+                        worstFrameMs: w.worstFrameMs || 0,
+                        slowFrames: w.slowFrames || 0,
+                        device: `${navigator.hardwareConcurrency || "?"}c/${navigator.deviceMemory || "?"}gb/dpr${window.devicePixelRatio || 1}`,
+                        ...extra,
+                    }),
+                }).catch(() => {});
+            } catch { /* never the second failure */ }
+        };
+        const stepBody = (raw) => {
             // ── ⚠️ FROZEN WHILE A PANEL IS OPEN, AND THE PAUSED TIME IS BANKED ──────────────────
             // The frame does nothing while a sheet is up, and every millisecond it skips is added to
             // w.pauseMs so that sceneNow() simply does not advance. That is what lets a thirty-second
@@ -2172,6 +2215,10 @@ export default function GroveScene({
                     const standing = w.foes.filter((f) => !f.dying).length;
                     w.waveCleared = Math.max(0, w.waveAt - (standing > 0 ? 1 : 0));
                     onRunEnd?.({ wavesCleared: w.waveCleared, cleared: done });
+                    // ⚠️ THE WAVE IT ENDED ON IS THE WHOLE SIGNAL. Nine stalls all on wave 12 was the
+                    // clue that cracked this; without a record of where healthy runs end, that pattern
+                    // was invisible.
+                    tele("run_end", { wave: w.waveCleared, meta: { cleared: done, total: waves.length } });
                 }
                 // ── ⚠️ THE CLOCK IS WRITTEN, NOT RENDERED ──────────────────────────────────────
                 // Straight onto the node, once a frame, which is the same reason the health flash and
@@ -2934,8 +2981,11 @@ export default function GroveScene({
                     if (f.isBoss && f.attacks?.length) {
                         // ⚠️ CYCLED IN ORDER, NOT PICKED AT RANDOM. A boss you can learn is the whole point
                         // of telegraphing; a random pick from three shapes is just noise with a wind-up.
-                        const atk = f.attacks[f.atk % f.attacks.length];
-                        f.atk += 1;
+                        // ⚠️ (f.atk || 0), NOT f.atk. Belt and braces for the freeze above: any future
+                        // spawner that forgets the field degrades to "always the first attack" instead of
+                        // throwing and taking the whole scene down with it.
+                        const atk = f.attacks[(f.atk || 0) % f.attacks.length] || f.attacks[0];
+                        f.atk = (f.atk || 0) + 1;
                         w.tels.push(...makeTelegraph(f, w.hero.x, now, atk));
                         f.nextAttack = now + atk.telegraph + 900 + w.rand() * 700;
                         f.windUntil = now + atk.telegraph;
@@ -3705,6 +3755,32 @@ export default function GroveScene({
             if (gap > (w.worstFrameMs || 0)) w.worstFrameMs = Math.round(gap);
             if (gap > 250) w.slowFrames = (w.slowFrames || 0) + 1;
             w.beatAt = now;
+        };
+
+        const step = (raw) => {
+            try {
+                stepBody(raw);
+            } catch (err) {
+                if (!threw) {
+                    threw = true;
+                    try {
+                        fetch("/api/marketplace/grove/telemetry", {
+                            method: "POST", keepalive: true, headers: { "content-type": "application/json" },
+                            body: JSON.stringify({
+                                kind: "scene_throw",
+                                message: String(err?.message || err).slice(0, 300),
+                                stack: String(err?.stack || "").slice(0, 1200),
+                                zone: zone?.n ?? null,
+                                arena: Boolean(arena),
+                                wave: w.waveAt ?? null,
+                                foes: (w.foes || []).length,
+                            }),
+                        }).catch(() => {});
+                    } catch { /* a reporter must never be the second failure */ }
+                }
+            }
+            // ⚠️ OUTSIDE THE CATCH. Rescheduling is the whole point: it must happen whether the frame
+            // succeeded or not, or the guard would be decoration.
             raf = requestAnimationFrame(step);
         };
 
