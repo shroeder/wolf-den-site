@@ -535,6 +535,50 @@ export async function sendTrackingCorrectedEmail(order) {
 }
 
 /**
+ * ── WE CHARGED YOU SOMETHING THE SCREEN DID NOT SAY ─────────────────────────────────────────────────────────
+ * A refund that is OUR mistake, not a change of mind — which is a different letter from
+ * sendOrderCancelledEmail, because that one reads as "your order was cancelled" and this one has to open
+ * by agreeing with the customer.
+ *
+ * Written for order #0C83F3BC, 2026-11-15. Andres Quang asked to cancel $213.11: "It was free shipping on
+ * my screen when I checked out, but when I see the receipt, it charged me for shipping." He was reading the
+ * screen correctly — the cart showed shipping as free until a fulfilment mode was picked, and the server
+ * then priced the parcel. See the note in ShopCartClient.
+ *
+ * ⚠️ `what` IS THE CUSTOMER'S OWN COMPLAINT, IN OUR WORDS. A refund notice that does not name the thing
+ * they wrote in about reads as a form letter, and the one thing somebody owed an apology can tell instantly
+ * is whether a person read their message.
+ */
+export async function sendOrderRefundApologyEmail(order, { what = "", refundAmountCents = 0, fixed = true } = {}) {
+    const resend = getResendClient();
+    const to = recipientEmail(order);
+    if (!resend || !to) return false;
+
+    const number = confirmationNumber(order);
+    const name = buyerName(order);
+    const amount = Number(refundAmountCents || order?.total_cents || 0);
+    const body = `
+        <h1>You were right &mdash; refunded in full</h1>
+        <p>${name ? `Hi ${escapeHtml(name.split(" ")[0])},` : "Hi,"}</p>
+        <p>${escapeHtml(what)}</p>
+        <p>Order <strong>#${number}</strong> has been <strong>refunded in full${amount ? `, ${money(amount)}` : ""}</strong>.
+           Depending on your bank it usually lands in a few business days.</p>
+        ${fixed ? `<p>The fault was on our screen, not in anything you did, and it has been fixed so the next
+           person sees the real postage before they pay rather than after.</p>` : ""}
+        <p>Sorry for the trouble, and thank you for telling us rather than just walking away &mdash; we would
+           not have found it otherwise. If you still want the posters, order again and it will price correctly
+           this time.</p>
+    `;
+
+    return resend.emails.send({
+        from: FROM,
+        to,
+        subject: `Refunded in full — order #${number}`,
+        html: shellHtml(`${body}${footerHtml()}`),
+    });
+}
+
+/**
  * Customer cancellation + refund notice with the owner's reason. Skips only if we have no address.
  * Reads the same recipient as every other order email, so a PICKUP cancellation reaches the buyer too.
  */

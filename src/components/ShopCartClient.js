@@ -344,8 +344,20 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             shippingPending = false;
         }
     } else {
-        displayShippingCents = 0;
-        shippingPending = false;
+        // ── ⚠️ NO MODE CHOSEN YET IS "UNKNOWN", NOT "FREE". THIS COST A SALE. ──────────────────────
+        // fulfillmentMode starts as "" — the buyer has not picked pickup or shipping. This branch used
+        // to answer 0 and call it final, so the cart summary read FREE SHIPPING before anyone had said
+        // where the parcel was going. The server then priced the actual parcel and charged for it.
+        //
+        // Andres Quang, order #0C83F3BC, 2026-11-15, asking to cancel $213.11: "It was free shipping on
+        // my screen when I checked out, but when I see the receipt, it charged me for shipping." He was
+        // reading the screen correctly. Fully refunded.
+        //
+        // ⚠️ IT CONTRADICTED THE RULE WRITTEN DIRECTLY ABOVE IT — "don't show a flat number or FREE as
+        // if it were final before we've actually priced it from the address". Every other branch here
+        // honours that; this one, the DEFAULT one that every buyer sees first, did not.
+        displayShippingCents = null;
+        shippingPending = true;
     }
     const shippingKnown = !shippingPending;
 
