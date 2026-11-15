@@ -20,8 +20,19 @@ const log = createServerLogger({ source: "client-error" });
 
 // One push per path per 10 minutes. A render loop can fire this dozens of times a second, and burying the
 // first report under a thousand identical ones is the same as having no report.
-const PUSH_COOLDOWN_MS = 10 * 60 * 1000;
-const lastPush = new Map();
+//
+// ⚠️ AND IT CANNOT LIVE IN MEMORY. This was a Map in module scope, which is one Map per lambda instance —
+// so two members hitting the same bug land on two instances, each with an empty Map, and both buzz the
+// phone. 2026-11-14, 18:21:35 and 18:22:22: same path, same message shape, forty-seven seconds apart, two
+// pushes through a cooldown that had been fixed hours earlier. The Map was never wrong about what it had
+// seen; it had just never seen the other instance's push.
+//
+// So it is derived from the rows, which every instance shares. In FIXED buckets of wall clock, not "is
+// there a row in the last ten minutes" — that second rule reads like the same thing and fails much worse:
+// during a sustained outage every report has a predecessor inside its own window, so the first one pushes
+// and then nothing ever pushes again. A repeat push is the message "this is STILL happening", and silence
+// is indistinguishable from fixed.
+const PUSH_BUCKET_S = 10 * 60;
 
 export async function POST(request) {
     try {
@@ -85,29 +96,20 @@ export async function POST(request) {
         //
         // Digits collapse to # so the shape of the message is the key. [[a-rule-moved-and-the-watcher-did-not]]
         const shape = message.replace(/\d+/g, "#");
-        const key = `${path}|${shape}`;
-        const now = Date.now();
-        let fresh = !quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS);
 
-        // ── ⚠️ AND THE MAP ABOVE IS ONLY ONE LAMBDA'S MEMORY ───────────────────────────────────────────
-        // `lastPush` is module state in a serverless function, so there is one of it per instance, and
-        // Vercel runs as many instances as there is concurrency. Two members hitting the same bug land on
-        // two instances, each with an empty Map, and both push — which is the shape of what is actually
-        // arriving: 2026-11-14, 18:21:35 and 18:22:22, same path, same message, different members, forty-
-        // seven seconds apart, both through a cooldown that had just been fixed. The Map was never wrong
-        // about what it had seen; it had just never seen the other instance's push.
-        //
-        // The row we are about to write IS the durable record of "this was reported", so ask it. Checked
-        // before the insert rather than after, so it cannot match the report it is deciding about. One
-        // query, only on the path that is about to buzz somebody's phone.
+        // The rows are the shared memory (see PUSH_BUCKET_S above): this report pushes only if it is the
+        // first of its shape in the ten-minute bucket it landed in. Asked BEFORE the insert below, because
+        // a check that runs after it matches the very report it is deciding about and nothing would ever
+        // push again. One query, and only on the path that is about to buzz somebody's phone.
+        let fresh = !quiet;
         if (fresh) {
             const seen = await db.query(
                 `SELECT 1 FROM mkt_client_error
-                  WHERE created_at > NOW() - INTERVAL '10 minutes'
+                  WHERE created_at >= to_timestamp(floor(extract(epoch FROM NOW()) / $3) * $3)
                     AND path = $1
                     AND regexp_replace(message, '\\d+', '#', 'g') = $2
                   LIMIT 1`,
-                [path, shape]
+                [path, shape, PUSH_BUCKET_S]
             ).catch(() => []);
             if (seen.length) fresh = false;
         }
@@ -121,7 +123,6 @@ export async function POST(request) {
         ).catch(() => { /* the log line above is the real record */ });
 
         if (fresh) {
-            lastPush.set(key, now);
             await sendAdminPush({
                 sound: { kind: "error" },
                 title: "A page crashed",
