@@ -74,13 +74,6 @@ export async function POST(request) {
         if (quiet) log.warn("client.chunk_noise", { path, message, who, ua, recovered, chunkNoise });
         else log.error("client.crash", { path, message, digest, who, ua, stack });
 
-        // And keep it, so a pattern across members is visible rather than a scroll through logs.
-        await db.query(
-            `INSERT INTO mkt_client_error (buyer_id, path, message, digest, stack, ua)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [buyer?.id || null, path, quiet ? `[chunk] ${message}` : message, digest, stack, ua]
-        ).catch(() => { /* the log line above is the real record */ });
-
         // ── ⚠️ THE COOLDOWN KEY CANNOT CONTAIN THE THING THAT VARIES ───────────────────────────────────
         // It was `${path}|${message}`, and a message like "scene loop silent for 6148ms" carries a
         // different number every single time — so every report was its own key, the 10-minute window
@@ -91,9 +84,43 @@ export async function POST(request) {
         // 7813ms, 6148ms. Three keys, three pushes, cooldown untouched.
         //
         // Digits collapse to # so the shape of the message is the key. [[a-rule-moved-and-the-watcher-did-not]]
-        const key = `${path}|${message.replace(/\d+/g, "#")}`;
+        const shape = message.replace(/\d+/g, "#");
+        const key = `${path}|${shape}`;
         const now = Date.now();
-        if (!quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
+        let fresh = !quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS);
+
+        // ── ⚠️ AND THE MAP ABOVE IS ONLY ONE LAMBDA'S MEMORY ───────────────────────────────────────────
+        // `lastPush` is module state in a serverless function, so there is one of it per instance, and
+        // Vercel runs as many instances as there is concurrency. Two members hitting the same bug land on
+        // two instances, each with an empty Map, and both push — which is the shape of what is actually
+        // arriving: 2026-11-14, 18:21:35 and 18:22:22, same path, same message, different members, forty-
+        // seven seconds apart, both through a cooldown that had just been fixed. The Map was never wrong
+        // about what it had seen; it had just never seen the other instance's push.
+        //
+        // The row we are about to write IS the durable record of "this was reported", so ask it. Checked
+        // before the insert rather than after, so it cannot match the report it is deciding about. One
+        // query, only on the path that is about to buzz somebody's phone.
+        if (fresh) {
+            const seen = await db.query(
+                `SELECT 1 FROM mkt_client_error
+                  WHERE created_at > NOW() - INTERVAL '10 minutes'
+                    AND path = $1
+                    AND regexp_replace(message, '\\d+', '#', 'g') = $2
+                  LIMIT 1`,
+                [path, shape]
+            ).catch(() => []);
+            if (seen.length) fresh = false;
+        }
+
+        // And keep it, so a pattern across members is visible rather than a scroll through logs. AFTER the
+        // question above, which is about the ten minutes before this report and must not see it.
+        await db.query(
+            `INSERT INTO mkt_client_error (buyer_id, path, message, digest, stack, ua)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [buyer?.id || null, path, quiet ? `[chunk] ${message}` : message, digest, stack, ua]
+        ).catch(() => { /* the log line above is the real record */ });
+
+        if (fresh) {
             lastPush.set(key, now);
             await sendAdminPush({
                 sound: { kind: "error" },
