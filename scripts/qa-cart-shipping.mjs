@@ -43,6 +43,8 @@ const CART = {
     // ⚠️ ZERO, AND THAT IS THE POINT. No mode chosen -> shopShippingCents returns 0 before it ever reaches
     // the weight table. The question this rig asks is what the SCREEN does with that zero.
     shippingCents: 0,
+    // What postage WOULD be for this basket, from the same function that bills it.
+    shippingIfDeliveredCents: 2500,
     onlineFeeCents: 588,
     taxCents: 1155,
     totalCents: 18543,
@@ -109,22 +111,35 @@ const payTotal = await ev(`(() => {
     const el = document.querySelector(".shop-payment-total strong");
     return el ? (el.textContent || "").replace(/\s+/g, " ").trim() : null;
 })()`);
-// A commitment is a bare money value. "$185.43 + shipping" is the withheld form and is fine.
-const totalShown = payTotal && !payTotal.includes("+") ? payTotal : null;
-const saysFree = Boolean(totalShown);
-const saysPending = !totalShown;
+// ⚠️ THE TEST FLIPPED. The question is no longer "is a total withheld" -- it is "does the cart show
+// the number they will actually pay". Delivered on this basket is $168.00 + $25.00 postage + tax +
+// fee. A total that is MISSING postage is the defect; a withheld total is now also a failure, because
+// the buyer still cannot see what they owe.
+// ── THE ASSERTION ──────────────────────────────────────────────────────────────────────────
+// ⚠️ IT WAS "is the total withheld". That was right for ten minutes and is now wrong. Luke:
+// "we should be showing them the number that they are going to pay." So the test is whether
+// the cart, with NO delivery method chosen, shows BOTH a real postage figure and a real
+// total that contains it.
+const shipRow = await ev(`(() => {
+    const rows = [...document.querySelectorAll(".shop-payment-breakdown p, .shop-payment-total")];
+    const r = rows.find((x) => /shipping/i.test(x.querySelector("span")?.textContent || ""));
+    return r ? (r.querySelector("strong")?.textContent || "").trim() : null;
+})()`);
+const moneyOf = (t) => { const m = String(t || "").match(/\$([\d,]+\.\d\d)/); return m ? Number(m[1].replace(/,/g, "")) : null; };
+const shipAmount = moneyOf(shipRow);
+const totalAmount = moneyOf(payTotal);
+const totalIsBare = Boolean(payTotal) && !String(payTotal).includes("+");
+// A total that contains the postage must exceed subtotal + postage.
+const totalIncludesShipping = totalIsBare && shipAmount != null && totalAmount != null
+    && totalAmount >= 168.00 + shipAmount;
 
-console.log(`\ncart text around shipping:`);
-const m = String(text).match(/.{0,90}[Ss]hipping.{0,90}/g) || [];
-for (const bit of m.slice(0, 6)) console.log("   …" + bit.trim() + "…");
-
-console.log(`
-  a FINAL TOTAL is shown:   ${totalShown || (payTotal ? payTotal + " (withheld)" : "not rendered")}`);
-console.log(`  total withheld:           ${saysPending}`);
-console.log(`\n  ${saysFree && !saysPending
-    ? `✗ IT IS AN US PROBLEM — the cart commits to ${totalShown} with no postage in it`
-    : "✓ no final total is shown until a delivery method is chosen"}`);
+console.log(`\ncart, with no delivery method chosen:`);
+console.log(`  shipping row:   ${shipRow || "NOT SHOWN"}`);
+console.log(`  payment total:  ${payTotal || "NOT SHOWN"}`);
+console.log(`\n  ${totalIncludesShipping
+    ? "✓ the postage AND a total containing it are both on screen before any choice is made"
+    : `✗ IT IS AN US PROBLEM — shipping=${shipRow || "missing"}, total=${payTotal || "missing"}`}`);
 console.log(`  shot ${OUT}/cart.png`);
 
 try { chrome.kill(); } catch { /* gone */ }
-process.exit(saysFree && !saysPending ? 1 : 0);
+process.exit(totalIncludesShipping ? 0 : 1);

@@ -344,20 +344,28 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
             shippingPending = false;
         }
     } else {
-        // ── ⚠️ NO MODE CHOSEN YET IS "UNKNOWN", NOT "FREE". THIS COST A SALE. ──────────────────────
-        // fulfillmentMode starts as "" — the buyer has not picked pickup or shipping. This branch used
-        // to answer 0 and call it final, so the cart summary read FREE SHIPPING before anyone had said
-        // where the parcel was going. The server then priced the actual parcel and charged for it.
+        // ── ⚠️ NO MODE CHOSEN: SHOW WHAT DELIVERY WOULD COST. NOT ZERO, NOT A PROMPT. ──────────────
+        // Luke: "we should be showing them the number that they're going to pay, right? We don't need
+        // to leak how we came out with that number. We just need to tell them what the number is before
+        // they decide to pay."
         //
-        // Andres Quang, order #0C83F3BC, 2026-11-15, asking to cancel $213.11: "It was free shipping on
-        // my screen when I checked out, but when I see the receipt, it charged me for shipping." He was
-        // reading the screen correctly. Fully refunded.
+        // This branch has been wrong twice. It answered 0 and called it final — so the cart read FREE
+        // SHIPPING before anyone had said where the parcel was going, which is what Andres Quang paid
+        // $213.11 against a screen that totalled $185.43 (#0C83F3BC, refunded in full). Then it withheld
+        // the number instead, which stopped the lie and still left a buyer unable to see what postage
+        // cost until they had committed to a delivery method.
         //
-        // ⚠️ IT CONTRADICTED THE RULE WRITTEN DIRECTLY ABOVE IT — "don't show a flat number or FREE as
-        // if it were final before we've actually priced it from the address". Every other branch here
-        // honours that; this one, the DEFAULT one that every buyer sees first, did not.
-        displayShippingCents = null;
-        shippingPending = true;
+        // Both were the same mistake: treating "they haven't picked yet" as "we don't know". We do know.
+        // Postage here is banded on the parcel's WEIGHT and nothing else — no zone, no address — so the
+        // figure is final from the moment there are items in the basket. shippingIfDeliveredCents is the
+        // SAME shopShippingCents call that bills the order, forced down the shipping branch, so the
+        // screen cannot drift from the card.
+        //
+        // ⚠️ DELIVERY IS THE DEARER ANSWER, WHICH IS WHY IT IS THE DEFAULT ONE. Picking Local pickup
+        // takes this to zero and the total DOWN. The number a buyer sees before choosing can therefore
+        // only ever fall, never rise — which is the whole property that was broken here.
+        displayShippingCents = Number(cartData.shippingIfDeliveredCents) || 0;
+        shippingPending = false;
     }
     const shippingKnown = !shippingPending;
 
@@ -1193,7 +1201,11 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                                     <span>Shipping</span>
                                     <strong>
                                         {!hasFulfillmentChoice
-                                            ? "Choose delivery above"
+                                            // The real figure, with a word saying which answer it is —
+                                            // so nobody reads it as postage being charged on a pickup.
+                                            ? (displayShippingCents
+                                                ? `${formatMoney(displayShippingCents)} if delivered`
+                                                : "FREE")
                                             : shippingPending
                                                 ? (!isShippingAddressReady
                                                     ? "Enter address"

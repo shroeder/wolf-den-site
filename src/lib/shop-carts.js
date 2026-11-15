@@ -351,6 +351,23 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
     const preorderNote = preorderSentence(preorderArrivesOn, effectiveMode);
     // ⚠️ ITEMS, NOT JUST THE SUBTOTAL — postage is priced on weight. See shopShippingCents.
     const shippingCents = shopShippingCents(subtotalCents, effectiveMode, items);
+    // ── ⚠️ WHAT POSTAGE WOULD COST IF THIS WERE DELIVERED, WHATEVER MODE IS CHOSEN ──────────────────
+    // Luke: "We should always show shipping without compromising our shipping cost logic."
+    //
+    // `shippingCents` above is what this order WILL be charged and it answers 0 for pickup and 0 again
+    // before any mode is chosen — which is correct for billing and useless for a screen, because the cart
+    // then had nothing to put in a Shipping row and simply left postage out. A buyer reading four lines
+    // with no postage in them concludes there is none. That cost order #0C83F3BC.
+    //
+    // ⚠️ IT IS THE SAME FUNCTION WITH THE SAME ITEMS, forced down the "shipping" branch. Not a second
+    // formula, not a guess, not a table copied onto the client — so it cannot drift from what is charged,
+    // and the free-shipping threshold and the weight bands both still apply exactly once.
+    //
+    // ⚠️ AND IT IS EXACT, NOT AN ESTIMATE. Our postage is banded on the parcel's WEIGHT and nothing else
+    // — no zone, no address — so this number is already final the moment there are items in the basket.
+    // That is only true while OWN_SHIPPING prices the order; if live carrier rates ever come back, this
+    // becomes a quote and the screen has to say so.
+    const shippingIfDeliveredCents = shopShippingCents(subtotalCents, "shipping", items);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
     // ⚠️ THE CART QUOTES COVER BUT DOES NOT ADD IT TO THE TOTAL. Whether to insure is the buyer's answer
     // below the required line, so the cart cannot know it — it publishes the offer and its price, the screen
@@ -371,6 +388,7 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         // line rather than a number we asserted, and Square's own sales-tax report sees it.
         taxRate,
         shippingCents,
+        shippingIfDeliveredCents,
         // `insuranceCents` is what cover WOULD cost, not what is being charged. When it is required the
         // screen and the checkout both add it, which is why `insuranceRequired` travels with it.
         insuranceCents: insurance.cents,
