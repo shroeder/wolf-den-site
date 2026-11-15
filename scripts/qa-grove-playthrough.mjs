@@ -83,6 +83,18 @@ async function tap(sel, nth = 0) {
 }
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Network.enable"); await send("Profiler.enable");
+// ── ⚠️ A PHONE, NOT THIS MACHINE ────────────────────────────────────────────────────────────────────────────
+// The first clean run of this rig proved nothing about the members who are actually stalling: a desktop with
+// every sprite already in cache does not reproduce a phone meeting new art for the first time. --throttle
+// slows the CPU and empties the image cache, which is the state a real first encounter is in.
+const THROTTLE = Number(process.env.THROTTLE || 0);
+if (THROTTLE > 1) {
+    await send("Emulation.setCPUThrottlingRate", { rate: THROTTLE });
+    // ⚠️ THE CACHE IS THE A/B. Cold cache = a first encounter with a creature's art; warm = the same play
+    // with every sprite already decoded. If the stalls vanish when warm, the stall IS the art.
+    if (!process.env.WARM) await send("Network.setCacheDisabled", { cacheDisabled: true });
+    console.log(`  CPU throttled ${THROTTLE}x, image cache disabled`);
+}
 await send("Emulation.setDeviceMetricsOverride", { width: 430, height: 880, deviceScaleFactor: 1, mobile: true });
 await send("Network.setCookie", { name: "wolfden-mkt-buyer-session", value: COOKIE, domain: "localhost", path: "/" });
 
@@ -145,7 +157,7 @@ await send("Page.navigate", { url: `http://localhost:${PORT}/marketplace/grove` 
 const ready = await waitFor(`!!document.querySelector(".gv-zone, .gv-world, [class*='gv-']")`, 240);
 console.log(`  grove page: ${ready ? "loaded" : "NEVER LOADED"}`);
 if (!ready) { console.log(await ev(`document.body.innerText.slice(0,400)`)); process.exit(1); }
-await sleep(2500);
+await sleep(4000);
 await shot("hub");
 
 // ── ⚠️ DISMISS WHAT IS COVERING THE HUB FIRST ───────────────────────────────────────────────────────────────
@@ -188,8 +200,9 @@ let entered = false;
 for (const c of cards) {
     console.log(`     tapping "${c.label}"`);
     await tapAt(c.x, c.y);
-    await sleep(3000);
-    entered = await ev(`!!document.querySelector(".gv-world")`);
+    // ⚠️ POLL, DO NOT SLEEP A FIXED 3s. Under --throttle the scene takes many seconds to mount, and a
+    // fixed wait turned "slow" into "never entered" — which reads as a broken rig, not a slow machine.
+    entered = await waitFor(`!!document.querySelector(".gv-world")`, 40);
     if (entered) { console.log(`     -> entered`); break; }
 }
 console.log(`  in the world: ${entered}`);

@@ -36,6 +36,10 @@ export function launchChrome(port, profile) {
     clearPort(port);
     const proc = spawn(CHROME, [
         `--remote-debugging-port=${port}`, "--headless=new", "--no-first-run", "--no-default-browser-check",
+        // ⚠️ MUTED. Luke, 2026-11-14, while a Grove playthrough rig was running: "Mute it plz its so loug."
+        // These rigs PLAY THE GAME — the Grove has music, combat SFX and a boss sting — and a headless
+        // Chrome still owns the speakers. A rig nobody asked to hear is a rig that gets killed mid-run.
+        "--mute-audio",
         `--user-data-dir=${process.env.TEMP}/${profile}`, "about:blank",
     ], { stdio: "ignore" });
 

@@ -3698,6 +3698,12 @@ export default function GroveScene({
 
             // ⚠️ A HEARTBEAT THE WATCHDOG BELOW READS. One assignment per frame; it is the only way to
             // tell "the loop is running and the world is slow" from "the loop stopped".
+            // ⚠️ THE WORST FRAME OF THE SESSION, KEPT. The watchdog only fires on a total stall, so the
+            // slow slide INTO one left no trace at all — and "it felt laggy" is not something a report can
+            // carry. One comparison a frame, and the bark below ships the number.
+            const gap = now - (w.beatAt || now);
+            if (gap > (w.worstFrameMs || 0)) w.worstFrameMs = Math.round(gap);
+            if (gap > 250) w.slowFrames = (w.slowFrames || 0) + 1;
             w.beatAt = now;
             raf = requestAnimationFrame(step);
         };
@@ -3766,6 +3772,20 @@ export default function GroveScene({
                             hitStopFor: Math.max(0, Math.round((w.clock?.stopUntil || 0) - performance.now())),
                             paused: Boolean(w.pauseAt),
                             overlay: Boolean(document.querySelector(".gv-pop, .gv-ask")),
+                            // ── ⚠️ WHAT THE 2026-11-15 STALLS NEEDED AND DID NOT CARRY ──────────────
+                            // Twenty real reports said "silent for 7s" and nothing about WHY. The cause
+                            // turned out to be raster cost — a blur filter on every moving sprite — which
+                            // leaves no JS stack and no hot function, so none of the fields above could
+                            // ever have pointed at it. These five would have.
+                            //
+                            // rares/bosses because those bodies carried the heaviest filters; worstFrame
+                            // and slowFrames because a stall is the END of a slide, not an event; and the
+                            // device, because this was invisible on every machine we own.
+                            rares: document.querySelectorAll(".gv-foe.is-rare").length,
+                            bosses: document.querySelectorAll(".gv-foe.is-boss").length,
+                            worstFrameMs: w.worstFrameMs || 0,
+                            slowFrames: w.slowFrames || 0,
+                            dev: `${navigator.hardwareConcurrency || "?"}c/${navigator.deviceMemory || "?"}gb/dpr${window.devicePixelRatio || 1}`,
                         }),
                     }),
                 }).catch(() => {});

@@ -534,8 +534,23 @@ export const GROVE_CSS = `
    through zero, because no element has both. That is the fix — the deletion alone would have left the trap
    armed for the next person. */
 .gv-art { position: absolute; inset: 0; transform-origin: 50% 100%; will-change: transform; }
+/* ── ⚠️ NO FILTER ON A SPRITE THAT MOVES. THIS FROZE THE GROVE. ───────────────────────────────
+   This line used to read filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45)) -- on EVERY creature in the
+   scene. A drop-shadow is not a cheap decoration: the browser has to take the image's alpha silhouette
+   and blur it, and it has to redo that every frame the element moves. Every creature moves every frame.
+
+   On 2026-11-15, the first full day the Grove was open, that produced 20 real "scene loop silent"
+   reports across 9 members — stalls of six to nine seconds. It scaled with how many bodies were on
+   screen (4 to 24 at the moment of the stall) and it was invisible on a desktop, which is why playing
+   it here never showed it: the CPU profile was ~80% in (program) -- raster, not JavaScript -- so there was
+   no hot function to find.
+
+   ⚠️ THE CONTACT SHADOW WAS ALREADY DRAWN TWICE. .gv-shadow is a real element under every body and
+   its own comment calls it "the only thing on screen that says how high off the floor a body is". This
+   filter was a second shadow on top of it, paying a per-frame blur for something already there.
+   See [[no-overlay-for-lighting]] and [[sprite-alpha-floor-drop-shadow-box]]. */
 .gv-art img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block;
-    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45)); }
+    position: relative; z-index: 1; }
 
 /* ── THE HIT FLASH ────────────────────────────────────────────────────────────────────────────
    The struck body goes white for about a frame and a half, so the eye is told WHICH thing was hit without
@@ -803,9 +818,28 @@ export const GROVE_CSS = `
 
 /* A rare spawn and a boss are lit so you can pick them out. The glow is per-layer on the sprite rather
    than an overlay across the scene — a tint over the whole frame flattens every pixel to one colour.
-   See no-overlay-for-lighting. */
-.gv-foe.is-rare .gv-art img { filter: drop-shadow(0 0 14px rgba(170,140,255,0.9)) drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
-.gv-foe.is-boss .gv-art img { filter: drop-shadow(0 0 20px rgba(255,170,90,0.65)) drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
+   See no-overlay-for-lighting.
+
+   ── ⚠️ A HALO BEHIND THE SPRITE, NOT A FILTER ON IT ──────────────────────────────────────────
+   These two rules were filter: drop-shadow(0 0 14px ...) drop-shadow(0 3px 5px ...) -- TWO stacked blurs
+   of the sprite's own silhouette, recomputed every frame, on the only bodies in the game that are
+   already the most interesting thing on screen.
+
+   That is why every one of the nine arena stalls on 2026-11-15 was on wave 12 of 12 — the ONLY wave
+   that spawns a boss AND two rares (grove-coliseum-plan.js gives the last wave a boss and two rares),
+   so three doubly-filtered sprites moved at once in the densest moment of the run. The other eleven
+   stalls were in ordinary zones, where the rare spawn and the zone boss wear the same two filters.
+
+   A radial gradient behind the body reads the same at a glance and costs nothing to move: it is
+   rasterised once and then composited, where a blur is recomputed from the sprite's alpha every frame. */
+.gv-foe.is-rare .gv-art::before,
+.gv-foe.is-boss .gv-art::before {
+    content: ""; position: absolute; left: 50%; bottom: 0; width: 150%; height: 115%;
+    transform: translateX(-50%); border-radius: 50%; pointer-events: none; z-index: 0; }
+.gv-foe.is-rare .gv-art::before {
+    background: radial-gradient(closest-side, rgba(170,140,255,0.55), rgba(170,140,255,0.20) 52%, rgba(170,140,255,0) 72%); }
+.gv-foe.is-boss .gv-art::before {
+    background: radial-gradient(closest-side, rgba(255,170,90,0.50), rgba(255,170,90,0.18) 52%, rgba(255,170,90,0) 72%); }
 .gv-foe.is-boss .gv-shadow { width: 70%; height: 7%; margin-left: -35%; }
 
 /* The hero and the pet. The gradient stays as the BACKGROUND of the box, so it is what shows through when
