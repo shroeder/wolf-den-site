@@ -35,7 +35,7 @@ const ev = async (x) => (await send("Runtime.evaluate", { expression: x, returnB
 // His actual basket. subtotal 16800 = 6 x $28.00.
 const ITEM = {
     id: "mock-unova", name: "Unova Poster Collection", quantity: 6,
-    unitPriceCents: 2800, lineTotalCents: 16800, imageUrl: null, maxQuantity: 12,
+    priceCents: 2800, unitPriceCents: 2800, lineTotalCents: 16800, imageUrl: null, maxQuantity: 12,
 };
 const CART = {
     items: [ITEM], itemCount: 6,

@@ -1177,17 +1177,30 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                             {liveTaxCents ? (
                                 <p><span>Tax</span><strong>{formatMoney(liveTaxCents)}</strong></p>
                             ) : null}
-                            {fulfillmentMode === "shipping" ? (
+                            {/* ── ⚠️ THE SHIPPING ROW EXISTS BEFORE A MODE IS CHOSEN, AND IT DID NOT ──────
+                                This was gated on `fulfillmentMode === "shipping"`, so until the buyer picked
+                                a delivery method there was NO shipping line anywhere on the page: Subtotal,
+                                Tax, Online fee, Total. A summary that never mentions postage does not read as
+                                "postage is still unknown", it reads as "there is no postage".
+
+                                Andres Quang, #0C83F3BC: "It was free shipping on my screen when I checked
+                                out, but when I see the receipt, it charged me for shipping." He was charged
+                                $213.11 against the $185.43 the screen had added up. Refunded in full.
+
+                                Pickup is the one case that genuinely has no postage, so it keeps no row. */}
+                            {fulfillmentMode === "shipping" || (!hasFulfillmentChoice && !cartPickupOnly) ? (
                                 <p>
                                     <span>Shipping</span>
                                     <strong>
-                                        {shippingPending
-                                            ? (!isShippingAddressReady
-                                                ? "Enter address"
-                                                : ratesLoading
-                                                    ? "Calculating…"
-                                                    : "Select an option")
-                                            : (displayShippingCents ? formatMoney(displayShippingCents) : "FREE")}
+                                        {!hasFulfillmentChoice
+                                            ? "Choose delivery above"
+                                            : shippingPending
+                                                ? (!isShippingAddressReady
+                                                    ? "Enter address"
+                                                    : ratesLoading
+                                                        ? "Calculating…"
+                                                        : "Select an option")
+                                                : (displayShippingCents ? formatMoney(displayShippingCents) : "FREE")}
                                     </strong>
                                 </p>
                             ) : null}
