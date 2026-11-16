@@ -352,19 +352,26 @@ export async function sendSailingLaunchEmail(email, { name = "" } = {}) {
     return true;
 }
 
-// ── ⚠️ THE GROVE LAUNCH EMAIL — 2026-11-14 ──────────────────────────────────────────────────────────────────
-// Luke: "I would expect an email. Draft." Modelled on sendSailingLaunchEmail directly below-ish, because the
-// Grove opening is the same KIND of event — a whole room becoming available at once — and a member who got
-// the sailing one should recognise the shape.
+// ── ⚠️ THE GROVE LAUNCH EMAIL ───────────────────────────────────────────────────────────────────────────────
+// Luke: "I would expect an email." Then, on the first draft: "That email's terrible. It doesn't use our
+// theme, you know, like the dark theme and the yellow primary. It doesn't have any cool sprite groupings at
+// all. Like, you need to rethink that."
 //
-// ⚠️ THE AUDIENCE LIVES IN THE SCRIPT, NOT HERE. scripts/grove-launch-email.mjs owns who it goes to and
-// honours `notify_prefs -> email:announce`, the same column broadcastAnnouncementEmail reads. This function
-// sends to ONE address, so a dry run can render it without a database and a resend can target one person.
+// He was right. The first version was a green gradient header over a cream card with no art in it at all,
+// which is a template, not the Wolf Den. This one is the house dark + gold, and the game is in it.
 //
-// ⚠️ IT NAMES THE TOOL BONUS AND IT DOES SO DELIBERATELY. The Grove reads as a thing for people who want a
-// forest crawler, and most of the Den does not. The honest hook for everybody else is that the tools it pays
-// raise the farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the
-// weekly boss — that is the sentence that makes it everyone's feature rather than a side mode.
+// ⚠️ THREE COMPOSITED SPRITE BANDS, NOT SPRITES LAID OUT IN MARKUP. Outlook renders mail through Word,
+// which has no CSS positioning, so overlapping art in HTML either stacks vertically or vanishes. Each band
+// is baked into one flat PNG with the card colour behind it by scripts/gen-grove-email-art.mjs -- the
+// approach the win-back bands proved on real inboxes (05e4f7d2). PNG, because Outlook will not render the
+// webp the game itself uses.
+//
+// ⚠️ THE ART ALREADY EXISTED. 76 creatures, 84 bosses, 156 tool rungs, the chests and the armour are all in
+// public/images/grove. Nothing was generated for this.
+const GROVE_DARK = "#141414";
+const GROVE_CARD = "#121812";
+const GROVE_GOLD = "#D4AF37";
+
 export async function sendGroveLaunchEmail(email, { name = "" } = {}) {
     if (!email) return false;
     if (!process.env.RESEND_API_KEY) return false;
@@ -374,29 +381,90 @@ export async function sendGroveLaunchEmail(email, { name = "" } = {}) {
 
 /** The message object itself, so a preview can render exactly what would be sent without sending it. */
 export function groveLaunchMessage(email, { name = "" } = {}) {
+    const site = baseUrl();
+    const url = `${site}/marketplace/grove`;
+    const font = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
     const hi = name ? `Hey ${name},` : "Hey there,";
-    const url = `${baseUrl()}/marketplace/grove`;
+
+    // ⚠️ A TABLE, NOT A STYLED ANCHOR. Outlook ignores padding on an inline <a>, so a CSS button collapses
+    // to a bare line of text in the one client where it most needs to look deliberate.
+    const button = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:26px auto 6px;">
+      <tr><td align="center" bgcolor="${GROVE_GOLD}" style="border-radius:10px;">
+        <a href="${url}" style="display:inline-block;padding:15px 32px;font-family:${font};font-size:16px;font-weight:800;color:${GROVE_DARK};text-decoration:none;border-radius:10px;">Walk into the Grove</a>
+      </td></tr></table>`;
+
+    const band = (file, alt) => `<tr><td style="padding:6px 0 0;">
+        <img src="${site}/images/email/${file}" width="560" alt="${alt}" style="display:block;border:0;width:100%;max-width:560px;height:auto;"/>
+      </td></tr>`;
+
+    const h = (text) => `<tr><td style="padding:22px 28px 0;font-family:${font};">
+        <div style="color:${GROVE_GOLD};font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:800;">${text}</div>
+      </td></tr>`;
+
+    const para = (html) => `<tr><td style="padding:10px 28px 0;font-family:${font};font-size:15px;line-height:1.65;color:#d8d4cb;">${html}</td></tr>`;
+
     return {
         from: "The Wolf Den <portal@wolfdengamingmn.com>",
         to: email,
-        subject: "🌲 The Grove is open — seven maps of forest, and the gear in it",
-        html: `
-            <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:520px;margin:0 auto;color:#201a12;">
-                <p>${hi}</p>
-                <div style="text-align:center;padding:26px 18px;margin:14px 0;border:1px solid #6fae63;border-radius:16px;background:linear-gradient(160deg,#1d3a22,#0e1a11);color:#eaf6e6;">
-                    <div style="font-size:48px;line-height:1;">🌲</div>
-                    <div style="font-size:22px;font-weight:800;margin-top:10px;">The Grove is open</div>
-                    <div style="color:#b7ccb4;margin-top:8px;">The biggest thing in the Den, and it is no longer behind a door.</div>
-                </div>
-                <p>It has been in testing for months with a handful of members. That is over — <b>every account can walk in now</b>.</p>
-                <p><b>Seven maps of forest, twelve zones each.</b> You move your hero through it in real time and fight what is in front of you. Zones open by kill count: clear what you can see, take what it drops, go further in.</p>
-                <p><b>The gear is the point.</b> Every creature carries three pieces — ordinary, rare and super-rare — running common all the way up to mythic. The zone bosses are where the good ones come from, and they sit on a cooldown rather than a key.</p>
-                <p><b>And it pays out in rooms you already play.</b> Kills fill a bar; fill it and the forest hands you one of twelve crafting tools, a tier better than the one you hold. Those tools raise what you earn in the <b>farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss</b>. Once your twelve are current for a map, the bar starts paying chests instead.</p>
-                <p>There is also a <b>Coliseum</b> in there — a marshal, a key a day, twelve waves against a clock and a chest at the end. <b>Nobody has ever cleared all twelve</b> — the best anyone has managed is eleven.</p>
-                <p style="text-align:center;margin-top:20px;"><a href="${url}" style="display:inline-block;padding:12px 22px;background:#5fbf55;color:#07160a;text-decoration:none;border-radius:999px;font-weight:800;">Walk into the Grove →</a></p>
-                <p style="color:#777;font-size:13px;margin-top:20px;">The Pathfinder has a chapter on it now, with a gold chest at the end — if you would rather be walked through it, start there. 🐺</p>
-            </div>
-        `,
+        subject: "The Grove is open — seven maps of forest, and the gear in it",
+        html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="color-scheme" content="dark"/><meta name="supported-color-schemes" content="dark"/></head>
+<body style="margin:0;padding:0;background:${GROVE_DARK};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${GROVE_DARK};">
+ <tr><td align="center" style="padding:26px 12px 34px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+   <tr><td align="center" style="padding:0 0 18px;">
+     <a href="${site}" style="text-decoration:none;">
+       <img src="${site}/logo/wolf-den-full-logo.png" width="180" alt="The Wolf Den" style="display:block;border:0;width:180px;max-width:62%;height:auto;"/>
+     </a>
+   </td></tr>
+
+   <tr><td style="background:${GROVE_CARD};border:1px solid #2b332a;border-radius:16px;overflow:hidden;">
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+       <tr><td style="padding:30px 28px 0;font-family:${font};text-align:center;">
+         <div style="color:${GROVE_GOLD};font-size:12px;letter-spacing:.26em;text-transform:uppercase;font-weight:800;">Now open to everyone</div>
+         <h1 style="margin:10px 0 0;color:#ffffff;font-size:30px;line-height:1.15;font-weight:800;">The Grove</h1>
+         <p style="margin:10px 0 0;color:#9fb79a;font-size:15px;">Seven maps of forest. The biggest thing in the Den.</p>
+       </td></tr>
+
+       ${para(`${hi} it has been behind a door for months while a handful of members tested it. That is over &mdash; <strong style="color:#ffffff;">every account can walk in now</strong>.`)}
+
+       ${band("grove-foes.png", "Creatures of the Grove")}
+
+       ${h("What it is")}
+       ${para(`Twelve zones to a map, a creature in every one of them. You move your hero through it in <strong style="color:#ffffff;">real time</strong> and fight what is in front of you &mdash; built for a phone and one thumb. Zones open by kill count: clear what you can see, take what it drops, go further in.`)}
+
+       ${band("grove-gear.png", "Gear that drops in the Grove")}
+
+       ${h("The gear is the point")}
+       ${para(`Every creature carries three pieces &mdash; an ordinary one, a rare one and a super-rare one &mdash; running common all the way up to <strong style="color:#ffffff;">mythic</strong>. The zone bosses are where the good ones come from, and they sit on a cooldown rather than a key, so there is always one worth walking back for.`)}
+
+       ${band("grove-tools.png", "Crafting tools and chests from the kill bar")}
+
+       ${h("And it pays out in rooms you already play")}
+       ${para(`Kills fill a bar. Fill it and the forest hands you one of twelve <strong style="color:#ffffff;">crafting tools</strong>, a tier better than the one you hold &mdash; and those raise what you earn in the <strong style="color:${GROVE_GOLD};">farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss</strong>. Once your twelve are current for a map, the bar starts paying chests instead.`)}
+
+       ${h("The Coliseum")}
+       ${para(`A marshal, a key a day, twelve waves against a clock and a chest on the sand at the end. <strong style="color:#ffffff;">Nobody has ever cleared all twelve.</strong> The best anyone has managed is eleven.`)}
+
+       <tr><td style="padding:4px 28px 30px;">${button}</td></tr>
+
+     </table>
+   </td></tr>
+
+   <tr><td align="center" style="padding:18px 10px 0;font-family:${font};font-size:12px;line-height:1.7;color:#7d7d7d;">
+     The Pathfinder has a chapter on the Grove now, with a gold chest at the end &mdash; start there if you would rather be walked through it.<br/><br/>
+     <strong style="color:${GROVE_GOLD};">The Wolf Den</strong><br/>
+     <a href="${site}" style="color:#7d7d7d;">wolfdengamingmn.com</a>
+   </td></tr>
+
+  </table>
+ </td></tr>
+</table>
+</body></html>`,
     };
 }
 
