@@ -555,6 +555,18 @@ export async function openPack({ buyerId, idempotencyKey = null, pool: poolKey =
 // The route wraps it in `after()`.
 export async function notifyPackOpened(open, buyerName) {
     if (!open?.id) return;
+    // ── ⚠️ ONLY THE BIG ONES ARRIVE AT THE MOMENT THEY HAPPEN ──────────────────────────────────────
+    // Luke, 2026-11-16, looking at eight pushes inside one minute: "Its a bit excessive. Maybe it could
+    // alert me every once in a while instead. I do want to know whenever people are ripping and how they
+    // did. But it doesnt have to be immediately. Maybe once every 30 minutes."
+    //
+    // 58 opens in two hours is 58 notifications, and a channel that fires that often is a channel that
+    // gets swiped away without being read — which costs the alert that actually mattered.
+    //
+    // So an ordinary open says nothing now and is picked up by the half-hourly digest below. A BIG HIT
+    // still arrives immediately, because it is rare, it already has its own alert sound, and holding a
+    // $112 chase for twenty-nine minutes would be taking something away rather than tidying it up.
+    if (!open.bigHit) return;
     const { sendAdminPush } = await import("@/lib/push/send.js");
     const name = String(buyerName || "Someone").slice(0, 32);
     const card = String(open.card?.name || "a card").slice(0, 48);
@@ -570,6 +582,85 @@ export async function notifyPackOpened(open, buyerName) {
         data: { type: "pack_open", openId: String(open.id), pool: String(open.pool || "") },
         sound: open.bigHit ? { kind: "alert" } : null,
     }).catch(() => {});
+}
+
+
+/**
+ * ── EVERY HALF HOUR: WHO RIPPED, AND HOW THEY DID ───────────────────────────────────────────────────────────
+ * One push instead of one per pack. Luke: "I do want to know whenever people are ripping and how they did."
+ *
+ * ⚠️ IT READS A MARKER, NOT A WINDOW, AND THAT IS NOT A STYLE CHOICE. A digest that asked for "the last 30
+ * minutes" would silently drop every open that happened while the cron was late, retrying, or skipped — and
+ * it would double-count anything in the overlap if it ever ran early. The marker makes the digest exact
+ * regardless of when it actually runs, which is the same failure this repo has already shipped once: a
+ * reminder window narrower than its own cron never fired at all. See [[reminder-window-narrower-than-cron]].
+ *
+ * ⚠️ AND IT SAYS NOTHING WHEN NOTHING HAPPENED. A heartbeat that reports zero every half hour is how a
+ * channel teaches you to ignore it.
+ */
+export async function packRipDigest({ apply = true } = {}) {
+    const MARKER = "pack_rip_digest_at";
+    const since = await db.queryOne(`SELECT value FROM mkt_setting WHERE key = $1`, [MARKER]).catch(() => null);
+    // First ever run looks back one window rather than over the whole history of the shop.
+    const from = since?.value ? new Date(since.value) : new Date(Date.now() - 30 * 60 * 1000);
+
+    const rows = await db.query(
+        `SELECT o.id, o.price_cents, o.card_value_cents, o.created_at, o.pool,
+                COALESCE(b.display_name, b.alias, 'Someone') AS who,
+                c.card_name
+           FROM mkt_pack_open o
+           LEFT JOIN mkt_buyer b ON b.id = o.buyer_id
+           LEFT JOIN mystery_bag_cards c ON c.id = o.mystery_card_id
+          WHERE o.created_at > $1
+          ORDER BY o.created_at`,
+        [from.toISOString()],
+    ).catch(() => []);
+
+    const now = new Date();
+    if (apply) {
+        await db.query(
+            `INSERT INTO mkt_setting (key, value, updated_at) VALUES ($1, $2, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+            [MARKER, now.toISOString()],
+        ).catch(() => {});
+    }
+    if (!rows.length) return { opens: 0, sent: false };
+
+    const spent = rows.reduce((a, r) => a + (Number(r.price_cents) || 0), 0);
+    const pulled = rows.reduce((a, r) => a + (Number(r.card_value_cents) || 0), 0);
+    const best = rows.reduce((b, r) => ((Number(r.card_value_cents) || 0) > (Number(b?.card_value_cents) || 0) ? r : b), null);
+
+    // Who, and how many each — the "how they did" half. Ordered by count so the busiest reads first.
+    const byWho = new Map();
+    for (const r of rows) byWho.set(r.who, (byWho.get(r.who) || 0) + 1);
+    const people = [...byWho.entries()].sort((a, b) => b[1] - a[1])
+        .map(([who, n]) => (n > 1 ? `${who} x${n}` : who));
+
+    const money = (c) => `$${((Number(c) || 0) / 100).toFixed(2)}`;
+    // ⚠️ THE MARGIN IS THE POINT AND IT GOES IN THE TITLE, because a collapsed notification keeps the title
+    // and cuts the body. Spent minus pulled is what Luke is actually reading these for.
+    const up = spent - pulled;
+    const title = `${rows.length} pack${rows.length === 1 ? "" : "s"} opened · ${money(spent)} in, ${money(pulled)} out`;
+    const bodyBits = [
+        people.slice(0, 4).join(", ") + (people.length > 4 ? ` +${people.length - 4} more` : ""),
+        // ⚠️ THE SAME PARSER THE REVEAL USES. card_name carries the set code, number and rarity glued on;
+        // printing it raw would put "Mantyke SV2a 086/165 Rare Holo" in a notification body.
+        best?.card_name ? `best: ${parsePackCardName(best.card_name).name} ${money(best.card_value_cents)}` : null,
+        `${up >= 0 ? "up" : "down"} ${money(Math.abs(up))}`,
+    ].filter(Boolean);
+
+    if (!apply) return { opens: rows.length, sent: false, title, body: bodyBits.join(" · ") };
+
+    const { sendAdminPush } = await import("@/lib/push/send.js");
+    await sendAdminPush({
+        title,
+        body: bodyBits.join(" · "),
+        channels: ["full"],
+        route: "packFeed",
+        data: { type: "pack_digest", opens: String(rows.length) },
+        sound: null,
+    }).catch(() => {});
+    return { opens: rows.length, sent: true, title, body: bodyBits.join(" · ") };
 }
 
 /**
