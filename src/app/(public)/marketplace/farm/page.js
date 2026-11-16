@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import FarmClient from "@/components/FarmClient";
 import { featuredPackage } from "@/lib/marketplace/packages-server.js";
@@ -15,7 +14,6 @@ export const metadata = { title: "Farm | The Wolf Den", robots: { index: false }
 // Every signed-in member has a farm. ?u=<alias> inspects another member's farm (view-only).
 export default async function FarmPage({ searchParams }) {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("farm");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) notFound();
 

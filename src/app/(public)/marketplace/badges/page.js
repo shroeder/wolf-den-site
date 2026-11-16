@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import BadgeShopClient from "@/components/BadgeShopClient";
 import BadgeCollectionClient from "@/components/BadgeCollectionClient";
@@ -17,7 +16,6 @@ export const metadata = {
 
 export default async function BadgesPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("badges");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) {
         return (

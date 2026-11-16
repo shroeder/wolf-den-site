@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import { GiCardExchange } from "react-icons/gi";
 
 import TradeInbox from "@/components/TradeInbox";
@@ -14,7 +13,6 @@ const RC = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#f
 
 export default async function TradesPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("trade");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     const items = buyer ? await listTradeableItems(buyer.id, { limit: 120 }).catch(() => []) : [];
     return (

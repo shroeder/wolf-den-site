@@ -1,5 +1,4 @@
 import ConsumablesClient from "@/components/ConsumablesClient";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import DailyDeals from "@/components/DailyDeals";
 import EquipmentClient from "@/components/EquipmentClient";
 import ViewPing from "@/components/ViewPing";
@@ -16,7 +15,6 @@ export const metadata = {
 // today's deals, consumables (potions/scrolls/treats), and the gold gear shop grouped by slot.
 export default async function StorePage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("store");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) {
         return (

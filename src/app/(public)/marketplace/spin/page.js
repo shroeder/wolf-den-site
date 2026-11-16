@@ -1,5 +1,4 @@
 import ConsumableShelf from "@/components/ConsumableShelf";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import SpinWheel from "@/components/SpinWheel";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { halloweenOn } from "@/lib/marketplace/owner.js";
@@ -10,7 +9,6 @@ export const metadata = { title: "Daily Spin · The Wolf Den" };
 
 export default async function SpinPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("spin");
     // ── THE SAME ONE QUESTION EVERY DRESSED SCREEN ASKS ──────────────────────────────────────────────
     // halloweenOn, then the member's own town_halloween — the contract the town, the arena and the boss
     // screen already use. Resolved HERE rather than inside SpinWheel because the wheel renders its disc

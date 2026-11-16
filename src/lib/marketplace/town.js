@@ -1,9 +1,8 @@
 import "server-only";
 import path from "node:path";
 import fsSync from "node:fs";
-import { TOWNS, NEVER_GATED } from "@/lib/marketplace/towns.js";
+import { TOWNS, STREET_FIXTURES } from "@/lib/marketplace/towns.js";
 import { gateStateFor } from "@/lib/marketplace/town-gate.js";
-import { TOWNS as GATE_TOWNS, FEATURE_TOWN, NEVER_GATED as GATE_NEVER } from "@/lib/marketplace/towns.js";
 
 import { db } from "@/lib/db";
 import { groveOpen, isOwner, isPrimaryOwner } from "@/lib/marketplace/owner.js";
@@ -155,7 +154,7 @@ export function townStreet(townN) {
     // every street rather than only the one whose town happens to list it. Two reasons, and the second is the
     // real one: a way to give the Den money must be reachable from wherever the member is standing, and a
     // town with two buildings on it reads as an unfinished game rather than a waystation.
-    const fixtures = all.filter((b) => b.feature && NEVER_GATED.has(b.feature));
+    const fixtures = all.filter((b) => b.feature && STREET_FIXTURES.has(b.feature));
     const mine = forTown(townN);
     const here = [...mine, ...fixtures.filter((f) => !mine.some((m) => m.id === f.id))]
         .map((b) => ({ ...b, locked: false }));
@@ -815,20 +814,14 @@ export async function getTownState(buyerId, { previewTown = null } = {}) {
             // ⚠️ AND IT IS THE *MEMBER* THAT DECIDES, NOT A DEPLOY FLAG. gate.exempt is true for every
             // account that predates gating, so their street is exactly as lit as it was yesterday. The
             // two kinds of account coexist forever.
-            const lockInfo = (b) => {
-                if (gate.exempt) return null;                       // grandfathered: everything open
-                if (!b.feature || GATE_NEVER.has(b.feature)) return null;
-                const need = FEATURE_TOWN[b.feature];
-                if (!need || need <= (gate.town || 1)) return null;  // already reached
-                const t = GATE_TOWNS.find((x) => x.n === need) || null;
-                // opensAt is the TOWN, opensPast is the MAP that opens it — the client prints the first
-                // and the design says a locked feature must name the second, so both travel.
-                return { locked: true, opensAt: t?.name || `Town ${need}`, opensPast: t?.opens || null };
-            };
+            // ✂️ lockInfo WAS HERE — the plaza's shutter, which dimmed a building and said which town
+            // would open it. Removed 2026-11-16 with the unlock ladder: every feature is open to every
+            // account on day one, so there is nothing on this street to shut. It never ran in anger —
+            // gate.exempt was true for all 241 accounts, so this returned null every time it was called.
             const visible = town
                 ? townStreet(town).filter((b) => b.gate !== "owner" || isOwner(buyerId))
                 : [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))]
-                    .map((b) => ({ ...b, ...(lockInfo(b) || { locked: false }) }));
+                    .map((b) => ({ ...b, locked: false }));
             // ⚠️ ONE PASS FOR EVERYTHING THAT STANDS OUT THERE — see layOutStreet. The NPCs used to carry
             // their own hand-picked percentages in the client, which is how the act board ended up 0.4%
             // from the Mine. They take a slot in this row now, so a collision cannot be expressed.

@@ -1,5 +1,4 @@
 import PetsClient from "@/components/PetsClient";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import ViewPing from "@/components/ViewPing";
 import ConsumableShelf from "@/components/ConsumableShelf";
 
@@ -13,7 +12,6 @@ export const metadata = {
 
 export default async function PetsPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("pets");
     return (
         <>
             <ViewPing event="view_inventory" meta={{ section: "pets" }} />

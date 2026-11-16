@@ -1,5 +1,4 @@
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import { getSetsOverview } from "@/lib/marketplace/sets.js";
 import { getOwnedPieceIds, loanedPiece } from "@/lib/marketplace/collection-owned.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
@@ -13,7 +12,6 @@ export const metadata = { title: "Gear Sets · The Wolf Den" };
 
 export default async function SetsPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("sets");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     let equipped = [];
     let owned = [];

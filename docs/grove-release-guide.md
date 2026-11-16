@@ -1,62 +1,52 @@
-# Releasing the Grove — the ordered steps, and the gotchas
+# Releasing the Grove — what happened, and what is left
 
-Started 2026-11-04. **THE GROVE IS OPEN — step 2 shipped 2026-11-14.** Gating is still off (step 4 has not
-happened and the onboarding guide has not been retired), so the rest of this file is still live. This is the
-file that says what has to happen, in what
-order, on the day it is — and the place to write down anything found between now and then that would bite on
-launch day.
+Started 2026-11-04. **THE GROVE IS OPEN** (2026-11-14) **AND THE UNLOCK LADDER IS GONE** (2026-11-16).
 
-Luke: *"a Grove implementation guide when it comes time for us to release the feature. So that we know if
-there's any serialized steps that need to be taken on our end in order to properly release the feature, that
-we have a place to keep notes and make sure that we capture any gotchas."*
+> **Luke, 2026-11-16:** *"Remove the unlocking entirely. Everything's unlocked day one just like it was
+> before, and like I think it still is now. We're just going to release the Grove. We're going to tell people
+> about the Grove in an announcement, and that's it."*
 
-> **Add to this file the moment you find something, not on launch day.** A gotcha discovered in November and
-> remembered in January is a gotcha that ships.
+So the shape of this release changed completely, and most of this file is now history rather than
+instructions. What is actually true today:
 
----
+| | |
+|---|---|
+| **The Grove** | open to every signed-in member |
+| **Feature gating** | **deleted.** No `GATING_LIVE`, no `featureUnlocked`, no `gatePage`, no shuttered doors |
+| **The onboarding guide** | **stays** — see §3.11, which reverses its own retirement |
+| **What is left** | tell people. One Arbiter post, one email. Both written, neither sent |
 
-## 1. The switches
+⚠️ **THE GATING REMOVAL CHANGED NOTHING FOR ANY MEMBER, AND THAT IS WHY IT WAS SAFE.** `GATING_LIVE` was
+`false` for its entire life, so all 241 accounts carried `gated_at = NULL` and `featureUnlocked` returned
+true for every one of them. The teardown removed a branch that had never once been taken.
 
-Two constants open the Grove. **A third thing moves with them and is not a constant at all**, which is
-exactly why it is easy to miss — see §3.11.
+⚠️ **TWO THINGS SURVIVED THE TEARDOWN BECAUSE THEY WERE NEVER ONLY GATES**, and both would have broken
+something if removed with it:
 
-| switch | file | today | what it does |
-|---|---|---|---|
-| `canPreview("grove")` | `owner.js` | ✅ **everyone**, 2026-11-14 | who may enter the Grove at all |
-| `GATING_LIVE` | `towns.js` | `false` | whether new signups are stamped `gated_at` |
-| the onboarding guide | `guide-chapters.js`, `/marketplace/guide` | live | a chapter-by-chapter ramp through a game that gating locks |
+- `TOWNS[n].features` — also the **street inventory**. `townStreet(n)` reads it to decide which buildings
+  stand in each Grove town. Deleting the arrays would have emptied seven streets.
+- `NEVER_GATED`, now **`STREET_FIXTURES`** — also the set of buildings that stand on *every* street rather
+  than only their own town's, so the till is reachable from wherever a member is standing. Deleting it with
+  the ladder broke the build, which is how it was found.
+- `gateStateFor` — also answers **how deep a member is in the Grove**, which the hunts route and the town
+  street both still read.
 
-⚠️ **Nothing greps for the third row.** The first two are named constants a launch-day reader will find by
-searching; the guide is a whole feature with a gold payout attached, and the only reason it is written down
-here is that the doc which held it was deleted on 2026-11-04. Read §3.11 before step 4.
-
-**2026-11-09 — the beta-tester widening.** `PREVIEW_GUESTS.grove` went from 4 guests to 9: the five other
-holders of the **Tester role**, which `roles.js` grants off the `bug_hunter` badge (five rewarded bug
-reports) and which is also the roster of the private `testing` channel. That is step 2 done *narrowly* — a
-soft launch to the people who already report bugs, with `GATING_LIVE` still `false`, which is the safe half
-per the order rule below. ⚠️ **It is a snapshot of a moving group:** the badge keeps being earned and
-`canPreview` is synchronous with no database access, so the next member to reach five reports must be added
-by hand until the Grove opens to everyone.
-
-### ⚠️ The order is not a preference — one order mints unplayable accounts
-
-`GATING_LIVE = true` makes every **new** signup carry a `gated_at` stamp, and a stamped account has its
-features gated behind town progress. **The only thing that opens a town is Grove progress.** So if gating
-goes live while the Grove is still owner-gated, every account created in that window is locked out of the
-farm, the mine, the arena and twenty other rooms **with no way to unlock any of them** — not a degraded
-experience, an unplayable account, created silently, one signup at a time.
-
-- **Never** turn on `GATING_LIVE` before the Grove is open.
-- Turning the Grove on *without* `GATING_LIVE` is harmless: everyone keeps everything, nothing is gated.
-  That is the safe half, and it is a legitimate soft-launch step on its own.
-
-### The grandfather clause needs no work
-
-Every account that exists today has `gated_at = NULL`, and `featureUnlocked` returns `true` for a NULL
-forever. **There is no backfill and no flag to flip on existing rows.** Luke's rule — *"existing accounts
-keep everything"* — is already implemented by doing nothing. Do not write a migration for this.
+**`npm run check:gates` is deleted** along with the system it policed.
 
 ---
+
+## 1. ~~The switches~~ — there is one, and it is already on
+
+`groveOpen` in `owner.js` returns true for any signed-in member. That is the whole gate now.
+
+The other two rows of the table that used to be here are gone: `GATING_LIVE` was deleted with the ladder on
+2026-11-16, and the onboarding guide is **staying** (§3.11).
+
+⚠️ **The ordering rule that used to live here mattered enormously and no longer applies.** It said never turn
+on `GATING_LIVE` before the Grove is open, because Grove progress was the only thing that opened a town, so
+a stamped account created in that window could never unlock the farm, the mine or the arena. With gating
+gone there is no window and no stamp. Recorded because it is the sharpest thing this file ever contained,
+and because anyone reinstating a ladder has to solve it again.
 
 ## 2. Serialized steps
 
@@ -358,7 +348,7 @@ So the audit cannot be read as "the Grove is hollow":
 - **Tools** — the kill bar (`grove-bar.js`, 2026-11-08) is a real faucet. 2 members, 7 fills already.
 - **The Coliseum and its chests** — own system, own tiers (§3.6).
 - **Statues, emblems, class nodes, the boss, the bar's chest rung** — all have writers and readers.
-- `npm run check:grove`, `check:sql`, `check:gates`, `check:css`, `check:chrome`, `check:polls` and
+- `npm run check:grove`, `check:sql`, `check:css`, `check:chrome`, `check:polls` and
   `lint:undef` all pass as of 2026-11-09.
 
 ---
@@ -369,7 +359,6 @@ So the audit cannot be read as "the Grove is hollow":
 npm run check:grove          every reference resolves, the scene's geometry holds
 npm run check:sql            no query is handed a parameter it never uses
 npm run check:css            no rule is hiding inside a comment
-npm run check:gates          every gated feature's page guards itself
 npm run lint:undef           no call to something that does not exist
 node scripts/qa-town-npcs.mjs            (needs SHOT_COOKIE)
 ```

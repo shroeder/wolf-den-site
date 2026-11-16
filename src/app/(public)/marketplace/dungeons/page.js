@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import DelveClient from "@/components/DelveClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -13,7 +12,6 @@ export const metadata = {
 
 export default async function DelvesPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("dungeons");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/dungeons");
 

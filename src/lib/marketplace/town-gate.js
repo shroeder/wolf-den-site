@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db.js";
-import { featureUnlocked, lockedFeatures, townFromDepth, TOWNS } from "@/lib/marketplace/towns.js";
+import { townFromDepth, TOWNS } from "@/lib/marketplace/towns.js";
 
 // ── READING THE GATE ─────────────────────────────────────────────────────────────────────────────────────────
 // The pure rules live in towns.js; this is the one place that fetches what they need. Two columns off two
@@ -15,6 +15,10 @@ import { featureUnlocked, lockedFeatures, townFromDepth, TOWNS } from "@/lib/mar
 /**
  * @returns {{gatedAt: Date|null, unlockedN: number, town: number, exempt: boolean}}
  */
+// ⚠️ THIS SURVIVED THE UNLOCK LADDER BECAUSE IT IS NOT ONLY A GATE. It also answers how deep a
+// member is in the Grove (unlockedN), which the hunts route and the town street both still read.
+// `exempt` is now true for everybody, always, and `locked` is always empty — kept so the shapes
+// the menu and the street already destructure do not have to change in the same commit.
 export async function gateStateFor(buyerId) {
     if (!buyerId) return { gatedAt: null, unlockedN: 1, town: 1, exempt: true };
     const row = await db.queryOne(
@@ -40,19 +44,8 @@ export async function gateForMenu(buyerId) {
     return {
         town: st.town,
         exempt: st.exempt,
-        locked: lockedFeatures({ gated_at: st.gatedAt }, st.unlockedN),
+        locked: {},
         towns: TOWNS.map((t) => ({ n: t.n, id: t.id, name: t.name, biome: t.biome, opens: t.opens, blurb: t.blurb })),
     };
 }
 
-/**
- * The ROUTE half of the gate.
- *
- * ⚠️ FEATURE GATES COME IN PAIRS AND THIS IS THE HALF THAT GETS FORGOTTEN. A dimmed menu row whose URL still
- * serves the page is not locked — it is a locked door with the window open, and this codebase has shipped
- * exactly that before. Every gated page calls this; the menu calling gateForMenu is not a substitute.
- */
-export async function requireFeature(buyerId, feature) {
-    const st = await gateStateFor(buyerId);
-    return featureUnlocked({ gated_at: st.gatedAt }, feature, st.unlockedN);
-}

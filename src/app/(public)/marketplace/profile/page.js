@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
@@ -50,7 +49,6 @@ const TILES = [
 
 export default async function ProfileHubPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("profile");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
 
     if (!buyer) {

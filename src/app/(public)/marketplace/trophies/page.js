@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import TrophyRoom from "@/components/TrophyRoom";
 import ViewPing from "@/components/ViewPing";
@@ -24,7 +23,6 @@ export const metadata = {
 // The component is unchanged and still mounts inside the farm's tab for now; this is a second door, not a fork.
 export default async function TrophiesPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("trophies");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     return (
         <div className="stack reveal">

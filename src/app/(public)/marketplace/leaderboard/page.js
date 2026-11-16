@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 
 import ViewPing from "@/components/ViewPing";
 
@@ -14,7 +13,6 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default async function LeaderboardPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("leaderboard");
     const rows = await getLeaderboard(50);
 
     return (

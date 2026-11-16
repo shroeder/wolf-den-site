@@ -1,5 +1,4 @@
 import AuctionClient from "@/components/AuctionClient";
-import { gatePage } from "@/lib/marketplace/gate-page.js";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getAuctionState } from "@/lib/marketplace/auction.js";
@@ -12,7 +11,6 @@ export const metadata = {
 
 export default async function AuctionPage() {
     // The town gate's route half — see gate-page.js. One line, and it is the half that gets forgotten.
-    await gatePage("auction");
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) {
         return (

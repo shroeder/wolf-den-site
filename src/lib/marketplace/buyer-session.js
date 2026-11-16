@@ -1,5 +1,4 @@
 import "server-only";
-import { GATING_LIVE } from "@/lib/marketplace/towns.js";
 
 import { createHash, randomBytes, randomInt } from "node:crypto";
 
@@ -92,14 +91,14 @@ export async function createBuyer({ email, password, displayName = null, firstNa
         // clause — no backfill, no flag to flip on 200 rows, and nothing to get wrong in the gap
         // between a migration and a deploy.
         //
-        // ⚠️ GATED ONLY WHEN GATING_LIVE. While the Grove is owner-only there is no way to open a
-        // town, so stamping this early would mint unplayable accounts. See the note on the constant.
+        // ✂️ gated_at WAS STAMPED HERE. Removed 2026-11-16 with the rest of the unlock ladder — every
+        // feature is open to every account on day one. The COLUMN stays: it is NULL on all 241 rows and
+        // dropping it loses the record of a decision for no gain.
         row = await db.queryOne(
-            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name, first_name, last_name, gated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO mkt_buyer (email, email_normalized, password_hash, display_name, first_name, last_name)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id, email, display_name`,
-            [String(email).trim(), normalized, passwordHash, displayClean, firstClean, lastClean,
-                GATING_LIVE ? new Date() : null]
+            [String(email).trim(), normalized, passwordHash, displayClean, firstClean, lastClean]
         );
     }
     // Redeem any in-store/online purchases parked for this email before they had an account — their XP

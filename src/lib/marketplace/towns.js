@@ -28,7 +28,17 @@
 //
 // ⚠️ TURN THIS ON IN THE SAME DEPLOY THAT OPENS THE GROVE, never before it. The two are one switch wearing
 // two names.
-export const GATING_LIVE = false;
+// ✂️ GATING_LIVE WAS HERE, AND THE WHOLE UNLOCK LADDER WITH IT — removed 2026-11-16.
+// Luke: "Remove the unlocking entirely. Everything's unlocked day one just like it was before, and
+// like I think it still is now. We're just going to release the Grove."
+//
+// ⚠️ IT NEVER APPLIED TO ANYBODY. GATING_LIVE was false for its whole life, so all 241 accounts had
+// gated_at NULL and featureUnlocked returned true for every one of them. Removing this changed no
+// member's experience by a single door — it deleted a branch that had never once been taken.
+//
+// ⚠️ TOWNS STAYS, AND SO DOES EVERY `features` ARRAY. That array had two readers and only one was the
+// gate: townStreet(n) uses it to decide which buildings stand on each Grove town's street. Deleting
+// the arrays would empty seven streets.
 
 /**
  * Town N opens onto map N, and brings the features listed.
@@ -109,25 +119,19 @@ export const TOWNS = [
 ];
 
 /**
- * ⚠️ THE TILL IS NEVER LOCKED.
+ * ⚠️ THE TILL STANDS ON EVERY STREET.
  *
- * Anything that touches the business is open from the first second for every account, forever: buying,
- * store credit, mystery bags, the Card Vault, selling cards, events — and the rewards track, which pays
- * points on a purchase made on day one. A locked rewards page is a locked customer.
+ * This was NEVER_GATED, half of the unlock ladder that went on 2026-11-16 — but it had a SECOND reader
+ * that has nothing to do with gating and outlives it. townStreet() uses this set to decide which
+ * buildings are FIXTURES: the ones that stand on every town's street rather than only on the street of
+ * the town that lists them. Anything that touches the business — buying, store credit, the Card Vault,
+ * selling, events, the rewards track — has to be reachable from wherever the member is standing, and a
+ * town with two buildings on it reads as an unfinished game rather than a waystation.
  *
- * Identity and talking to people are not features to be earned either. The game gates GAME systems; it never
- * gates a way to give the Den money, or a way to reach somebody.
+ * Renamed to what it does. Deleting it with the ladder would have emptied six of seven streets.
  */
-export const NEVER_GATED = new Set([
-    "shop", "cart", "credit", "mystery", "vault", "sell", "events", "rewards",
-    "profile", "notifications", "inbox", "messages", "friends", "invite", "customize",
-    "guide", "changelog", "play", "town", "social",
-]);
 
 /** feature → the town number that opens it. Built once from TOWNS, so the table above is the only source. */
-export const FEATURE_TOWN = Object.fromEntries(
-    TOWNS.flatMap((t) => t.features.map((f) => [f, t.n])),
-);
 
 /**
  * Which town a member has reached, from how deep they are in the Grove.
@@ -136,6 +140,27 @@ export const FEATURE_TOWN = Object.fromEntries(
  * was double-counted. Twelve zones to a map, and the town AFTER a map opens once its last zone is cleared,
  * so a player standing in map 3 has towns 1-3 and gets town 4 on clearing zone 36.
  */
+/**
+ * ⚠️ THE TILL STANDS ON EVERY STREET.
+ *
+ * This list was NEVER_GATED, half of the unlock ladder that went on 2026-11-16 — and deleting it with the
+ * ladder broke the build, which was the right way to find out that it had a SECOND reader with nothing to do
+ * with gating.
+ *
+ * townStreet() uses it to decide which buildings are FIXTURES: the ones that stand on EVERY town's street
+ * rather than only on the street of the town that lists them. Anything that touches the business — buying,
+ * store credit, the Card Vault, selling, events, the rewards track — has to be reachable from wherever a
+ * member is standing, and a town with two buildings on it reads as an unfinished game rather than a
+ * waystation. Identity and talking to people travel for the same reason.
+ *
+ * So it is renamed to what it actually does, rather than removed with the thing it used to also serve.
+ */
+export const STREET_FIXTURES = new Set([
+    "shop", "cart", "credit", "mystery", "vault", "sell", "events", "rewards",
+    "profile", "notifications", "inbox", "messages", "friends", "invite", "customize",
+    "guide", "changelog", "play", "town", "social",
+]);
+
 export const townFromDepth = (unlockedN) => {
     const n = Math.max(1, Number(unlockedN) || 1);
     return Math.min(TOWNS.length, Math.floor((n - 1) / 12) + 1);
@@ -153,24 +178,4 @@ export const townFromDepth = (unlockedN) => {
  * for every new member is a far worse outcome than one that fails to lock something. The same rule as every
  * other lookup in this codebase: fail toward the permissive answer when the gate is the new thing.
  */
-export function featureUnlocked(buyer, feature, unlockedN = 1) {
-    if (!feature) return true;
-    if (NEVER_GATED.has(feature)) return true;
-    // The grandfather clause. Every account that existed when gating shipped has a NULL here.
-    if (!buyer?.gated_at) return true;
-    const need = FEATURE_TOWN[feature];
-    if (!need) return true;
-    return townFromDepth(unlockedN) >= need;
-}
 
-/** Everything still shut, for the menu — so a locked row can say WHICH map opens it rather than just "no". */
-export function lockedFeatures(buyer, unlockedN = 1) {
-    if (!buyer?.gated_at) return {};
-    const town = townFromDepth(unlockedN);
-    const out = {};
-    for (const t of TOWNS) {
-        if (t.n <= town) continue;
-        for (const f of t.features) out[f] = { town: t.n, name: t.name, opens: t.opens };
-    }
-    return out;
-}
