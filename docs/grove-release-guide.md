@@ -76,8 +76,9 @@ keep everything"* — is already implemented by doing nothing. Do not write a mi
 3. **Deploy and watch, with gating still off.** Everyone can play; nobody is gated. This is the window where
    load, the economy and the curve get their first real numbers.
 4. **Then flip `GATING_LIVE = true`**, in its own deploy, once step 3 looks right.
-5. **Retire the onboarding guide in that same deploy** — see §3.11. It is a third switch, and it is the one
-   nobody would think to look for.
+5. ~~**Retire the onboarding guide in that same deploy**~~ — **CANCELLED 2026-11-16, see §3.11.** The
+   guide stays. It needs re-keying from level to the town ladder and 14 missing chapters written, which
+   is work to do BEFORE gating rather than a switch to flip with it.
 6. **Announce.** See [[announce-every-fix-or-it-is-half-a-fix]] — and the standing carve-out that casino
    rates are never announced.
 
@@ -152,7 +153,60 @@ Removing chests removed the only route celestial and primordial had into the gam
 call (*"drop the top tiers entirely"*), not an oversight — but it means **the Grove cannot pay elite gear at
 all**. If that is wrong, it is a content decision to make before launch, not after.
 
-### 3.11 ⚠️ The onboarding guide has to retire in the SAME deploy as `GATING_LIVE`
+### 3.11 ⚠️ ~~The onboarding guide has to retire~~ — REVERSED 2026-11-16, DO NOT DELETE IT
+
+> **Luke, 2026-11-16:** *"Why would you completely delete the guide? We need a guide that tells people how
+> to frickin' play the game, right? ... The Grove is supposed to be a way to help show people features in a
+> cadence, with each town unlocking more features. But we still need to explain to people what all the
+> features are, including the Grove feature."*
+
+**The retirement below is cancelled.** The reasoning in it was not wrong about the symptom — under gating a
+level-ordered guide does become a list of doors that do not open — but the conclusion was. The gate and the
+guide are not in competition: **the Grove paces what a member may use, and the guide explains each thing as
+it arrives.** Deleting the explanation because the pacing exists leaves a new member with a locked door and
+no idea what is behind it.
+
+⚠️ **AND THE GUIDE IS NOT A DEAD FEATURE.** Measured 2026-11-16: **1,914 payouts across 173 of ~230
+members**, with a step claimed that morning. It is one of the most used things in the Den.
+
+#### What is actually wrong, measured
+
+The guide orders chapters by `minLevel`. The gate orders features by **town**. Those are different axes and
+they disagree, badly:
+
+| chapter | minLevel | its feature unlocks at |
+|---|---|---|
+| The Boss | 3 | **town 7** — the last rung |
+| The Mine | 10 | **town 2** — nearly the first |
+| The Shelf | 6 | town 5 |
+| The Casino | 10 | town 6 |
+
+So a gated member at town 2 would be offered *The Boss* — locked for six more towns — and **not** offered
+*The Mine*, which they had just earned. The book would teach the wrong things in the wrong order and the
+right ones never.
+
+**And 14 of the 31 gated features have no chapter at all:** `quests`, `tavern`, `compendium`, `fishing`,
+`bounties`, `creations`, `cards`, `market`, `auction`, `spin`, `leaderboard`, `trophies`, `track`, `badges`.
+
+#### The shape to build instead
+
+1. **Key chapters to the town ladder, not to level.** A chapter appears when `featureUnlocked` says its
+   feature is open. Level can stay as a secondary floor where a feature is genuinely level-sensitive.
+2. **Write the 14 missing chapters**, so every rung of the ladder is explained by the thing that opens it.
+3. **When nothing new is unlocked, the guide points at the Grove** — "go deeper to open <town>, which brings
+   <features>". That is the cadence Luke is describing, stated out loud, and it makes the Grove the engine
+   of the ramp rather than a side mode.
+4. ⚠️ **The two mint reasons stay.** `guide_step` and `guide_chapter` are wired into the coin ledger and are
+   paying out daily. Nothing here removes them.
+
+⚠️ **ONE THING TO FIX FIRST, BECAUSE IT MAKES ALL OF THIS UNMEASURABLE:** a `guide_step` payout does not
+record WHICH step it paid for. 107 steps were claimed in three days and not one of them can be attributed to
+a chapter. Until the key is in `meta`, nobody can tell which parts of the book work.
+
+---
+
+### 3.11b The original retirement note, kept for its argument
+
 Rescued 2026-11-04 from `grove-progression-requirements.md` before deleting it. This is the third thing
 that moves on launch day and the only one with no constant to grep for.
 
