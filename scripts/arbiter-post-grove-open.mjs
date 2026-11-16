@@ -1,10 +1,16 @@
 // ── THE GROVE IS OPEN ────────────────────────────────────────────────────────────────────────────────────────
 // The in-game announcement. Luke: "Prep announcement in game."
 //
+// ⚠️ AND IT DOES NOT EXPLAIN THE MECHANICS. Luke, on the first draft: "It's a little too on the nose
+// with explaining the mechanics. You can kind of leave a little room for them to be excited about it
+// instead of explaining exactly everything." The first version counted zones per map, broke down the
+// three drops per creature and described how the kill bar fills -- a manual, not an announcement. What
+// stays is what makes somebody open the door; the rest is in there to be found.
+//
 // ⚠️ PARAPHRASE ONLY — the standing rule for every member-facing post in this folder. Nothing about how it
 // was built, no flag names, no internals, nothing from our conversation. It says what is in the world, where
-// the door is, and stops. In particular it says NOTHING about gating: GATING_LIVE is still false, no account
-// is gated, and announcing a rule nobody is subject to would only frighten people.
+// the door is, and stops. It says nothing about gating because there is no gating -- the whole unlock ladder
+// was removed on 2026-11-16 and every feature is open to every account on day one.
 //
 // ⚠️ THE ARBITER'S GRAMMAR IS FOUR RULES AND BOLD IS NOT ONE OF THEM. See notice-format.js:
 //
@@ -40,26 +46,22 @@ It has been behind a door for months while a handful of you tested it. That door
 /images/grove/boss-bellowmaw.webp
 
 # Seven maps of forest
-Twelve zones to a map, a creature in every one of them. You move your hero through it in real time and fight what is in front of you — it is built for a phone and one thumb, and it is the largest thing in the Den by a distance.
+You walk your hero into it and fight what is in front of you. It is built for a phone and one thumb, and it is the largest thing in the Den by a distance.
 
-Zones open by kill count. Clear what is in front of you, take what it drops, walk further in. The deeper you go the harder it hits and the better it pays.
+The deeper you go the harder it hits — and the better it pays.
 
 /images/grove/armour-legendary_head.webp
 
-# The gear is the point
-Every creature in the forest has three pieces attached to it: an ordinary one, a rare one and a super-rare one. They run from common all the way up to mythic, and the zone bosses are where the good ones actually come from. A boss sits on a cooldown rather than a key, so there is always one worth walking back for.
+# Things in there are wearing gear you do not have
+It runs all the way up to mythic. The bosses have the best of it.
 
 /images/grove/chest-barrowed.webp
 
-# The kill bar pays crafting tools
-Kills fill a bar that belongs to the map you are on. Fill it and the forest hands you one of twelve crafting tools, one tier better than the one you are holding.
-
-Worth reading twice if a forest crawler is not your thing: those tools pay out in the farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss. Twelve rooms you already play.
-
-Once all twelve of your tools are current for a map, the bar starts handing you chests instead, and the deeper the map the better they roll.
+# It pays into the rest of the game
+The forest hands out crafting tools, and those raise what you earn in the farm, the mine, the kitchen, at sea and half a dozen other rooms you already play. Keep going and it starts handing out chests instead.
 
 # The Coliseum
-There is a marshal in the forest with a key. Twelve waves, a clock, and a chest on the sand at the end of it. You get a key a day.
+There is a marshal in there with a key, and twelve waves behind it.
 
 Nobody has ever cleared all twelve. The best anyone has managed is eleven. If you are the first, say so.
 
@@ -67,8 +69,6 @@ Nobody has ever cleared all twelve. The best anyone has managed is eleven. If yo
 - On your hub, as The Grove
 - Second in the game menu
 - Through the door in town
-
-The Pathfinder has a chapter on it now as well, four steps and a gold chest at the end, if you would rather be walked in.
 
 Go in. Tell me what breaks.`;
 

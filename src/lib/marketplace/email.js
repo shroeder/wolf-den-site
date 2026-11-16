@@ -430,25 +430,25 @@ export function groveLaunchMessage(email, { name = "" } = {}) {
          <p style="margin:10px 0 0;color:#9fb79a;font-size:15px;">Seven maps of forest. The biggest thing in the Den.</p>
        </td></tr>
 
-       ${para(`${hi} it has been behind a door for months while a handful of members tested it. That is over &mdash; <strong style="color:#ffffff;">every account can walk in now</strong>.`)}
+       ${para(`${hi} it has been behind a door for months while a handful of members tested it. That door is gone &mdash; <strong style="color:#ffffff;">every account can walk in now</strong>.`)}
 
        ${band("grove-foes.png", "Creatures of the Grove")}
 
-       ${h("What it is")}
-       ${para(`Twelve zones to a map, a creature in every one of them. You move your hero through it in <strong style="color:#ffffff;">real time</strong> and fight what is in front of you &mdash; built for a phone and one thumb. Zones open by kill count: clear what you can see, take what it drops, go further in.`)}
+       ${h("What is waiting in it")}
+       ${para(`You walk your hero into it and fight what is in front of you, in <strong style="color:#ffffff;">real time</strong> &mdash; built for a phone and one thumb. The deeper you go the harder it hits, and the better it pays.`)}
 
        ${band("grove-gear.png", "Gear that drops in the Grove")}
 
-       ${h("The gear is the point")}
-       ${para(`Every creature carries three pieces &mdash; an ordinary one, a rare one and a super-rare one &mdash; running common all the way up to <strong style="color:#ffffff;">mythic</strong>. The zone bosses are where the good ones come from, and they sit on a cooldown rather than a key, so there is always one worth walking back for.`)}
+       ${h("What they are wearing")}
+       ${para(`Things in there are wearing gear you do not have. It runs all the way up to <strong style="color:#ffffff;">mythic</strong>, and the bosses have the best of it.`)}
 
        ${band("grove-tools.png", "Crafting tools and chests from the kill bar")}
 
-       ${h("And it pays out in rooms you already play")}
-       ${para(`Kills fill a bar. Fill it and the forest hands you one of twelve <strong style="color:#ffffff;">crafting tools</strong>, a tier better than the one you hold &mdash; and those raise what you earn in the <strong style="color:${GROVE_GOLD};">farm, the mine, fishing, cooking, sailing, pets, the jeweller, the dungeons, the arena and the weekly boss</strong>. Once your twelve are current for a map, the bar starts paying chests instead.`)}
+       ${h("It pays into the rest of the game")}
+       ${para(`The forest hands out <strong style="color:#ffffff;">crafting tools</strong>, and those raise what you earn in the <strong style="color:${GROVE_GOLD};">farm, the mine, the kitchen, at sea</strong> and half a dozen other rooms you already play. Keep going and it starts handing out chests instead.`)}
 
        ${h("The Coliseum")}
-       ${para(`A marshal, a key a day, twelve waves against a clock and a chest on the sand at the end. <strong style="color:#ffffff;">Nobody has ever cleared all twelve.</strong> The best anyone has managed is eleven.`)}
+       ${para(`There is a marshal in there with a key, and twelve waves behind it. <strong style="color:#ffffff;">Nobody has ever cleared all twelve.</strong> The best anyone has managed is eleven.`)}
 
        <tr><td style="padding:4px 28px 30px;">${button}</td></tr>
 
