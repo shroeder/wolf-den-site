@@ -36,13 +36,35 @@ export function useColiseum({ onChanged, onResult } = {}) {
     // A ref is written synchronously, so the second caller in the same tick sees it.
     const settledRef = useRef(false);
 
+    // ── ⚠️ THE CATCH WAS ON THE WRONG PROMISE, AND IT COST MEMBERS THEIR KEYS ──────────────────────
+    // This read `r.json().catch(...)` — which handles a reply that is not JSON, and does nothing at all
+    // about the FETCH rejecting. A phone that loses signal mid-request, a 502, a backgrounded tab
+    // killing the connection: all of those reject, and the rejection went straight past `start` (which
+    // had a `finally` but no `catch`) and past `finish` (which had neither).
+    //
+    //   Anamarisa, 2026-11-16: "it took my coin but didnt let me play"
+    //   Mama G,    2026-11-16: "have to close out and reopen the site to get out"
+    //   WyldStallyn, 2026-11-17: "I have also lost 2 coins and all rewards in the grove due to freezing"
+    //
+    // It leaves no trace anywhere, which is why it survived three rounds of looking: the game loop is
+    // fine, nothing throws inside a frame, and an unhandled rejection is not a React error. The only
+    // sign was three "Load failed" rows in mkt_client_error.
+    //
+    // Every failure is a value now. Nothing above this has to know a fetch can reject.
     const post = useCallback(async (body) => {
-        const r = await fetch("/api/marketplace/grove/coliseum", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        return r.json().catch(() => ({ ok: false, error: "bad_response" }));
+        try {
+            const r = await fetch("/api/marketplace/grove/coliseum", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const j = await r.json().catch(() => null);
+            if (j) return j;
+            return { ok: false, error: r.ok ? "bad_response" : `http_${r.status}`, offline: !r.ok };
+        } catch {
+            // The request never got an answer. The server may or may not have acted on it.
+            return { ok: false, error: "offline", offline: true };
+        }
     }, []);
 
     // ── ⚠️ THE DAILY KEY LIVES HERE NOW ────────────────────────────────────────────────────────────
@@ -70,13 +92,23 @@ export function useColiseum({ onChanged, onResult } = {}) {
             const j = await post({ action: "start", map });
             if (j?.ok) {
                 settledRef.current = false;
-                setRun({ map, plan: j.plan });
+                // The ordinal rides along so the settle can be retried without paying twice.
+                setRun({ map, plan: j.plan, run: Number(j.run) || 0 });
                 onChanged?.();
             } else {
                 // ⚠️ THE REFUSAL IS A RESULT TOO, and it is the one that was costing the most: "no_key" is
                 // the ordinary state of the gate for most of every day, so the silent version of this made
                 // the Coliseum look broken rather than closed.
-                onResult?.({ error: j?.error === "no_key" ? "You need a key. The marshal hands one out daily." : (j?.error || "Could not start.") });
+                onResult?.({
+                    error: j?.error === "no_key"
+                        ? "You need a key. The marshal hands one out daily."
+                        // ⚠️ AND A DEAD CONNECTION SAYS SO, rather than the card sitting there doing
+                        // nothing. This was the silent case: the key may well be spent, so the honest
+                        // message is to check rather than to promise either way.
+                        : j?.offline
+                            ? "Could not reach the Coliseum — check your connection and open the marshal again."
+                            : (j?.error || "Could not start."),
+                });
             }
         } finally {
             setBusy(false);
@@ -86,8 +118,35 @@ export function useColiseum({ onChanged, onResult } = {}) {
     const finish = useCallback(async ({ wavesCleared, cleared }) => {
         if (settledRef.current || !run) return;
         settledRef.current = true;
-        const j = await post({ action: "settle", map: run.map, wavesCleared, cleared });
+
+        // ── ⚠️ RETRIED, AND SAFE TO RETRY ──────────────────────────────────────────────────────────
+        // A settle that lost its request used to end the member's evening: the run stayed live for
+        // ever because setRun(null) was below an await that never resolved, settledRef was already
+        // true so nothing could settle it again, and `busy || run` left the marshal disabled until
+        // the page was reloaded. The key was spent and the chests never arrived.
+        //
+        // Three attempts, backing off, because the usual cause is a few seconds of bad signal.
+        // settleRun claims the run's ordinal in its own UPDATE, so a request that actually landed
+        // before the connection dropped is recognised on the retry and does not pay twice.
+        let j = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            j = await post({ action: "settle", map: run.map, wavesCleared, cleared, run: run.run || 0 });
+            if (j?.ok || !j?.offline) break;
+            await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        }
+
+        // ⚠️ UNCONDITIONALLY, AND BEFORE ANYTHING ELSE CAN THROW. Whatever happened on the wire, the
+        // member is not left standing in an arena they cannot leave.
         setRun(null);
+        if (!j?.ok) {
+            onResult?.({
+                error: j?.offline
+                    ? "Your run could not be saved — the connection dropped. Nothing was taken from your record."
+                    : (j?.error || "Could not settle the run."),
+            });
+            onChanged?.();
+            return;
+        }
         if (j?.ok) {
             // ⚠️ THE CHEST COUNT RIDES ALONG, because the card has to say something TRUE about them.
             // Played for real on 2026-11-12 the card read "The chests you earned are on the sand" after a

@@ -72,6 +72,9 @@ export async function POST(request) {
                     map,
                     wavesCleared: Number(body?.wavesCleared) || 0,
                     cleared: Boolean(body?.cleared),
+                    // ⚠️ WHICH RUN THIS IS. The client retries a settle that failed on the wire, and
+                    // settleRun pays chests per call -- the ordinal is what makes the repeat a no-op.
+                    run: Number(body?.run) || 0,
                 });
                 return noStore(r);
             }

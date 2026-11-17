@@ -1,0 +1,14 @@
+-- ── A COLISEUM RUN CAN ONLY BE SETTLED ONCE, SO SETTLING CAN BE RETRIED ──────────────────────────────────────
+-- Members were losing keys and rewards to a network blip. useColiseum's settle had no catch around its fetch,
+-- so a rejected request left the run live forever with settledRef already true: the key was spent, nothing
+-- could settle it, and the marshal stayed disabled until the page was reloaded.
+--
+--   Anamarisa, 2026-11-16: "it took my coin but didnt let me play"
+--   Mama G,    2026-11-16: "have to close out and reopen the site to get out"
+--   WyldStallyn, 2026-11-17: "I have also lost 2 coins and all rewards in the grove due to freezing"
+--
+-- ⚠️ THE OBVIOUS FIX -- RETRY THE SETTLE -- WAS UNSAFE, which is why this column exists. settleRun INSERTs a
+-- chest row per tier and increments `clears` every time it is called, so a retry over a request that actually
+-- landed would pay the chests twice. `runs` already counts runs started; recording which run number was last
+-- settled makes a repeat a no-op that returns the same answer, and makes the retry safe to add.
+ALTER TABLE mkt_grove_coliseum ADD COLUMN IF NOT EXISTS settled_run int NOT NULL DEFAULT 0;

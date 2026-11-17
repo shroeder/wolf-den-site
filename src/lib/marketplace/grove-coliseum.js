@@ -30,13 +30,17 @@ const centralDay = (d = new Date()) =>
  * shape as the casino stake.
  */
 export async function startRun(buyerId, mapN) {
+    // ⚠️ `runs` COMES BACK, AND IT IS THE RUN'S NAME. The settle is retried on a network failure now
+    // (members were losing keys to a dropped request), and settleRun pays chests every time it is
+    // called — so a retry has to be able to say WHICH run it is settling. The counter this already
+    // kept is that identity; nothing new had to be minted.
     const row = await db.queryOne(
         `UPDATE mkt_grove_coliseum SET keys = keys - 1, runs = runs + 1, updated_at = NOW()
-          WHERE buyer_id = $1 AND map_n = $2 AND keys >= 1 RETURNING keys`,
+          WHERE buyer_id = $1 AND map_n = $2 AND keys >= 1 RETURNING keys, runs`,
         [buyerId, Number(mapN)],
     ).catch(() => null);
     if (!row) return { ok: false, error: "no_key" };
-    return { ok: true, keys: Number(row.keys) || 0, plan: runPlan(mapN) };
+    return { ok: true, keys: Number(row.keys) || 0, run: Number(row.runs) || 0, plan: runPlan(mapN) };
 }
 
 /**
@@ -45,18 +49,49 @@ export async function startRun(buyerId, mapN) {
  * The kills themselves are settled by the ordinary Grove path — same loot, same multi-kill, same zone
  * progress — so nothing about drops happens here. This is the frame only.
  */
-export async function settleRun(buyerId, { map, wavesCleared, cleared }) {
+export async function settleRun(buyerId, { map, wavesCleared, cleared, run = 0 }) {
     const m = Number(map) || 1;
     const total = wavesFor(m).length;
     const got = Math.max(0, Math.min(total, Number(wavesCleared) || 0));
     const won = Boolean(cleared) && got >= total;
 
-    await db.query(
-        `UPDATE mkt_grove_coliseum
-            SET best_wave = GREATEST(best_wave, $3), clears = clears + $4, updated_at = NOW()
-          WHERE buyer_id = $1 AND map_n = $2`,
-        [buyerId, m, got, won ? 1 : 0],
-    ).catch(() => {});
+    // ── ⚠️ ONCE PER RUN, AND THE GUARD IS THE WRITE ITSELF ──────────────────────────────────────
+    // The client retries this now, because losing it to a dropped request cost members their key AND
+    // their chests. But every call below INSERTs a chest per tier and adds to `clears`, so "just retry
+    // it" would have paid a successful run twice.
+    //
+    // The run's ordinal is claimed in the same UPDATE that records the result: `settled_run < $5` can
+    // only be true once, and the row is locked for the duration of the statement — so two settles in
+    // flight at the same instant cannot both win it. A repeat updates nothing, and falls through to
+    // return the same answer it returned the first time rather than an error, because to the caller a
+    // settle that already happened is a settle that succeeded.
+    //
+    // ⚠️ run=0 MEANS A CLIENT THAT DID NOT SEND ONE, and it still settles. An older tab mid-run when
+    // this shipped has no ordinal to send, and refusing it would strand exactly the people this is
+    // meant to protect. They keep the old at-least-once behaviour; everyone else gets exactly-once.
+    const claimed = run > 0
+        ? await db.queryOne(
+            `UPDATE mkt_grove_coliseum
+                SET best_wave = GREATEST(best_wave, $3), clears = clears + $4,
+                    settled_run = $5, updated_at = NOW()
+              WHERE buyer_id = $1 AND map_n = $2 AND settled_run < $5
+              RETURNING 1 AS ok`,
+            [buyerId, m, got, won ? 1 : 0, run],
+        ).catch(() => null)
+        : await db.queryOne(
+            `UPDATE mkt_grove_coliseum
+                SET best_wave = GREATEST(best_wave, $3), clears = clears + $4, updated_at = NOW()
+              WHERE buyer_id = $1 AND map_n = $2 RETURNING 1 AS ok`,
+            [buyerId, m, got, won ? 1 : 0],
+        ).catch(() => null);
+
+    if (run > 0 && !claimed) {
+        // Already settled. Say what it paid, and say it was not paid again.
+        return {
+            ok: true, alreadySettled: true,
+            wavesCleared: got, totalWaves: total, cleared: won, chests: [],
+        };
+    }
 
     const tiers = chestsFor({ map: m, wavesCleared: got, totalWaves: total, cleared: won });
     for (const tier of tiers) {
