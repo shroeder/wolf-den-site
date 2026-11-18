@@ -3874,7 +3874,17 @@ export default function GroveScene({
             // restarted with a fresh `last`, which fixed dt and left every absolute deadline in the past —
             // so coming back to a backgrounded Grove fired the whole respawn and every pending timer on
             // one frame. It goes through the same accumulator now.
-            else if (!raf) { if (!w.pauseAt) w.pauseAt = performance.now(); raf = requestAnimationFrame(step); }
+            else if (!raf) {
+                if (!w.pauseAt) w.pauseAt = performance.now();
+                // ⚠️ AND THE HEARTBEAT IS RESET BEFORE THE LOOP RESTARTS, or the watchdog reports the
+                // time the TAB was away as a freeze. rAF does not run in a hidden tab, so beatAt is
+                // stale by however long the member was on another app -- and the first thing they get
+                // back is a "scene loop silent for 9852ms" on the owner's phone for a game that was
+                // working perfectly. Both remaining stall reports on 2026-11-17 were exactly this:
+                // paused true, worst frame 31ms and 50ms, nothing wrong at all.
+                w.beatAt = performance.now();
+                raf = requestAnimationFrame(step);
+            }
         };
         document.addEventListener("visibilitychange", onVis);
         document.addEventListener("resume", woke);
