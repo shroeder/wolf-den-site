@@ -1,5 +1,6 @@
 import ConsumablesClient from "@/components/ConsumablesClient";
 import EquipmentClient from "@/components/EquipmentClient";
+import ScrollTopOnLoad from "@/components/ScrollTopOnLoad";
 import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
@@ -51,6 +52,7 @@ export default async function InventoryPage() {
 
     return (
         <div className="stack reveal">
+            <ScrollTopOnLoad />
             <ViewPing event="view_inventory" />
             {/* Consumables FIRST. They sat below the whole equipment screen — a long scroll on a phone — so
                 members were sitting on potions, treats and relics without knowing it. An item you own and never
