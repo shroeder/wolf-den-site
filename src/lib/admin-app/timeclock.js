@@ -163,6 +163,11 @@ export async function clockStatus() {
         clockedIn: Boolean(open),
         shiftId: open?.id || null,
         startedAt: open?.start_at || null,
+        // ⚠️ THE SCREEN CANNOT GUESS WHICH BUTTON TO SHOW. A break that is running is one with no end on
+        // it; without this the app would have to offer both "break" and "back" and hope.
+        onBreak: Boolean((open?.breaks || []).find((b) => !b.end_at)),
+        breakStartedAt: (open?.breaks || []).find((b) => !b.end_at)?.start_at || null,
+        breaksToday: (open?.breaks || []).length,
         minutesToday: mins,
         store: win,
     };
@@ -211,4 +216,90 @@ export async function clockOut() {
     const shift = r.json?.shift;
     const mins = shift?.start_at && shift?.end_at ? Math.round((new Date(shift.end_at) - new Date(shift.start_at)) / 60000) : null;
     return { ok: true, shiftId: shift?.id || null, minutes: mins };
+}
+
+// ── GOING ON BREAK, AND COMING BACK ─────────────────────────────────────────────────────────────────────────
+// Luke: "the break event on admin and employee."
+//
+// ⚠️ EVERYTHING EXCEPT THE BUTTON ALREADY EXISTED, which is why this is small. Square's shift object carries
+// a `breaks` array, the account already has a break type configured — "Meal break", 30 minutes, unpaid,
+// mandatory — and breakeven.js has subtracted unpaid breaks from paid hours since it was written:
+//
+//     for (const br of s?.breaks || []) if (br?.is_paid === false) hrs -= ...
+//
+// So the wage figure on the Today screen gets this right the moment a break can be recorded at all. Nothing
+// downstream needed changing; there was simply no way to start one.
+//
+// ⚠️ THE BREAK TYPE IS READ, NOT HARDCODED. Its id is per-location and per-account, and an id pasted into
+// source is the thing that works until the day somebody edits the break in Square. Unpaid is preferred
+// because that is the one that changes what the shop pays; if only paid types exist, the first is used and
+// the hours simply stay whole.
+async function mealBreakType(locationId) {
+    const r = await sq("/v2/labor/break-types").catch(() => null);
+    const all = (r?.json?.break_types || []).filter((b) => !locationId || b.location_id === locationId);
+    if (!all.length) return null;
+    return all.find((b) => b.is_paid === false) || all[0];
+}
+
+/** The break still running on a shift, if any. Square marks it by the absence of an end. */
+const openBreakOf = (shift) => (shift?.breaks || []).find((b) => !b.end_at) || null;
+
+// ⚠️ SQUARE WANTS THE WHOLE SHIFT BACK ON EVERY UPDATE, so both of these read the open shift, change one
+// thing, and send all of it — the same shape clockOut uses. Sending a partial shift silently drops whatever
+// was left out, which for a break would mean clocking somebody out by accident.
+async function putShift(open, breaks) {
+    return sq(`/v2/labor/shifts/${open.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+            shift: {
+                location_id: open.location_id,
+                team_member_id: open.team_member_id,
+                start_at: open.start_at,
+                ...(open.end_at ? { end_at: open.end_at } : {}),
+                ...(open.wage ? { wage: open.wage } : {}),
+                breaks,
+                version: open.version,
+            },
+        }),
+    }).catch(() => null);
+}
+
+export async function breakStart() {
+    const member = await resolveTeamMember();
+    if (!member.id) return { ok: false, error: "no_team_member" };
+    const open = await openShift(member.id).catch(() => null);
+    if (!open) return { ok: false, error: "not_clocked_in" };
+    if (openBreakOf(open)) return { ok: false, error: "already_on_break" };
+
+    const type = await mealBreakType(open.location_id);
+    if (!type) return { ok: false, error: "no_break_type" };
+
+    const breaks = [...(open.breaks || []), {
+        break_type_id: type.id,
+        name: type.break_name || "Break",
+        expected_duration: type.expected_duration || "PT30M",
+        is_paid: type.is_paid === true,
+        start_at: new Date().toISOString(),
+    }];
+    const r = await putShift(open, breaks);
+    if (!r?.ok) return { ok: false, error: "square_failed", status: r?.status, detail: r?.json?.errors?.[0]?.detail || null };
+    return { ok: true, onBreak: true, paid: type.is_paid === true, name: type.break_name || "Break" };
+}
+
+export async function breakEnd() {
+    const member = await resolveTeamMember();
+    if (!member.id) return { ok: false, error: "no_team_member" };
+    const open = await openShift(member.id).catch(() => null);
+    if (!open) return { ok: false, error: "not_clocked_in" };
+    const running = openBreakOf(open);
+    if (!running) return { ok: false, error: "not_on_break" };
+
+    const now = new Date().toISOString();
+    const breaks = (open.breaks || []).map((b) => (b === running || (!b.end_at && b.start_at === running.start_at)
+        ? { ...b, end_at: now }
+        : b));
+    const r = await putShift(open, breaks);
+    if (!r?.ok) return { ok: false, error: "square_failed", status: r?.status, detail: r?.json?.errors?.[0]?.detail || null };
+    const mins = Math.round((new Date(now) - new Date(running.start_at)) / 60000);
+    return { ok: true, onBreak: false, minutes: mins, paid: running.is_paid === true };
 }
