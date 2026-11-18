@@ -55,7 +55,34 @@ const ok = await waitFor(`/gear|equip|inventory|loadout/i.test(document.body.inn
 if (!ok) { console.log("✗ the gear page never rendered — is the session good?"); try { chrome.kill(); } catch {} process.exit(2); }
 await sleep(4000);
 
+// ── ⚠️ DISMISS THE DAILY CARD, OR THE WHOLE MEASUREMENT IS OF A MODAL ───────────────────────────────
+// "Welcome back! Day 9" lands on arrival for any returning member and it takes a scroll lock with it, so
+// the page measures exactly one viewport tall and scrollY can only ever be 0. The first verification run
+// after the fix reported a clean pass against that — a page it had never managed to look at.
+const dismiss = async () => {
+    for (let k = 0; k < 6; k += 1) {
+        const hit = await ev(`(() => {
+            const el = document.querySelector("[aria-label='Close'], [aria-label='close'], .gv-pop-x, .modal-x");
+            if (!el) return false;
+            el.click();
+            return true;
+        })()`);
+        if (!hit) break;
+        await sleep(600);
+    }
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await sleep(1200);
+};
+await dismiss();
+
 const first = await metrics();
+// ⚠️ AND IT REFUSES TO JUDGE A PAGE THAT NEVER GREW. One viewport tall means the content is not there.
+if (first.h <= first.vh + 50) {
+    console.log(`✗ the page is only ${first.h}px tall — content never rendered, nothing below means anything.`);
+    try { chrome.kill(); } catch { /* gone */ }
+    process.exit(2);
+}
 console.log(`  fresh load        y=${first.y}  page height ${first.h}`);
 
 // ⚠️ A RELOAD, NOT A SECOND NAVIGATE. Page.reload is what the member's refresh button does; a fresh
@@ -71,6 +98,7 @@ await sleep(700);
 await send("Page.reload", { ignoreCache: false });
 await waitFor(`/gear|equip|inventory|loadout/i.test(document.body.innerText || "")`, 120);
 await sleep(4000);
+await dismiss();
 
 const after = await metrics();
 const atBottom = after.h - (after.y + after.vh) < 80;
