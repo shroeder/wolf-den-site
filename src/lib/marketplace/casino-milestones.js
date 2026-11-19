@@ -51,12 +51,42 @@ export const STAT_EVERY = {
 // five to twelve members on the first day and left the rung with nothing to say afterwards.
 //
 // Each one carries a casinoPerk, so this is also the order in which the floor gets kinder to you.
+//
+// ── ⚠️ AND FOUR OF THEM HAD FALLEN OFF THE FLOOR ENTIRELY ────────────────────────────────────────────────
+// The rework replaced the Counter's original five with a new five, and four pets went out of the game in the
+// swap: the Tallyman, the Gilded Magpie, the Croupier's Cat and the Night Auditor. Nothing removed them —
+// they still have collectible rows, sprites, casinoPerks, ascension effects and cards in the kit, and seven
+// members hold one from the days when they were 50,000 chips at the Counter. They simply had no source any
+// more, which is worse than being removed: the game still shows them to you and offers no way to get one.
+//
+// They go back on the ladder BETWEEN the rungs that replaced them, every 25,000 — Eric, 2026-11-18: "just
+// mixing them in using like 25,000 increments in between the already existing pets." The interleave is by
+// rarity, so the band still climbs: rare, epic, epic, legendary, legendary, legendary, mythic, mythic.
+//
+// ⚠️ THIS CHANGES NO MACHINE'S ODDS, and that is worth stating because it looks like it must. MAX_PERKS in
+// casino.js is built from every pet carrying a casinoPerk, obtainable or not — so the four were ALREADY in
+// the worst case the paytables are budgeted against. Making them reachable does not raise the ceiling, it
+// just means somebody can finally stand at it. Measured with all of them owned: slot5 90.00% -> 94.08%,
+// against an RTP_CEILING of 95%.
+//
+// ── ⚠️ AND THE IVORY ADDER CAME OFF, BECAUSE IT WAS NEVER THE CASINO'S TO GIVE ───────────────────────────
+// It sat at 200,000 as one of the replacement five and it is a CARD pet: `source: "cards"`, cardLevel 15,
+// no casinoExclusive, no casinoPerk. cards-kit.js says of its four "exclusive to this game and reachable
+// nowhere else, which is the whole point of them" — and this rung was the nowhere else. It also broke the
+// line directly above this block, because a rung carrying no casinoPerk cannot make the floor kinder.
+//
+// Taking it off restores the card game's exclusive and does not strand it: CARDS_PUBLIC has been true since
+// 2026-09-11, so rank 15 is a live source. The fifteen members who already claimed it off this ladder keep
+// it — entitlements are a floor and the claim path grants, never revokes. [[declared-but-never-read]]
 export const PET_AT = {
     copper_paw: 50000,
+    tallyman: 75000,
     brass_magpie: 100000,
+    gilded_magpie: 125000,
     jade_tortoise: 150000,
-    ivory_adder: 200000,
-    onyx_hare: 250000,
+    croupiers_cat: 175000,
+    night_auditor: 200000,
+    onyx_hare: 225000,
 };
 
 // Sable's three, behind the rope. Higher than the Counter's five because the rope is the point of them.

@@ -226,9 +226,16 @@ export const counterItem = (id) => COUNTER_STORE.find((i) => i.id === id)
 // discount cannot do that: it moves what chips BUY, which is a number priced by hand in this file and nowhere
 // else. The worst case is that chests get cheaper, which is a thing anybody can see and reverse in one line.
 //
-// SMALL, AND CAPPED HARD. Owning all five casino pets and all nine casino badges is a very long road and it
+// SMALL, AND CAPPED HARD. Owning every casino pet and all nine casino badges is a very long road and it
 // comes to 15% off — about a rung and a half down the chest ladder. Big enough to be worth having, nowhere
 // near big enough to be the reason to chase them.
+//
+// ⚠️ THE CAP IS WHAT HOLDS THIS, NOT THE ARITHMETIC — and as of 2026-11-18 it is doing real work rather than
+// sitting exactly on the sum. casinoTrophies counts every `casinoExclusive` pet, and restoring the Tallyman,
+// the Gilded Magpie, the Croupier's Cat and the Night Auditor to the ladder took the obtainable set from
+// seven to eleven: 11 x 1.5% + 9 x 0.5% = 21%, clamped to 15%. The most anybody can get is unchanged, which
+// is the point of clamping rather than re-pricing; what changed is that the cap can now be reached without
+// the complete set. If that road should be long again, move DISCOUNT_PER_PET, not the cap.
 export const DISCOUNT_PER_PET = 0.015;
 export const DISCOUNT_PER_BADGE = 0.005;
 export const DISCOUNT_MAX = 0.15;
