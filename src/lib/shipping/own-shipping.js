@@ -80,7 +80,10 @@ export const DEFAULT_SHIPPING_SERVICE = "ground";
 // (1,728 in³) by its SIZE: the large box rates as ~26 lb whatever is in it. Makayla Clouse's 7.3 lb order cost
 // $52.83 in the large box against $25 collected; the same parcel quotes $11.12 in the 15 x 12 x 10.
 export const SHIPPING_BOXES = [
-    { id: "medium", name: "Small box · 15 × 12 × 10 in", length: 15, width: 12, height: 10 },
+    // 12 x 12 x 12 is exactly 1,728 in³ — the largest box USPS still bills by real weight. Makayla's order
+    // quoted $7.14 in it. Ordered 2026-11-20; the default from here on.
+    { id: "cube12", name: "12 × 12 × 12 in box", length: 12, width: 12, height: 12 },
+    { id: "medium", name: "15 × 12 × 10 in box", length: 15, width: 12, height: 10 },
     { id: "large", name: "Large box · 18 × 14.5 × 12.5 in (costly: billed ~26 lb)", length: 18, width: 14.5, height: 12.5 },
 ];
 
