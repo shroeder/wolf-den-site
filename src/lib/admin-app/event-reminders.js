@@ -35,6 +35,19 @@ export const STORE_EVENTS = [
         body: "The Friday Magic event kicks off at 4:00 — get it going.",
         channels: ["employee"],
     },
+    // A ONE-OFF: `date` (the shop's YYYY-MM-DD) limits it to that single day. Luke, 2026-11-20: "Add a reminder
+    // in the admin and employee app to start a one-piece event at 2:45 p.m. on this Saturday." Fires at 2:45
+    // because /api/jobs/event-reminders runs at :15 and :45 as well as the half-hourly timeclock job.
+    {
+        id: "one_piece_2026_11_21",
+        date: "2026-11-21",
+        day: 6,
+        hour: 14,
+        minute: 45,
+        title: "Time to start One Piece",
+        body: "The One Piece event starts at 2:45 — get it going.",
+        channels: ["full", "employee"],
+    },
 ];
 
 async function loadState() {
@@ -83,6 +96,7 @@ export async function runEventReminders({ dryRun = false, now = new Date() } = {
 
     for (const ev of STORE_EVENTS) {
         if (ev.day !== cn.day) continue;
+        if (ev.date && ev.date !== today) continue; // a one-off only fires on its own date
         const at = ev.hour * 60 + ev.minute;
         if (cn.mins < at || cn.mins >= at + GRACE_MIN) continue; // not yet, or too late to be useful
         out.due.push(ev.id);

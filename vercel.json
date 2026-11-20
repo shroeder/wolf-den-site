@@ -129,6 +129,10 @@
             "schedule": "5 * * * *"
         },
         {
+            "path": "/api/jobs/event-reminders",
+            "schedule": "15,45 * * * *"
+        },
+        {
             "path": "/api/jobs/cash-refunds",
             "schedule": "20 */4 * * *"
         },
