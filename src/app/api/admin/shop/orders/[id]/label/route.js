@@ -134,6 +134,19 @@ export async function POST(request, { params }) {
             // rate bought is the USPS service the buyer paid for; an order from before services existed is
             // Ground. A shipment that already exists is reused, never replaced — it may carry postage.
             const body = await request.json().catch(() => ({}));
+            // ⚠️ A SHIPMENT FROM A FAILED ATTEMPT MUST NOT PIN THE OLD WEIGHT. If an earlier tap created the
+            // shipment and the buy then failed, reusing it silently bought postage on that attempt's weight
+            // and box, ignoring what staff just typed. An unbought shipment costs nothing, so when a new
+            // weight or box arrives and the old one has no postage on it, a fresh one is made. One that DOES
+            // have postage is still recovered below rather than bought twice.
+            const sentParcel = Number(body?.weightOz) > 0 || Boolean(body?.boxId);
+            if (sentParcel && order.easypost_shipment_id) {
+                const existing = await getShipment(order.easypost_shipment_id).catch(() => null);
+                if (existing && !existing.labelUrl) {
+                    order.easypost_shipment_id = null;
+                    order.easypost_rate_id = null;
+                }
+            }
             if (!order.easypost_shipment_id || !order.easypost_rate_id) {
                 // The scale reading and the shop box staff picked; the estimate for anything not given.
                 const estimate = buildParcel(order.items_json || []);

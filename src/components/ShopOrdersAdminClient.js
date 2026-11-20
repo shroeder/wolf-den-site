@@ -200,7 +200,7 @@ function OrderCard({ order: o, onUpdate }) {
                                 </a>
                             ) : (
                                 <>
-                                    {!o.hasShipment ? (
+                                    {true ? (
                                         <input
                                             type="number"
                                             min="0"
@@ -212,7 +212,7 @@ function OrderCard({ order: o, onUpdate }) {
                                             onChange={(e) => setWeightKg(e.target.value)}
                                         />
                                     ) : null}
-                                    {!o.hasShipment && boxes.length ? (
+                                    {boxes.length ? (
                                         <ThemedSelect
                                             value={boxId}
                                             onChange={setBoxId}
