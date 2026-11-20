@@ -75,8 +75,13 @@ export const DEFAULT_SHIPPING_SERVICE = "ground";
 // Luke, 2026-11-20: "We effectively just have two different sizes of boxes... we just need to select from a
 // drop down." Staff pick one at the scale; its size goes to EasyPost with the weight they read. Add the
 // second box here when it arrives — the app and the admin page both list whatever is in this array.
+//
+// ⚠️ THE FIRST BOX IS THE DEFAULT, AND IT HAS TO BE THE SMALL ONE. USPS bills anything over 1 cubic foot
+// (1,728 in³) by its SIZE: the large box rates as ~26 lb whatever is in it. Makayla Clouse's 7.3 lb order cost
+// $52.83 in the large box against $25 collected; the same parcel quotes $11.12 in the 15 x 12 x 10.
 export const SHIPPING_BOXES = [
-    { id: "large", name: "Large box · 18 × 14.5 × 12.5 in", length: 18, width: 14.5, height: 12.5 },
+    { id: "medium", name: "Small box · 15 × 12 × 10 in", length: 15, width: 12, height: 10 },
+    { id: "large", name: "Large box · 18 × 14.5 × 12.5 in (costly: billed ~26 lb)", length: 18, width: 14.5, height: 12.5 },
 ];
 
 export function shippingBoxFor(id) {
