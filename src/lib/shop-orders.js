@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { estimateParcelWeightOz } from "@/lib/shipping/easypost";
+import { buildParcel } from "@/lib/shipping/easypost";
 import { shippingServiceByEasyPostName, shippingServiceFor } from "@/lib/shipping/own-shipping";
 
 function parseItemsJson(itemsJson) {
@@ -34,7 +34,9 @@ export function serializeShopOrderForAdmin(o) {
         // Any shipped order can have its label bought now: the shipment is created at the scale if checkout
         // did not make one. The estimate prefills the weight box; the service is what the buyer paid for.
         canBuyLabel: o.fulfillment_mode === "shipping",
-        estimatedWeightOz: o.fulfillment_mode === "shipping" ? estimateParcelWeightOz(parseItemsJson(o.items_json)) : null,
+        // The estimate staff overwrite with the scale and tape measure: { weight (oz), length, width, height (in) }.
+        estimatedParcel: o.fulfillment_mode === "shipping" ? buildParcel(parseItemsJson(o.items_json)) : null,
+        estimatedWeightOz: o.fulfillment_mode === "shipping" ? buildParcel(parseItemsJson(o.items_json)).weight : null,
         paidServiceName: o.fulfillment_mode === "shipping"
             ? (shippingServiceByEasyPostName(o.shipping_service) || (o.easypost_rate_id ? null : shippingServiceFor(null)))?.name || null
             : null,

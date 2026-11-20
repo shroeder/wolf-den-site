@@ -89,6 +89,11 @@ function OrderCard({ order: o, onUpdate }) {
     const [labelBusy, setLabelBusy] = useState(false);
     // Weight off the scale, in ounces. Prefilled with the estimate; EasyPost bills on what is declared.
     const [weightOz, setWeightOz] = useState(o.estimatedWeightOz ? String(o.estimatedWeightOz) : "");
+    // Tape-measure dimensions in inches, prefilled with the estimated box.
+    const est = o.estimatedParcel || {};
+    const [dims, setDims] = useState({
+        l: est.length ? String(est.length) : "", w: est.width ? String(est.width) : "", h: est.height ? String(est.height) : "",
+    });
     const [labelError, setLabelError] = useState("");
     // What we last emailed the customer about, so a status tap visibly reaches them.
     const [notified, setNotified] = useState("");
@@ -110,7 +115,12 @@ function OrderCard({ order: o, onUpdate }) {
             const res = await fetch(`/api/admin/shop/orders/${o.id}/label`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ weightOz: Number(weightOz) || null }),
+                body: JSON.stringify({
+                    weightOz: Number(weightOz) || null,
+                    lengthIn: Number(dims.l) || null,
+                    widthIn: Number(dims.w) || null,
+                    heightIn: Number(dims.h) || null,
+                }),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -203,6 +213,19 @@ function OrderCard({ order: o, onUpdate }) {
                                             onChange={(e) => setWeightOz(e.target.value)}
                                         />
                                     ) : null}
+                                    {!o.hasShipment ? ["l", "w", "h"].map((k) => (
+                                        <input
+                                            key={k}
+                                            type="number"
+                                            min="1"
+                                            step="0.5"
+                                            style={{ width: 70 }}
+                                            placeholder={`${k.toUpperCase()} in`}
+                                            title={{ l: "Length", w: "Width", h: "Height" }[k] + " in inches"}
+                                            value={dims[k]}
+                                            onChange={(e) => setDims((d) => ({ ...d, [k]: e.target.value }))}
+                                        />
+                                    )) : null}
                                     <button type="button" className="button primary" disabled={labelBusy} onClick={buyLabel}>
                                         {labelBusy ? "Buying…" : `Buy label${o.paidServiceName ? ` · ${o.paidServiceName}` : ""}`}
                                     </button>

@@ -135,11 +135,18 @@ export async function POST(request, { params }) {
             // Ground. A shipment that already exists is reused, never replaced — it may carry postage.
             const body = await request.json().catch(() => ({}));
             if (!order.easypost_shipment_id || !order.easypost_rate_id) {
-                const weighed = Math.round(Number(body?.weightOz));
+                // Scale and tape measure, when staff typed them; the estimate for anything left blank.
                 const estimate = buildParcel(order.items_json || []);
-                const parcel = Number.isFinite(weighed) && weighed > 0
-                    ? { ...estimate, weight: Math.min(1120, weighed) }
-                    : estimate;
+                const measured = (v, max) => {
+                    const n = Number(v);
+                    return Number.isFinite(n) && n > 0 ? Math.min(max, Math.round(n * 10) / 10) : null;
+                };
+                const parcel = {
+                    weight: measured(body?.weightOz, 1120) ?? estimate.weight,
+                    length: measured(body?.lengthIn, 108) ?? estimate.length,
+                    width: measured(body?.widthIn, 108) ?? estimate.width,
+                    height: measured(body?.heightIn, 108) ?? estimate.height,
+                };
                 const quoted = await getShippingRates({
                     toAddress: {
                         name: order.shipping_name,
