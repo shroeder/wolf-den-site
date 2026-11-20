@@ -89,7 +89,8 @@ function OrderCard({ order: o, onUpdate }) {
     const [labelUrl, setLabelUrl] = useState(o.shippingLabelUrl || "");
     const [labelBusy, setLabelBusy] = useState(false);
     // Weight off the scale, in ounces. Prefilled with the estimate; EasyPost bills on what is declared.
-    const [weightOz, setWeightOz] = useState(o.estimatedWeightOz ? String(o.estimatedWeightOz) : "");
+    // The shop scale reads kilograms; EasyPost wants ounces (1 kg = 35.274 oz).
+    const [weightKg, setWeightKg] = useState(o.estimatedWeightOz ? (o.estimatedWeightOz / 35.274).toFixed(2) : "");
     // Which shop box it went in; its size goes to EasyPost with the weight.
     const boxes = Array.isArray(o.shippingBoxes) ? o.shippingBoxes : [];
     const [boxId, setBoxId] = useState(boxes[0]?.id || "");
@@ -115,7 +116,7 @@ function OrderCard({ order: o, onUpdate }) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    weightOz: Number(weightOz) || null,
+                    weightOz: Number(weightKg) > 0 ? Math.round(Number(weightKg) * 35.274 * 10) / 10 : null,
                     boxId: boxId || null,
                 }),
             });
@@ -202,12 +203,13 @@ function OrderCard({ order: o, onUpdate }) {
                                     {!o.hasShipment ? (
                                         <input
                                             type="number"
-                                            min="1"
+                                            min="0"
+                                            step="0.01"
                                             style={{ width: 90 }}
-                                            placeholder="oz"
-                                            title="Parcel weight in ounces"
-                                            value={weightOz}
-                                            onChange={(e) => setWeightOz(e.target.value)}
+                                            placeholder="kg"
+                                            title="Parcel weight in kilograms"
+                                            value={weightKg}
+                                            onChange={(e) => setWeightKg(e.target.value)}
                                         />
                                     ) : null}
                                     {!o.hasShipment && boxes.length ? (
