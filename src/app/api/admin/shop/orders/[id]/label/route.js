@@ -71,6 +71,11 @@ export async function GET(request, { params }) {
                 trackingCode: shipment?.trackingCode || null,
                 rateStillOffered,
                 ratesOnOffer: shipment?.rateIds?.length ?? 0,
+                paidCents: shipment?.paidCents ?? null,
+                insuranceFeeCents: shipment?.insuranceFeeCents ?? 0,
+                parcel: shipment?.parcel || null,
+                refundStatus: shipment?.refundStatus || null,
+                chargedCustomerCents: Number(order.shipping_cents) || 0,
                 verdict: shipment?.labelUrl
                     ? "Postage ALREADY BOUGHT for this shipment. Pressing Buy will recover it rather than charge again."
                     : rateStillOffered

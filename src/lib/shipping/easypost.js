@@ -390,7 +390,27 @@ export async function getShipment(shipmentId) {
         status: shipment.status || null,
         // Every rate still on the shipment, so the caller can say whether the one we stored is still offered.
         rateIds: (shipment.rates || []).map((r) => r.id),
+        // What the bought label actually cost, and the parcel it was rated on — so the order card can show
+        // the price paid without anybody opening the EasyPost dashboard.
+        paidCents: shipment.postage_label && rate ? Math.round(Number(rate.rate || 0) * 100) : null,
+        insuranceFeeCents: (shipment.fees || []).filter((f) => f.type === "InsuranceFee")
+            .reduce((s, f) => s + Math.round(Number(f.amount || 0) * 100), 0),
+        parcel: shipment.parcel
+            ? { weightOz: shipment.parcel.weight, length: shipment.parcel.length, width: shipment.parcel.width, height: shipment.parcel.height }
+            : null,
+        refundStatus: shipment.refund_status || null,
     };
+}
+
+/**
+ * Ask EasyPost to refund (void) a bought, UNUSED label. USPS refunds labels that were never scanned; the
+ * money comes back to the EasyPost balance once USPS confirms, which can take days ("submitted" first).
+ */
+export async function refundShipment(shipmentId) {
+    if (!isEasyPostEnabled()) throw new Error("EasyPost is not configured.");
+    if (!shipmentId) throw new Error("Missing shipment id.");
+    const s = await easyPostFetch(`/shipments/${encodeURIComponent(shipmentId)}/refund`, { method: "POST" });
+    return { refundStatus: s?.refund_status || null };
 }
 
 /**
