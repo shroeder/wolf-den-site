@@ -139,12 +139,30 @@ export async function POST(request, { params }) {
             // rate bought is the USPS service the buyer paid for; an order from before services existed is
             // Ground. A shipment that already exists is reused, never replaced — it may carry postage.
             const body = await request.json().catch(() => ({}));
+
+            // ── ⚠️ NO LABEL WITHOUT A SCALE READING AND A BOX ─────────────────────────────────────────────
+            // Luke, 2026-11-20: "it shouldn't let us ship it unless we've weighed it and confirm the box size,
+            // because we're gonna forget to do that all the time." An estimate on the label is a USPS
+            // adjustment charge weeks later, or a $52.83 label on a $25 charge. Enforced here as well as in
+            // the apps, so an old app version cannot buy on a guess. A bought label being recovered is exempt.
+            const dimsGiven = [body?.lengthIn, body?.widthIn, body?.heightIn].every((v) => Number(v) > 0);
+            const hasPostage = order.easypost_shipment_id
+                ? Boolean((await getShipment(order.easypost_shipment_id).catch(() => null))?.labelUrl)
+                : false;
+            if (!hasPostage) {
+                if (!(Number(body?.weightOz) > 0)) {
+                    return NextResponse.json({ error: "Weigh the parcel and enter its weight before buying the label." }, { status: 400 });
+                }
+                if (!shippingBoxFor(String(body?.boxId || "")) && !dimsGiven) {
+                    return NextResponse.json({ error: "Pick the box (or enter its size) before buying the label." }, { status: 400 });
+                }
+            }
             // ⚠️ A SHIPMENT FROM A FAILED ATTEMPT MUST NOT PIN THE OLD WEIGHT. If an earlier tap created the
             // shipment and the buy then failed, reusing it silently bought postage on that attempt's weight
             // and box, ignoring what staff just typed. An unbought shipment costs nothing, so when a new
             // weight or box arrives and the old one has no postage on it, a fresh one is made. One that DOES
             // have postage is still recovered below rather than bought twice.
-            const sentParcel = Number(body?.weightOz) > 0 || Boolean(body?.boxId);
+            const sentParcel = Number(body?.weightOz) > 0 || Boolean(body?.boxId) || dimsGiven;
             if (sentParcel && order.easypost_shipment_id) {
                 const existing = await getShipment(order.easypost_shipment_id).catch(() => null);
                 if (existing && !existing.labelUrl) {
@@ -159,9 +177,10 @@ export async function POST(request, { params }) {
                 const weighed = Number(body?.weightOz);
                 const parcel = {
                     weight: Number.isFinite(weighed) && weighed > 0 ? Math.min(1120, Math.round(weighed * 10) / 10) : estimate.weight,
-                    length: box?.length ?? estimate.length,
-                    width: box?.width ?? estimate.width,
-                    height: box?.height ?? estimate.height,
+                    // A custom size (a box that is not one of ours) wins over the picker.
+                    length: (dimsGiven ? Number(body.lengthIn) : null) ?? box?.length ?? estimate.length,
+                    width: (dimsGiven ? Number(body.widthIn) : null) ?? box?.width ?? estimate.width,
+                    height: (dimsGiven ? Number(body.heightIn) : null) ?? box?.height ?? estimate.height,
                 };
                 const quoted = await getShippingRates({
                     toAddress: {

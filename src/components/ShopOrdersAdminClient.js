@@ -88,12 +88,15 @@ function OrderCard({ order: o, onUpdate }) {
     const [busy, setBusy] = useState(false);
     const [labelUrl, setLabelUrl] = useState(o.shippingLabelUrl || "");
     const [labelBusy, setLabelBusy] = useState(false);
-    // Weight off the scale, in ounces. Prefilled with the estimate; EasyPost bills on what is declared.
-    // The shop scale reads kilograms; EasyPost wants ounces (1 kg = 35.274 oz).
-    const [weightKg, setWeightKg] = useState(o.estimatedWeightOz ? (o.estimatedWeightOz / 35.274).toFixed(2) : "");
-    // Which shop box it went in; its size goes to EasyPost with the weight.
+    // Weight off the scale (kg; EasyPost wants ounces, 1 kg = 35.274 oz) and the box it went in. Both start
+    // EMPTY so a label cannot be bought on a guess — Luke: "it shouldn't let us ship it unless we've weighed it
+    // and confirm the box size." "custom" is a box that isn't one of ours.
+    const [weightKg, setWeightKg] = useState("");
     const boxes = Array.isArray(o.shippingBoxes) ? o.shippingBoxes : [];
-    const [boxId, setBoxId] = useState(boxes[0]?.id || "");
+    const [boxId, setBoxId] = useState("");
+    const [custom, setCustom] = useState({ l: "", w: "", h: "" });
+    const customOk = ["l", "w", "h"].every((k) => Number(custom[k]) > 0);
+    const readyToBuy = Number(weightKg) > 0 && (boxId === "custom" ? customOk : Boolean(boxId));
     const [labelError, setLabelError] = useState("");
     // What we last emailed the customer about, so a status tap visibly reaches them.
     const [notified, setNotified] = useState("");
@@ -117,7 +120,9 @@ function OrderCard({ order: o, onUpdate }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     weightOz: Number(weightKg) > 0 ? Math.round(Number(weightKg) * 35.274 * 10) / 10 : null,
-                    boxId: boxId || null,
+                    ...(boxId === "custom"
+                        ? { lengthIn: Number(custom.l), widthIn: Number(custom.w), heightIn: Number(custom.h) }
+                        : { boxId: boxId || null }),
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -216,12 +221,40 @@ function OrderCard({ order: o, onUpdate }) {
                                         <ThemedSelect
                                             value={boxId}
                                             onChange={setBoxId}
-                                            options={boxes.map((b) => ({ value: b.id, label: b.name }))}
+                                            options={[
+                                                { value: "", label: "Choose the box" },
+                                                ...boxes.map((b) => ({ value: b.id, label: b.name })),
+                                                { value: "custom", label: "Custom size…" },
+                                            ]}
                                             ariaLabel="Shipping box"
                                         />
                                     ) : null}
-                                    <button type="button" className="button primary" disabled={labelBusy} onClick={buyLabel}>
-                                        {labelBusy ? "Buying…" : `Buy label${o.paidServiceName ? ` · ${o.paidServiceName}` : ""}`}
+                                    {boxId === "custom" ? ["l", "w", "h"].map((k) => (
+                                        <input
+                                            key={k}
+                                            type="number"
+                                            min="0"
+                                            step="0.5"
+                                            style={{ width: 70 }}
+                                            placeholder={`${k.toUpperCase()} in`}
+                                            value={custom[k]}
+                                            onChange={(e) => setCustom((c) => ({ ...c, [k]: e.target.value }))}
+                                        />
+                                    )) : null}
+                                    {boxId === "custom" && customOk && Number(custom.l) * Number(custom.w) * Number(custom.h) > 1728 ? (
+                                        <span style={{ color: "#f7a6a6" }}>Over 1 cubic foot: USPS bills this box by size.</span>
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        className="button primary"
+                                        disabled={labelBusy || !readyToBuy}
+                                        onClick={buyLabel}
+                                    >
+                                        {labelBusy
+                                            ? "Buying…"
+                                            : !readyToBuy
+                                                ? "Weigh it and pick the box first"
+                                                : `Buy label${o.paidServiceName ? ` · ${o.paidServiceName}` : ""}`}
                                     </button>
                                 </>
                             )
