@@ -47,17 +47,55 @@ export const SHIPPING_BANDS = [
     { maxOz: Infinity, cents: 3500, label: "over 10 lb" },
 ];
 
+// ── THE BUYER PICKS A USPS SERVICE; THE SERVICE PICKS THE BAND ──────────────────────────────────────────────
+// Luke, 2026-11-20: "we stick with the flat rates, and allow them to select which usps service they want, and
+// depending on the service they select dictates their flat rate. The flat rate is a conservative estimate to
+// insulate ourselves from losing money in shipping. Then in the actual admin and employee app is where we
+// will interact with easypost."
+//
+// So the customer still never sees a live carrier quote (we do not know the real weight until it is on the
+// scale), but they DO choose the speed, and the label bought at ship time is bought for that service.
+// `easyPost` is EasyPost's service name for USPS; the label route matches the rate on it.
+//
+// ⚠️ EACH `cents` LIST LINES UP WITH SHIPPING_BANDS ABOVE, band for band. Ground is the original table. The
+// Priority and Express rows are seeded conservatively from USPS retail at the far zones — they are Luke's to
+// set, like the rest of this file.
+export const SHIPPING_SERVICES = [
+    { id: "ground", name: "USPS Ground Advantage", eta: "2–5 business days", easyPost: "GroundAdvantage",
+        cents: SHIPPING_BANDS.map((b) => b.cents) },
+    { id: "priority", name: "USPS Priority Mail", eta: "1–3 business days", easyPost: "Priority",
+        cents: [1500, 1800, 2700, 3500, 5000, 7500] },
+    { id: "express", name: "USPS Priority Mail Express", eta: "1–2 business days", easyPost: "Express",
+        cents: [5500, 6500, 8500, 10500, 13500, 18000] },
+];
+
+export const DEFAULT_SHIPPING_SERVICE = "ground";
+
+/** The service for an id; anything unknown is Ground, the one every order already priced against. */
+export function shippingServiceFor(id) {
+    return SHIPPING_SERVICES.find((s) => s.id === id) || SHIPPING_SERVICES[0];
+}
+
+/** Which service an order's stored `shipping_service` (the EasyPost name) refers to, or null. */
+export function shippingServiceByEasyPostName(name) {
+    const n = String(name || "").toLowerCase();
+    return SHIPPING_SERVICES.find((s) => s.easyPost.toLowerCase() === n) || null;
+}
+
 /**
- * The shipping charge for a parcel of `weightOz`.
+ * The shipping charge for a parcel of `weightOz` sent by `serviceId`.
  *
  * ⚠️ IT FAILS UPWARD. An unknown or nonsense weight takes the TOP band, not the bottom one — the failure that
  * has cost this shop money thirteen times is under-charging, so the direction a broken input falls has to be
  * the safe one. [[ladder-lookups-must-fail-upward]]
  */
-export function bandedShippingCents(weightOz) {
+export function bandedShippingCents(weightOz, serviceId = DEFAULT_SHIPPING_SERVICE) {
+    const prices = shippingServiceFor(serviceId).cents;
+    const top = prices[prices.length - 1];
     const oz = Number(weightOz);
-    if (!Number.isFinite(oz) || oz <= 0) return SHIPPING_BANDS[SHIPPING_BANDS.length - 1].cents;
-    return (SHIPPING_BANDS.find((band) => oz <= band.maxOz) || SHIPPING_BANDS[SHIPPING_BANDS.length - 1]).cents;
+    if (!Number.isFinite(oz) || oz <= 0) return top;
+    const i = SHIPPING_BANDS.findIndex((band) => oz <= band.maxOz);
+    return i < 0 ? top : (prices[i] ?? top);
 }
 
 // ── INSURANCE ───────────────────────────────────────────────────────────────────────────────────────────────

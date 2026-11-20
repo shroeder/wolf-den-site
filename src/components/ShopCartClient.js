@@ -250,6 +250,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // Live USPS rates (EasyPost). enabled:false => fall back to the flat shipping in cartData.
     const [shipRates, setShipRates] = useState({ enabled: false, options: [], shipmentId: null });
     const [selectedRateId, setSelectedRateId] = useState("");
+    // Our own flat-rate USPS services (OWN_SHIPPING). Only the id is ever sent; checkout reprices it.
+    const [shipServiceId, setShipServiceId] = useState("ground");
     // ── SHIPPING INSURANCE ──────────────────────────────────────────────────────────────────────────────
     // Luke: "ideally we would want the customer to elect to pay for insurance... probably if it's over a
     // certain amount, they should be required to insure it."
@@ -322,6 +324,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
     // When EasyPost returns live rates, the buyer must pick one and the totals use that rate.
     const selectedRate = shipRates.options.find((rate) => rate.id === selectedRateId) || null;
     const usingCalculatedShipping = shipRates.enabled && fulfillmentMode === "shipping" && !cartPickupOnly;
+    const shippingOptions = Array.isArray(cartData?.shippingOptions) ? cartData.shippingOptions : [];
+    const selectedService = shippingOptions.find((o) => o.id === shipServiceId) || shippingOptions[0] || null;
     // Be honest about shipping: don't show a flat number or "FREE" as if it were final before we've
     // actually priced it from the address. It's "pending" until either a live rate is picked, or (only
     // when EasyPost isn't returning rates at all) the server flat rate legitimately applies.
@@ -340,7 +344,9 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
         } else {
             // Address entered, rating finished, but no live rates came back — EasyPost unavailable, so
             // the server's flat rate is the real, applicable shipping (not a false "free").
-            displayShippingCents = cartData.shippingCents;
+            // With our own USPS services this is the ticked service's flat rate — the same table checkout
+            // recharges from, so the screen and the card agree.
+            displayShippingCents = selectedService ? selectedService.cents : cartData.shippingCents;
             shippingPending = false;
         }
     } else {
@@ -748,6 +754,8 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
                 }
                 checkoutPayload.shippingRateId = selectedRate.id;
                 checkoutPayload.easyPostShipmentId = shipRates.shipmentId;
+            } else if (selectedService) {
+                checkoutPayload.shippingService = selectedService.id;
             }
         }
 
@@ -1143,6 +1151,30 @@ export default function ShopCartClient({ paymentsEnabled, squareApplicationId, s
 
                                 {fulfillmentMode === "shipping" && !isShippingAddressReady ? (
                                     <p className="secondary">Still needed to calculate shipping: {missingAddressFields.join(", ")}.</p>
+                                ) : null}
+
+                                {fulfillmentMode === "shipping" && !cartPickupOnly && !usingCalculatedShipping && shippingOptions.length ? (
+                                    <div className="cart-shipping-rates">
+                                        <fieldset className="cart-rate-list">
+                                            <legend>Choose a USPS service</legend>
+                                            {shippingOptions.map((opt) => (
+                                                <label key={opt.id} className="cart-rate-option">
+                                                    <input
+                                                        type="radio"
+                                                        name="shipping-service"
+                                                        value={opt.id}
+                                                        checked={selectedService?.id === opt.id}
+                                                        onChange={() => setShipServiceId(opt.id)}
+                                                        disabled={checkoutBusy}
+                                                    />
+                                                    <span className="cart-rate-name">
+                                                        {opt.name}{opt.eta ? ` · ${opt.eta}` : ""}
+                                                    </span>
+                                                    <strong>{opt.cents ? formatMoney(opt.cents) : "FREE"}</strong>
+                                                </label>
+                                            ))}
+                                        </fieldset>
+                                    </div>
                                 ) : null}
 
                                 {fulfillmentMode === "shipping" && isShippingAddressReady ? (

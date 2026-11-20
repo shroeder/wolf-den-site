@@ -87,6 +87,8 @@ function OrderCard({ order: o, onUpdate }) {
     const [busy, setBusy] = useState(false);
     const [labelUrl, setLabelUrl] = useState(o.shippingLabelUrl || "");
     const [labelBusy, setLabelBusy] = useState(false);
+    // Weight off the scale, in ounces. Prefilled with the estimate; EasyPost bills on what is declared.
+    const [weightOz, setWeightOz] = useState(o.estimatedWeightOz ? String(o.estimatedWeightOz) : "");
     const [labelError, setLabelError] = useState("");
     // What we last emailed the customer about, so a status tap visibly reaches them.
     const [notified, setNotified] = useState("");
@@ -105,7 +107,11 @@ function OrderCard({ order: o, onUpdate }) {
         setLabelBusy(true);
         setLabelError("");
         try {
-            const res = await fetch(`/api/admin/shop/orders/${o.id}/label`, { method: "POST" });
+            const res = await fetch(`/api/admin/shop/orders/${o.id}/label`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ weightOz: Number(weightOz) || null }),
+            });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 setLabelError(data?.error || "Could not buy label.");
@@ -179,15 +185,28 @@ function OrderCard({ order: o, onUpdate }) {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 {!isPickup ? (
                     <>
-                        {o.hasShipment ? (
+                        {o.hasShipment || o.canBuyLabel ? (
                             labelUrl ? (
                                 <a className="button primary" href={labelUrl} target="_blank" rel="noreferrer">
                                     Print label →
                                 </a>
                             ) : (
-                                <button type="button" className="button primary" disabled={labelBusy} onClick={buyLabel}>
-                                    {labelBusy ? "Buying…" : "Buy label"}
-                                </button>
+                                <>
+                                    {!o.hasShipment ? (
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            style={{ width: 90 }}
+                                            placeholder="oz"
+                                            title="Parcel weight in ounces"
+                                            value={weightOz}
+                                            onChange={(e) => setWeightOz(e.target.value)}
+                                        />
+                                    ) : null}
+                                    <button type="button" className="button primary" disabled={labelBusy} onClick={buyLabel}>
+                                        {labelBusy ? "Buying…" : `Buy label${o.paidServiceName ? ` · ${o.paidServiceName}` : ""}`}
+                                    </button>
+                                </>
                             )
                         ) : null}
                         <input

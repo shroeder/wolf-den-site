@@ -1,7 +1,9 @@
 import "server-only";
 
 import { taxCentsFor } from "@/lib/shop-tax-base";
-import { bandedShippingCents, insuranceOffered, insuranceRequired, OWN_SHIPPING } from "@/lib/shipping/own-shipping";
+import {
+    bandedShippingCents, DEFAULT_SHIPPING_SERVICE, insuranceOffered, insuranceRequired, OWN_SHIPPING, SHIPPING_SERVICES,
+} from "@/lib/shipping/own-shipping";
 import { insuranceCostCents, parcelEstimate } from "@/lib/shipping/easypost";
 
 // Tax + shipping for the online shop.
@@ -40,7 +42,7 @@ export function shopTaxCents(subtotalCents, rate = shopTaxRate(), shippingCents 
  * `items` is optional so an old caller cannot crash, but omitting it costs money — with no items there is no
  * weight, and bandedShippingCents deliberately fails to the TOP band rather than the bottom.
  */
-export function shopShippingCents(subtotalCents, fulfillmentMode, items = null) {
+export function shopShippingCents(subtotalCents, fulfillmentMode, items = null, serviceId = DEFAULT_SHIPPING_SERVICE) {
     if (fulfillmentMode !== "shipping") {
         return 0;
     }
@@ -63,9 +65,22 @@ export function shopShippingCents(subtotalCents, fulfillmentMode, items = null) 
         // the CHEAPEST answer in the file. Handing it a zero weight gets the dearest one instead, which is
         // the direction a shop that has undercharged thirteen times in a row should fall.
         const oz = Array.isArray(items) && items.length ? parcelEstimate(items).weight : 0;
-        return bandedShippingCents(oz);
+        return bandedShippingCents(oz, serviceId);
     }
     return 599;
+}
+
+/**
+ * Every USPS service the buyer may pick, priced for this basket — through shopShippingCents, so the free and
+ * flat overrides still apply exactly once and the option a buyer ticks is the figure checkout charges.
+ */
+export function shopShippingOptions(subtotalCents, items = null) {
+    return SHIPPING_SERVICES.map((s) => ({
+        id: s.id,
+        name: s.name,
+        eta: s.eta,
+        cents: shopShippingCents(subtotalCents, "shipping", items, s.id),
+    }));
 }
 
 /**

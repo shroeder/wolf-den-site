@@ -10,7 +10,7 @@ import {
     upsertSquareCustomerProfile,
 } from "@/lib/consignment/square";
 import { getShipmentRate, isEasyPostEnabled } from "@/lib/shipping/easypost";
-import { OWN_SHIPPING } from "@/lib/shipping/own-shipping";
+import { OWN_SHIPPING, shippingServiceFor } from "@/lib/shipping/own-shipping";
 import { getAuthenticatedShopCustomerFromCookies } from "@/lib/shop-customer-session";
 import { awardPurchaseXp, resolveBuyerId } from "@/lib/marketplace/xp.js";
 import { addCredit, getStoreCredit, spendCredit } from "@/lib/marketplace/store-credit.js";
@@ -32,7 +32,7 @@ import {
     updateShopOrderPaymentResult,
 } from "@/lib/shop-orders";
 import { resolveActiveCartId } from "@/lib/shop-carts";
-import { shopInsuranceQuote, shopTaxCents } from "@/lib/shop-pricing";
+import { shopInsuranceQuote, shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -383,6 +383,15 @@ export async function POST(request) {
                 easyPostRateId = rateId;
                 shippingCarrier = rate.carrier;
                 shippingService = rate.service;
+            } else if (fulfillment.fulfillmentMode === "shipping" && OWN_SHIPPING) {
+                // ── THE BUYER'S USPS SERVICE SETS THE FLAT RATE ─────────────────────────────────────
+                // Only the service id comes from the page; the price is recomputed here from the same
+                // table the cart quoted, so a page cannot pick its own postage. The EasyPost name is
+                // stored so the label bought at ship time is bought for the service that was paid for.
+                const service = shippingServiceFor(String(body?.shippingService || ""));
+                effectiveShippingCents = shopShippingCents(cart.subtotalCents, "shipping", cart.items, service.id);
+                shippingCarrier = "USPS";
+                shippingService = service.easyPost;
             }
 
             // ⚠️ THE TAX IS RECOMPUTED, NOT REUSED. cart.taxCents was quoted against the cart's ESTIMATED

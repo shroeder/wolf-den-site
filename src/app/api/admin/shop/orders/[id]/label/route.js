@@ -1,9 +1,10 @@
 import { after, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getShopOrderById, setShopOrderShippingLabel } from "@/lib/shop-orders";
+import { getShopOrderById, setShopOrderShipment, setShopOrderShippingLabel } from "@/lib/shop-orders";
 import { sendOrderStatusEmail } from "@/lib/shop-order-email.js";
-import { buildParcel, buyShippingLabel, getShipment, isEasyPostEnabled } from "@/lib/shipping/easypost";
+import { buildParcel, buyShippingLabel, getShipment, getShippingRates, isEasyPostEnabled } from "@/lib/shipping/easypost";
+import { shippingServiceByEasyPostName, shippingServiceFor } from "@/lib/shipping/own-shipping";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -119,11 +120,53 @@ export async function POST(request, { params }) {
                 return NextResponse.json({ order, labelUrl: order.shipping_label_url, alreadyBought: true });
             }
 
+            if (order.fulfillment_mode !== "shipping") {
+                return NextResponse.json({ error: "This is a pickup order; there is nothing to post." }, { status: 400 });
+            }
+
+            // ── ⚠️ THE SHIPMENT IS MADE HERE NOW, AT THE SCALE ───────────────────────────────────────────
+            // Luke, 2026-11-20: the customer picks a USPS service at a flat rate; "the actual admin and
+            // employee app is where we will interact with easypost." So checkout no longer creates a
+            // shipment, and the label used to need one — which is why the Buy label button vanished from
+            // every order after Nov 13.
+            //
+            // Staff may send the weight off the scale (`weightOz`); without one the estimate is used. The
+            // rate bought is the USPS service the buyer paid for; an order from before services existed is
+            // Ground. A shipment that already exists is reused, never replaced — it may carry postage.
+            const body = await request.json().catch(() => ({}));
             if (!order.easypost_shipment_id || !order.easypost_rate_id) {
-                return NextResponse.json(
-                    { error: "This order has no EasyPost shipment (pickup order, or placed before shipping was enabled)." },
-                    { status: 400 }
-                );
+                const weighed = Math.round(Number(body?.weightOz));
+                const estimate = buildParcel(order.items_json || []);
+                const parcel = Number.isFinite(weighed) && weighed > 0
+                    ? { ...estimate, weight: Math.min(1120, weighed) }
+                    : estimate;
+                const quoted = await getShippingRates({
+                    toAddress: {
+                        name: order.shipping_name,
+                        addressLine1: order.shipping_address_line1,
+                        addressLine2: order.shipping_address_line2,
+                        city: order.shipping_city,
+                        state: order.shipping_state,
+                        postalCode: order.shipping_postal_code,
+                        country: order.shipping_country || "US",
+                        phone: order.shipping_phone,
+                    },
+                    items: order.items_json || [],
+                    parcel,
+                });
+                if (!quoted?.shipmentId) {
+                    return NextResponse.json({ error: "EasyPost couldn't rate this address. Check the shipping address on the order." }, { status: 400 });
+                }
+                const wanted = (shippingServiceByEasyPostName(order.shipping_service) || shippingServiceFor(null)).easyPost;
+                const usps = quoted.rates.filter((r) => /usps/i.test(r.carrier));
+                const rate = usps.find((r) => r.service.toLowerCase() === wanted.toLowerCase())
+                    || usps.find((r) => /groundadvantage/i.test(r.service))
+                    || usps[0];
+                if (!rate) {
+                    return NextResponse.json({ error: "EasyPost returned no USPS rates for this parcel." }, { status: 400 });
+                }
+                const saved = await setShopOrderShipment(id, { shipmentId: quoted.shipmentId, rateId: rate.id });
+                Object.assign(order, saved || { easypost_shipment_id: quoted.shipmentId, easypost_rate_id: rate.id });
             }
 
             // ── ⚠️ ASK EASYPOST BEFORE SPENDING ANYTHING ────────────────────────────────────
@@ -163,7 +206,14 @@ export async function POST(request, { params }) {
                     //    the label without it would mean collecting for cover we never actually bought —
                     //    on exactly the high-value cards the cover exists for. Ordinary shop orders carry 0
                     //    here and behave exactly as before.
-                    insuranceCents: Number(order.insurance_cents) || 0,
+                    //
+                    // ⚠️ EASYPOST TAKES THE DECLARED VALUE, NOT THE PREMIUM. This passed insurance_cents —
+                    // what the buyer paid FOR cover — so a $250 order was insured for $2.50. The value is the
+                    // merchandise; a vault order has no subtotal, so its cards' values are summed instead.
+                    insuranceCents: (Number(order.insurance_cents) || 0) > 0
+                        ? ((Number(order.subtotal_cents) || 0)
+                            || (order.items_json || []).reduce((s, i) => s + (Number(i?.valueCents) || 0), 0))
+                        : 0,
                 });
             }
 

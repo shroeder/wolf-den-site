@@ -8,7 +8,7 @@ import {
     toPriceCents,
 } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
-import { shopInsuranceQuote, shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
+import { shopInsuranceQuote, shopShippingCents, shopShippingOptions, shopTaxCents } from "@/lib/shop-pricing";
 import {
     getExistingCartId,
     setShopCartId,
@@ -368,6 +368,9 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
     // That is only true while OWN_SHIPPING prices the order; if live carrier rates ever come back, this
     // becomes a quote and the screen has to say so.
     const shippingIfDeliveredCents = shopShippingCents(subtotalCents, "shipping", items);
+    // The USPS services the buyer picks between, each already priced for this basket. The figures above are
+    // Ground (the cheapest), so "if delivered" can only rise when a faster service is ticked, never surprise.
+    const shippingOptions = shopShippingOptions(subtotalCents, items);
     const taxCents = shopTaxCents(subtotalCents, taxRate, shippingCents);
     // ⚠️ THE CART QUOTES COVER BUT DOES NOT ADD IT TO THE TOTAL. Whether to insure is the buyer's answer
     // below the required line, so the cart cannot know it — it publishes the offer and its price, the screen
@@ -389,6 +392,7 @@ export async function getCartSummary(cartId, { fulfillmentMode = null, cached = 
         taxRate,
         shippingCents,
         shippingIfDeliveredCents,
+        shippingOptions,
         // `insuranceCents` is what cover WOULD cost, not what is being charged. When it is required the
         // screen and the checkout both add it, which is why `insuranceRequired` travels with it.
         insuranceCents: insurance.cents,

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { estimateParcelWeightOz } from "@/lib/shipping/easypost";
+import { shippingServiceByEasyPostName, shippingServiceFor } from "@/lib/shipping/own-shipping";
 
 function parseItemsJson(itemsJson) {
     try {
@@ -29,6 +31,13 @@ export function serializeShopOrderForAdmin(o) {
         shippingService: o.shipping_service || null,
         shippingLabelUrl: o.shipping_label_url || null,
         hasShipment: Boolean(o.easypost_shipment_id && o.easypost_rate_id),
+        // Any shipped order can have its label bought now: the shipment is created at the scale if checkout
+        // did not make one. The estimate prefills the weight box; the service is what the buyer paid for.
+        canBuyLabel: o.fulfillment_mode === "shipping",
+        estimatedWeightOz: o.fulfillment_mode === "shipping" ? estimateParcelWeightOz(parseItemsJson(o.items_json)) : null,
+        paidServiceName: o.fulfillment_mode === "shipping"
+            ? (shippingServiceByEasyPostName(o.shipping_service) || (o.easypost_rate_id ? null : shippingServiceFor(null)))?.name || null
+            : null,
         // ⚠️ A VAULT ORDER IS PICKED FROM THE VAULT BOX, NOT OFF THE SHELF. The orders screen needs to know
         //    so it can show a pull list rather than a picking list — the line items are cards somebody
         //    already owns, at zero price, and treating them like merchandise would have staff looking for
@@ -171,6 +180,17 @@ export async function createPendingShopOrder({
 }
 
 // Store the bought EasyPost label + tracking on the order and mark it shipped.
+/** Record the EasyPost shipment created at ship time, BEFORE anything is bought, so a retry finds it. */
+export async function setShopOrderShipment(orderId, { shipmentId, rateId }) {
+    return db.queryOne(
+        `UPDATE shop_orders
+         SET easypost_shipment_id = $2, easypost_rate_id = $3, updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [orderId, toNullableText(shipmentId), toNullableText(rateId)]
+    );
+}
+
 export async function setShopOrderShippingLabel(orderId, { labelUrl, trackingNumber, carrier, service }) {
     return db.queryOne(
         `UPDATE shop_orders

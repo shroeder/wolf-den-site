@@ -310,7 +310,8 @@ function toRateOption(rate) {
 
 // Create an EasyPost shipment for the buyer's address + cart and return purchasable rate options.
 // Returns null when EasyPost isn't configured so callers fall back to flat shipping.
-export async function getShippingRates({ toAddress, items }) {
+// `parcel` overrides the estimate — the label route passes the weight staff read off the scale.
+export async function getShippingRates({ toAddress, items, parcel = null }) {
     if (!isEasyPostEnabled()) {
         return null;
     }
@@ -336,7 +337,7 @@ export async function getShippingRates({ toAddress, items }) {
             shipment: {
                 to_address: to,
                 from_address: getShipFromAddress(),
-                parcel: buildParcel(items),
+                parcel: parcel || buildParcel(items),
             },
         }),
     });
