@@ -71,6 +71,18 @@ export const SHIPPING_SERVICES = [
 
 export const DEFAULT_SHIPPING_SERVICE = "ground";
 
+// ── THE BOXES THE SHOP ACTUALLY SHIPS IN ────────────────────────────────────────────────────────────────────
+// Luke, 2026-11-20: "We effectively just have two different sizes of boxes... we just need to select from a
+// drop down." Staff pick one at the scale; its size goes to EasyPost with the weight they read. Add the
+// second box here when it arrives — the app and the admin page both list whatever is in this array.
+export const SHIPPING_BOXES = [
+    { id: "large", name: "Large box · 18 × 14.5 × 12.5 in", length: 18, width: 14.5, height: 12.5 },
+];
+
+export function shippingBoxFor(id) {
+    return SHIPPING_BOXES.find((b) => b.id === id) || null;
+}
+
 /** The service for an id; anything unknown is Ground, the one every order already priced against. */
 export function shippingServiceFor(id) {
     return SHIPPING_SERVICES.find((s) => s.id === id) || SHIPPING_SERVICES[0];

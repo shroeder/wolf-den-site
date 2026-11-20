@@ -4,7 +4,7 @@ import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getShopOrderById, setShopOrderShipment, setShopOrderShippingLabel } from "@/lib/shop-orders";
 import { sendOrderStatusEmail } from "@/lib/shop-order-email.js";
 import { buildParcel, buyShippingLabel, getShipment, getShippingRates, isEasyPostEnabled } from "@/lib/shipping/easypost";
-import { shippingServiceByEasyPostName, shippingServiceFor } from "@/lib/shipping/own-shipping";
+import { shippingBoxFor, shippingServiceByEasyPostName, shippingServiceFor } from "@/lib/shipping/own-shipping";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -135,17 +135,15 @@ export async function POST(request, { params }) {
             // Ground. A shipment that already exists is reused, never replaced — it may carry postage.
             const body = await request.json().catch(() => ({}));
             if (!order.easypost_shipment_id || !order.easypost_rate_id) {
-                // Scale and tape measure, when staff typed them; the estimate for anything left blank.
+                // The scale reading and the shop box staff picked; the estimate for anything not given.
                 const estimate = buildParcel(order.items_json || []);
-                const measured = (v, max) => {
-                    const n = Number(v);
-                    return Number.isFinite(n) && n > 0 ? Math.min(max, Math.round(n * 10) / 10) : null;
-                };
+                const box = shippingBoxFor(String(body?.boxId || ""));
+                const weighed = Number(body?.weightOz);
                 const parcel = {
-                    weight: measured(body?.weightOz, 1120) ?? estimate.weight,
-                    length: measured(body?.lengthIn, 108) ?? estimate.length,
-                    width: measured(body?.widthIn, 108) ?? estimate.width,
-                    height: measured(body?.heightIn, 108) ?? estimate.height,
+                    weight: Number.isFinite(weighed) && weighed > 0 ? Math.min(1120, Math.round(weighed * 10) / 10) : estimate.weight,
+                    length: box?.length ?? estimate.length,
+                    width: box?.width ?? estimate.width,
+                    height: box?.height ?? estimate.height,
                 };
                 const quoted = await getShippingRates({
                     toAddress: {
