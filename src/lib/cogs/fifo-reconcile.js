@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { costSales } from "@/lib/cogs/fifo.js";
+import { remapOrders } from "@/lib/admin-app/sale-remap.js";
 import { isConsumptionRow, nonSaleConsumption } from "@/lib/cogs/stock-moves.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -193,6 +194,8 @@ export async function reconcileFifo({ full = false, dryRun = false } = {}) {
                 },
             },
         });
+        // A line rung on the wrong item is costed as the right one -- the same swap the phone sees.
+        await remapOrders(page.orders);
         for (const order of page.orders || []) {
             orders += 1;
             const soldAt = order.closed_at || order.updated_at || order.created_at;

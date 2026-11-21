@@ -11,6 +11,7 @@ import { logGeneration, logText } from "@/lib/marketplace/ai-ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
 import { expandShopOrderLines } from "@/lib/admin-app/shop-order-lines.js";
 import { annotateFifoCosts } from "@/lib/admin-app/fifo-annotate.js";
+import { remapSaleLines } from "@/lib/admin-app/sale-remap.js";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
 
@@ -367,6 +368,10 @@ export async function handleProxy(request, upstreamKey, context) {
         // FIFO cost belongs on the SALE, not on the item: it depends on how many of that item were sold
         // before it. The reconciler has already worked each one out; this hangs it on the line the app is
         // about to read. Added alongside the existing fields, never in place of them.
+        // A line rung on the wrong item is pointed at the right one FIRST (sale_line_remap), so the cost
+        // below is worked out for the item it should have been.
+        responseBody = await remapSaleLines(responseBody)
+            .catch(() => responseBody);
         responseBody = await annotateFifoCosts(responseBody)
             .catch(() => responseBody);
     }

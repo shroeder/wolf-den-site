@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db.js";
 import { annotateFifoCosts } from "@/lib/admin-app/fifo-annotate.js";
+import { remapSaleLines } from "@/lib/admin-app/sale-remap.js";
 import { createServerLogger } from "@/lib/server-logger";
 import { expandShopOrders } from "@/lib/admin-app/shop-order-lines.js";
 import { addDays, dateParts, dayKey, hourOf, startOfDayMillis, ZONE } from "@/lib/admin-app/chicago-day.js";
@@ -96,7 +97,8 @@ async function searchCompletedOrders({ locationIds, lookbackDays }) {
         // string and hands one back, so the page is re-parsed rather than used directly — that is the price
         // of there being ONE implementation of "what did this line cost".
         const { text } = await squarePost("/v2/orders/search", body);
-        const annotated = await annotateFifoCosts(text);
+        // Remapped lines first (sale_line_remap), exactly as the proxy does, so both agree.
+        const annotated = await annotateFifoCosts(await remapSaleLines(text));
         const page = JSON.parse(annotated);
         orders.push(...(page.orders || []));
         cursor = page.cursor || null;
