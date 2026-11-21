@@ -49,7 +49,10 @@ export async function GET(request) {
             // wrong for one deliberately withdrawn, where it would advertise a product nobody can buy. See
             // bags-gate.js — the whole $20 bag is off until Luke turns it back on.
             const pools = [
-                ...(bagsOpenFor(buyer.id) ? [{
+                // ⚠️ AND AN EMPTY BAG IS DROPPED TOO. The bags are off for members, so the only person who
+                // saw this tile was Luke via the preview — as "0 inside · Resting", first in the carousel.
+                // Luke, 2026-11-21: "Can u hide this". It comes back by itself when the bag is restocked.
+                ...(bagsOpenFor(buyer.id) && pool.remaining > 0 ? [{
                     key: "bags", brand: "Wolf Den Mystery Bag", priceCents: pool.priceCents,
                     art: poolByKey("bags")?.art || null,
                     units: pool.remaining, open: pool.remaining > 0 && pool.priceTrusted !== false,
