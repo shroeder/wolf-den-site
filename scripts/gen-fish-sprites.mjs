@@ -11,6 +11,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { housePrompt, SMALL_ICON_EXTRA } from "../src/lib/marketplace/art-style.js";
+import { drawImage } from "./lib/draw-image.mjs";
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -89,6 +90,13 @@ const FISH = {
     //
     // Each one carries its own light for the same reason the deep-water six were rerolled: the log draws
     // these at 44px, and an orange-on-black fish at 44px is a smudge. Glow is what survives the downscale.
+    // Den Quest's freshwater catch (2026-11-22): the Brook and the Mere.
+    fish_trout: "A brown river trout with an olive-bronze back, a buttery gold flank speckled with dark spots "
+        + "and small red spots ringed in pale halos, and a square tail",
+    fish_pike: "A long lean northern pike, olive-green with rows of pale bean-shaped spots along its flank, "
+        + "a flat duck-billed snout and a dorsal fin set far back near the tail",
+    fish_carp: "A deep-bodied common carp with large golden-bronze scales, a slightly arched back, "
+        + "small barbels at the corners of its mouth and reddish lower fins",
     fish_hw_wickfish: "A pale waxy fish in profile, its back ridged like melted candle wax with a single "
         + "lit wick burning with a small warm flame just behind its head, soft drips down its flank, eyes "
         + "reflecting the flame",
@@ -120,17 +128,12 @@ async function one(k) {
     const prompt = housePrompt(FISH[k], { extra: `${POSE} ${SMALL_ICON_EXTRA}` });
     for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
-            const resp = await fetch("https://api.openai.com/v1/images/generations", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-                // medium, not high: "high" is ~4x the price and the extra detail dies in the downscale (see art-style.js).
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
-            });
-            if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
-            const b64 = (await resp.json())?.data?.[0]?.b64_json;
-            if (!b64) throw new Error("no image");
+            // ⚠️ THROUGH draw-image.mjs, NOT A HARD-CODED MODEL: gpt-image-1 is retired and
+            //    answers "does not exist", which reads as a key problem. The chain falls through.
+            const { buf, model } = await drawImage({ key, prompt, size: "1024x1024", quality: "low", background: "transparent" });
             const file = path.join(OUT, `${k}.png`);
-            fs.writeFileSync(file, await shrink(Buffer.from(b64, "base64")));
+            fs.writeFileSync(file, await shrink(buf));
+            console.log(`  drawn by ${model}`);
             console.log(`✓ ${k} (${Math.round(fs.statSync(file).size / 1024)}kb)`);
             return true;
         } catch (e) {
