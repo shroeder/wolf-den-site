@@ -236,6 +236,33 @@ export async function sellVaultCards({ buyerId, cardIds, auto = false }) {
     );
     if (!claimed.length) return { ok: false, error: "nothing_sellable" };
 
+    // ── ⚠️ A CARD SOLD BACK IS NO LONGER OWED, SO ITS SHELF TASK GOES ──────────────────────────────────────
+    // The reveal's sell button already did this (packs.js); this path, the vault's own sell-back and the
+    // expiry sweep, did not. Five shelf singles sold back from the vault minutes after opening sat in the
+    // queue for ten days as "5 cards owed to members", pushing both phones every morning (2026-11-26).
+    // Same rule as the reveal: a shelf single never moved, so its `find` is simply done; a bag is still
+    // sealed in the tub with our card inside, so its `pull` becomes a re-shelve.
+    const soldPoolIds = claimed.map((c) => c.mystery_card_id).filter(Boolean);
+    if (soldPoolIds.length) {
+        await db
+            .query(
+                `UPDATE mkt_pack_pull_task
+                    SET status = 'done', done_at = NOW(), done_by = 'system',
+                        note = 'Sold back from the vault before it was found — the card never left the case'
+                  WHERE status = 'open' AND kind = 'find' AND mystery_card_id = ANY($1::uuid[])`,
+                [soldPoolIds]
+            )
+            .catch((error) => logger.warn("vault.sell.find_task_close_failed", { message: error?.message }));
+        await db
+            .query(
+                `UPDATE mkt_pack_pull_task
+                    SET kind = 'reshelve', note = 'Sold back from the vault — open the bag and re-shelve the card'
+                  WHERE status = 'open' AND kind = 'pull' AND mystery_card_id = ANY($1::uuid[])`,
+                [soldPoolIds]
+            )
+            .catch((error) => logger.warn("vault.sell.pull_task_reshelve_failed", { message: error?.message }));
+    }
+
     // ⚠️ sold_back_cents IS WHAT WE PAID, NOT WHAT THE CARD WAS WORTH. It used to be set to
     //    current_value_cents inside the claiming UPDATE, which was correct only while the rate was 100%.
     //    Written here instead, from buyBackCents, so the column cannot silently keep meaning "market" —
