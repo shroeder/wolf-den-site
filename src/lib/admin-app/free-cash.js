@@ -2,7 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { CASH_BALANCE_SQL } from "@/lib/cash/cash-ledger.js";
-import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
+import { inForceOn, listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
+import { dayKey } from "@/lib/admin-app/chicago-day.js";
 
 // ── CASH POSITION — what can I actually spend ────────────────────────────────────────────────────────────────────────────────
 //
@@ -133,7 +134,8 @@ async function monthlyBillsPaid(items) {
     ).catch(() => []);
     const paid = new Map();
     for (const item of items) {
-        const label = String(item.label || "").trim();
+        // "Rent (reduced, Dec-Jun)" is still paid as rent: match on the name before any bracket.
+        const label = String(item.label || "").replace(/\s*\(.*\)\s*$/, "").trim();
         if (!label) continue;
         const low = label.toLowerCase();
         const hit = rows.find((r) =>
@@ -146,7 +148,9 @@ async function monthlyBillsPaid(items) {
 
 async function overheadRemaining() {
     const items = await listOverhead().catch(() => []);
-    const active = items.filter((i) => i.active !== false);
+    // Only the lines in force today: a dated line (migration 519) outside its window costs nothing now.
+    const today = dayKey(Date.now());
+    const active = items.filter((i) => inForceOn({ ...i, active: i.active !== false }, today));
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysLeft = daysInMonth - now.getDate() + 1;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
+import { inForceOn, listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
 import { listEntries } from "@/lib/ledger/ledger.js";
 import { readReportSeries } from "@/lib/admin-app/report-bundle-store.js";
 import { reconcileSpend } from "@/lib/admin-app/ledger-classify.js";
@@ -92,7 +92,8 @@ export async function yearReport({ year } = {}) {
 
     // The run rate is kept, demoted to what it actually is: a forward-looking daily target, the same
     // figure the Today page reads. It is no longer what break-even is measured against.
-    const activeOverhead = overheadItems.filter((i) => i.active);
+    // The rate in force today (a dated line, migration 519, counts only inside its window).
+    const activeOverhead = overheadItems.filter((i) => inForceOn(i, dayKey(Date.now())));
     const dailyOverheadCents = Math.round(activeOverhead.reduce((s2, i) => s2 + perDayCents(i), 0));
 
     const netPosition = merchProfit - recon.operatingCost;

@@ -24,9 +24,21 @@ export function perDayCents(item) {
     }
 }
 
+// Is a line in force on this Chicago day? starts_on / ends_on are optional and inclusive (migration 519):
+// rent at $100 for seven months is one line with both, and the $750 either side is two more.
+export function inForceOn(item, key) {
+    if (!item?.active) return false;
+    if (item.starts_on && key < item.starts_on) return false;
+    if (item.ends_on && key > item.ends_on) return false;
+    return true;
+}
+const dailyOverheadOn = (items, key) => items.reduce((s, i) => s + (inForceOn(i, key) ? perDayCents(i) : 0), 0);
+
 // ── Overhead line items ───────────────────────────────────────────────────────────────────────────────────
 export async function listOverhead() {
-    return db.query(`SELECT id, label, amount_cents, cadence, active, sort_order FROM wolfden_overhead ORDER BY active DESC, sort_order, id`, []).catch(() => []);
+    return db.query(`SELECT id, label, amount_cents, cadence, active, sort_order,
+            to_char(starts_on, 'YYYY-MM-DD') AS starts_on, to_char(ends_on, 'YYYY-MM-DD') AS ends_on
+        FROM wolfden_overhead ORDER BY active DESC, sort_order, starts_on NULLS FIRST, id`, []).catch(() => []);
 }
 const CADENCES = new Set(["daily", "weekly", "monthly", "yearly"]);
 export async function upsertOverhead({ id, label, amountCents, cadence, active, sortOrder }) {
@@ -180,8 +192,6 @@ export async function employeeHoursByDay(teamMemberIds, fromISO, toISO) {
 // this with the gross profit its reports already compute for the same range.
 export async function breakevenSummary({ from, to }) {
     const [items, config] = await Promise.all([listOverhead(), getConfig()]);
-    const activeItems = items.filter((i) => i.active);
-    const dailyOverheadCents = activeItems.reduce((s, i) => s + perDayCents(i), 0);
 
     // ── ⚠️ MIDNIGHT IS MEASURED, NOT ASSUMED ────────────────────────────────────────────────────────
     // This was a date built from a hardcoded "-05:00", which IS midnight in Chicago for the eight months
@@ -192,6 +202,9 @@ export async function breakevenSummary({ from, to }) {
     // See the long note in chicago-day.js.
     const fromKey = from || dayKey(Date.now() - 29 * 864e5);
     const toKey = to || dayKey(Date.now());
+    // The headline rate is the one in force on the range's last day (today, on the Today page).
+    const activeItems = items.filter((i) => inForceOn(i, toKey));
+    const dailyOverheadCents = dailyOverheadOn(items, toKey);
     const fromISO = new Date(startOfDayMillis(fromKey)).toISOString();
     // The exclusive end of the last day, which is also what Square wants as an end_at.
     const toISO = new Date(endOfDayMillis(toKey) + 1).toISOString();
@@ -238,7 +251,8 @@ export async function breakevenSummary({ from, to }) {
             laborCents += c; hrs += mh;
             m.hours += mh; m.cents += c;
         }
-        const overheadCents = Math.round(dailyOverheadCents);
+        // Each day bills only the lines in force that day, so a rent change never rewrites the past.
+        const overheadCents = Math.round(dailyOverheadOn(items, key));
         days.push({ date: key, overheadCents, hours: Math.round(hrs * 100) / 100, laborCents, costCents: overheadCents + laborCents });
         totalOverhead += overheadCents;
         totalLabor += laborCents;
